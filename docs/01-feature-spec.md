@@ -13,7 +13,7 @@
 | F07 | LoanAgent Tool Call | Backend 3 | P0 |
 | F08 | Runtime Tool Call Interception | Backend 2 | P0 |
 | F09 | Verified Agent Identity | Backend 2 | P0 |
-| F10 | Audit Attempt 선저장 | Backend 3 | P0 |
+| F10 | Authentication / Audit Start | Backend 2 + Backend 1 | P0 |
 | F11 | Financial Context Resolver / Scope Status | Backend 1 | P0 |
 | F12 | Prompt Injection Detection | Frontend & AI | P0 |
 | F13 | Behavior Feature Builder | Frontend & AI | P0 |
@@ -22,7 +22,7 @@
 | F16 | OPA PolicyDecision | Backend 2 | P0 |
 | F17 | Runtime Enforcement | Backend 2 | P0 |
 | F18 | Mock Financial API | Backend 3 | P0 |
-| F19 | Execution Outcome / Audit 완성 | Backend 3 | P0 |
+| F19 | Execution Outcome / Audit Persistence | Backend 1 + Backend 3 Contract | P0 |
 | F20 | Web UI / Security Dashboard | Frontend & AI | P0 |
 | F21 | Docker Compose 실행환경 | Backend 3 중심, 전원 | P0 |
 
@@ -363,24 +363,52 @@ Runtime Body의 Agent 주장값이 아니라 Gateway가 검증한 Credential로 
 
 ---
 
-## F10. Audit Attempt 선저장
+## F10. Authentication / Audit Start
 
 ### 목적
 
-인증 실패를 포함해 Runtime 요청의 추적 가능성을 보장한다.
+인증되지 않은 요청이 Business Audit DB Write를 무제한 유발하지 않도록 **Rate Limit과 Agent 인증을 먼저 수행**하면서, 인증 실패 흔적도 별도의 Security Event로 추적한다.
+
+### 처리 순서
+
+```text
+Request Size / 최소 Envelope
+↓
+Rate Limit
+↓
+Request ID / Trace ID
+↓
+Agent Credential 검증
+```
+
+인증 성공:
+
+```text
+Verified Agent Identity
+↓
+Gateway → Core Audit API
+↓
+PROCESSING Business AuditEvent 저장
+↓
+Authorization 진행
+```
+
+인증 실패:
+
+```text
+Gateway → Core Security Event API
+↓
+최소 SecurityAuthEvent 저장
+↓
+401 / 403 종료
+```
 
 ### 처리 규칙
 
-1. 최소 Envelope / Request Size를 검증한다.
-2. Request ID / Trace ID를 발급한다.
-3. `PROCESSING` AuditEvent를 저장한다.
-4. 인증 성공 후 Verified Identity를 보충한다.
-5. 인증 실패 시 확인 가능한 Metadata와 실패 Reason만 저장한다.
-6. Audit 선저장이 실패하면 금융 API를 호출하지 않는다.
-
-P0에서는 간단한 Request Rate/Size 제한을 적용해 인증 전 Audit Flood 위험을 줄인다.
-
----
+- Gateway는 PostgreSQL에 직접 접근하지 않는다.
+- 인증 실패 요청에 대해 Business AuditEvent를 만들지 않는다.
+- SecurityAuthEvent에는 Prompt/Document/금융 데이터 원문을 저장하지 않는다.
+- Business Audit 선저장이 실패하면 Downstream 금융 호출을 수행하지 않는다.
 
 ## F11. Financial Context Resolver / Scope Status
 
@@ -444,12 +472,26 @@ customerScope = VIOLATION
 
 ### 목적
 
-AgentRun 입력 또는 참조 문서에 포함된 악성 지시를 탐지한다.
+AgentRun의 Prompt, 참조 문서 등 **새로운 비신뢰 입력이 유입될 때** 악성 지시를 탐지하고 재사용 가능한 Prompt Risk Snapshot을 만든다.
 
 ### API
 
 ```http
 POST /internal/v1/risk/prompt
+```
+
+### 호출 기준
+
+```text
+새 Prompt / Document / 외부 입력
+→ 검사
+
+동일 inputHash + modelVersion
+→ 재검사하지 않음
+→ 기존 Prompt Risk Snapshot 재사용
+
+Tool Call 발생
+→ 동일 입력에 대한 Prompt Detector 반복 호출 X
 ```
 
 ### 출력 예시
@@ -460,6 +502,7 @@ POST /internal/v1/risk/prompt
   "promptRisk": 0.96,
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
+  "inputHash": "sha256:...",
   "modelVersion": "prompt-guard-1"
 }
 ```
@@ -469,9 +512,8 @@ POST /internal/v1/risk/prompt
 - 한국어·영어 Rule Detection과 분류 모델을 결합한다.
 - 원본 입력을 FastAPI Application Log / DB에 저장하지 않는다.
 - 모델 오류를 낮은 Risk로 대체하지 않는다.
+- Prompt Risk는 권한을 확대하지 않는다.
 - Threshold는 평가 결과로 고정한다.
-
----
 
 ## F13. Behavior Feature Builder
 
@@ -498,7 +540,8 @@ afterHoursAccess
 
 - `ToolCallAttempt`와 `ExecutionOutcome`을 분리한다.
 - 현재 요청의 미래 `success / recordsRead` 등을 실행 전 Feature에 넣지 않는다.
-- Backend 3의 Audit 조회 결과와 현재 Attempt를 입력으로 사용한다.
+- Gateway가 Core Behavior History API에서 받은 최근 완료 이력과 현재 Attempt를 입력으로 사용한다.
+- Gateway는 Behavior History를 위해 PostgreSQL을 직접 조회하지 않는다.
 - 학습과 Runtime이 동일한 Feature Builder 코드를 사용한다.
 - 이력 부족 시 `COLD_START`를 반환한다.
 
@@ -662,26 +705,39 @@ Mock Financial API 미호출
 ### 보안 규칙
 
 - 시연용 가상 데이터만 사용한다.
-- Gateway가 발급한 내부 Credential을 검증한다.
-- LoanAgent 직접 호출은 거부한다.
-- 테스트에서 호출 횟수를 확인할 수 있어야 한다.
+- 정상 P0 Runtime 경로는 `LoanAgent → Gateway → Mock Finance`로 고정한다.
+- BLOCK 요청이 Mock Finance에 도달하지 않는지 호출 횟수로 검증할 수 있어야 한다.
+- NetworkPolicy를 이용한 직접 우회 차단 보장은 P1 Kubernetes Hardening에서 검증한다.
 
 ---
 
-## F19. Execution Outcome / Audit 완성
+## F19. Execution Outcome / Audit Persistence
 
 ### 목적
 
-요청 접수부터 최종 실행 결과까지 하나의 AuditEvent로 완성한다.
+인증 성공 후 생성된 Business AuditEvent에 최종 실행 결과를 반영하고, 인증 실패 Event와 Business Audit을 명확히 분리한다.
 
-### 저장 항목
+### 역할
+
+```text
+Backend 3
+→ AuditEvent / ToolCallAttempt / ExecutionOutcome Contract
+
+Backend 1 Core
+→ Audit / SecurityAuthEvent Persistence + Internal API
+
+Backend 2 Gateway
+→ Runtime에서 Core Audit API 호출
+```
+
+### Business Audit 저장 항목
 
 ```text
 Verified Agent
 Employee / AgentRun / Case / Passport
 Target Consumer / Tool / Data Type
 Scope Status
-Prompt Risk / Model Version
+Prompt Risk Snapshot / Model Version
 Behavior Risk / Feature·Model Version
 OPA Decision / Policy Version
 Downstream 도달 여부
@@ -693,10 +749,10 @@ Reason Code
 ### 처리 규칙
 
 - `ALLOW / BLOCK / ERROR`를 모두 저장한다.
+- 인증 실패는 별도 `SecurityAuthEvent`로 저장한다.
 - 원본 Prompt, 금융 문서, 금융 API Response Payload를 저장하지 않는다.
+- Gateway는 Audit DB를 직접 수정하지 않고 Core Internal API만 호출한다.
 - 외부에서 AuditEvent를 수정·삭제하는 API를 제공하지 않는다.
-
----
 
 ## F20. Web UI / Security Dashboard
 
@@ -787,19 +843,23 @@ Vue Frontend
 
 | ID | 조건 | 기대 결과 |
 |---|---|---|
-| AC-01 | 정상 Case·Passport·Tool·Data | ALLOW, Downstream 1회, Audit 저장 |
+| AC-01 | 정상 Case·Passport·Tool·Data | ALLOW, Downstream 1회, Business Audit 저장 |
 | AC-02 | Employee는 가능하지만 현재 Case 밖 고객 | `CASE_SCOPE_VIOLATION`, BLOCK, Downstream 0회 |
-| AC-03 | Prompt Injection | BLOCK, Downstream 0회 |
-| AC-04 | Prompt Detector가 놓친 Case 위반 | Case Rule로 BLOCK |
-| AC-05 | Passport 밖 Tool/Data | BLOCK |
-| AC-06 | Mandate 밖 Data | BLOCK |
-| AC-07 | 만료 Passport | `TASK_PASSPORT_EXPIRED`, BLOCK |
-| AC-08 | Agent Identity 불일치 | `AGENT_IDENTITY_MISMATCH`, BLOCK |
-| AC-09 | Behavior Alert 구간 단독 | ALLOW + 위험 표시 |
-| AC-10 | Scope 정상 + Hard Limit 미초과 + Behavior Critical | AI Risk로 BLOCK |
-| AC-11 | Hard Request Limit 초과 | Rule 기반 BLOCK |
-| AC-12 | Risk/OPA 오류 | Fail-closed BLOCK |
-| AC-13 | Mock Finance 오류 | ERROR Audit |
-| AC-14 | 정상·차단·오류 | Dashboard에서 모두 조회 |
-| AC-15 | LoanAgent의 Mock Finance 직접 접근 | 내부 Credential 검증으로 실패 |
-| AC-16 | Docker Compose | 전체 P0 E2E 재현 가능 |
+| AC-03 | 새로운 Prompt/Document에 Prompt Injection | 입력 유입 시 탐지, BLOCK 가능한 Prompt Risk Snapshot 생성 |
+| AC-04 | 동일 Prompt/Document로 여러 Tool Call | Prompt Detector 재추론 없이 기존 Snapshot 재사용 |
+| AC-05 | Prompt Detector가 놓친 Case 위반 | Case Rule로 BLOCK |
+| AC-06 | Passport 밖 Tool/Data | BLOCK |
+| AC-07 | Mandate 밖 Data | BLOCK |
+| AC-08 | 만료 Passport | `TASK_PASSPORT_EXPIRED`, BLOCK |
+| AC-09 | Agent Identity 불일치 | `AGENT_IDENTITY_MISMATCH`, BLOCK |
+| AC-10 | 인증 실패 | Business Audit 생성 X, 최소 SecurityAuthEvent DB 저장 |
+| AC-11 | Behavior Alert 구간 단독 | ALLOW + 위험 표시 |
+| AC-12 | Scope 정상 + Hard Limit 미초과 + Behavior Critical | AI Risk로 BLOCK |
+| AC-13 | Hard Request Limit 초과 | Rule 기반 BLOCK |
+| AC-14 | Risk/OPA/Core 필수 의존성 오류 | Fail-closed BLOCK |
+| AC-15 | Business Audit 선저장 실패 | Downstream 0회 |
+| AC-16 | Gateway의 FinGuard DB 직접 접근 | 금지, Core Internal API 경유 |
+| AC-17 | Mock Finance 오류 | ERROR Audit |
+| AC-18 | 정상·차단·오류 | Dashboard에서 모두 조회 |
+| AC-19 | Docker Compose | 전체 P0 E2E 재현 가능 |
+| AC-P1-01 | LoanAgent의 Gateway 네트워크 우회 | Kubernetes NetworkPolicy 적용 시 차단 |

@@ -1,6 +1,6 @@
 name: Bug
 description: 재현 가능한 결함 보고
-title: "[Bug] "
+title: "[FIX] "
 labels: ["bug"]
 body:
   - type: textarea

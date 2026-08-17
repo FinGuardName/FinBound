@@ -127,6 +127,53 @@ BLOCK
 
 시스템 처리 실패는 정책 결정과 구분해 `ERROR` Outcome으로 기록한다.
 
+## 6.1 2026-08-17 Architecture Freeze 추가 결정
+
+### DB 접근
+
+```text
+Gateway → PostgreSQL 직접 접근 X
+Gateway → Core Internal API → PostgreSQL
+```
+
+FinGuard Context, Audit, Security Event, Behavior History의 DB 접근 주체는 Core로 일원화한다.
+
+### Prompt Injection 검사 시점
+
+```text
+새 Prompt / Document / 외부 입력
+→ Prompt Injection 검사
+→ Prompt Risk Snapshot 저장
+
+동일 입력
+→ 재검사 X
+→ 기존 Snapshot 재사용
+```
+
+Behavior Risk는 누적 행동이 변하므로 Tool Call마다 다시 계산한다.
+
+### 인증 / Audit
+
+```text
+Request Size / Envelope
+→ Rate Limit
+→ Agent Credential 검증
+
+인증 성공
+→ Business AuditEvent 생성
+→ Authorization
+
+인증 실패
+→ 최소 SecurityAuthEvent를 Core API로 DB 기록
+→ 종료
+```
+
+인증 실패 Event에는 Prompt/Document/금융 데이터 원문을 저장하지 않는다.
+
+### Kubernetes
+
+Gateway 우회에 대한 NetworkPolicy 기반 차단은 P1 Hardening으로 분리한다. 현재 기본 MVP 개발과 다음 회의 전 개발 범위에서는 Kubernetes를 필수로 구현하지 않는다.
+
 ## 7. P0 구현 범위
 
 ### 권한·Financial Context
@@ -203,19 +250,45 @@ Agent는 자신이 사용할 권한 목록을 직접 제출해 확대할 수 없
 
 ## 10. Runtime 처리 흐름
 
-1. LoanAgent가 Gateway에 금융 Tool Call을 보낸다.
-2. Gateway가 최소 Request Envelope를 검증하고 Request ID를 발급한다.
-3. Gateway가 Service Credential로 Agent Identity를 검증한다.
-4. AuditEvent를 `PROCESSING`으로 저장하고 검증된 Identity를 기록한다.
-5. Financial Context Resolver가 Employee Authority, Permission Template, Case, Mandate, Passport를 조회한다.
-6. Context Resolver가 각 Scope에 대해 `OK / VIOLATION` 상태를 계산한다.
-7. FastAPI AI Risk Engine이 Prompt Risk와 Behavior Risk를 계산한다.
-8. Spring Authorization Service가 `Scope Status + AI Risk + Hard Limit`을 `AuthorizationContext`로 구성한다.
-9. OPA가 AuthorizationContext를 Rego 정책으로 평가해 `PolicyDecision`을 반환한다.
-10. `ALLOW`이면 Gateway가 내부 Credential을 붙여 Mock Financial API를 호출한다.
-11. `BLOCK`이면 Mock Financial API에 도달하지 않고 요청을 종료한다.
-12. Backend가 Execution Outcome을 AuditEvent에 반영한다.
-13. Vue Dashboard는 Spring Read-only API를 통해 Audit을 조회한다.
+### 10.1 새로운 Agent 입력 유입 시
+
+```text
+새 Prompt / Document / 외부 입력
+→ Secured Input 저장 + Hash
+→ Prompt Injection Detection
+→ Prompt Risk Snapshot 저장
+```
+
+동일 `inputHash + modelVersion` 조합은 Tool Call마다 다시 추론하지 않는다.
+
+### 10.2 Tool Call Runtime
+
+1. LoanAgent가 Gateway에 Tool Call을 보낸다.
+2. Gateway가 Request Size / 최소 Envelope를 검증한다.
+3. Gateway가 Rate Limit을 적용하고 Request ID / Trace ID를 준비한다.
+4. Gateway가 Service Credential로 Agent Identity를 검증한다.
+5. 인증 실패 시 Business Audit을 만들지 않고 Core Security Event API를 통해 최소 `SecurityAuthEvent`를 DB에 남긴 뒤 종료한다.
+6. 인증 성공 시 Verified Agent Identity를 생성하고 Core Audit API를 통해 `PROCESSING` Business AuditEvent를 생성한다.
+7. Gateway가 Core Runtime Context API를 호출하고 Core Context Resolver가 Scope Status를 계산한다.
+8. Gateway가 Core Behavior History API로 최근 완료 이력을 조회하고 현재 `ToolCallAttempt`를 결합한다.
+9. FastAPI AI Risk Engine이 Behavior Risk를 계산한다. Prompt Risk는 현재 입력에 대해 저장된 Prompt Risk Snapshot을 사용한다.
+10. Gateway가 `Scope Status + Prompt Risk Snapshot + Behavior Risk + Hard Limit`을 `AuthorizationContext`로 구성한다.
+11. OPA가 Rego 정책으로 `PolicyDecision`을 반환한다.
+12. `ALLOW`이면 Gateway가 Mock Financial API로 요청을 전달한다.
+13. `BLOCK`이면 Mock Financial API에 도달하지 않고 요청을 종료한다.
+14. Gateway가 Core Audit API를 통해 Execution Outcome을 기존 AuditEvent에 반영한다.
+15. Vue Dashboard는 Spring Core의 Read-only API를 통해 Audit을 조회한다.
+
+### DB 경계
+
+```text
+Core → PostgreSQL O
+Gateway → PostgreSQL X
+LoanAgent → PostgreSQL X
+Frontend → PostgreSQL X
+FastAPI Risk Engine → PostgreSQL X
+OPA → PostgreSQL X
+```
 
 ## 11. Scope Status와 PolicyDecision 책임
 
@@ -307,15 +380,16 @@ Prompt Detector가 공격을 놓치는 별도 테스트에서도 Case Scope Rule
 
 ## 14. 기록 원칙
 
-다음 결과를 모두 PostgreSQL에 저장한다.
+### Business AuditEvent
+
+인증에 성공한 Runtime Tool Call에 대해 다음을 저장한다.
 
 ```text
-인증 성공·실패
-정상 ALLOW
-정책 BLOCK
-ERROR
+Verified Agent Identity
+Employee / AgentRun / Case / Passport
+Target Consumer / Tool / Data Type
 Scope Status
-Prompt Risk / 모델 버전
+Prompt Risk Snapshot / 모델 버전 / Input Hash
 Behavior Risk / Feature·모델 버전
 OPA Decision / Policy 버전
 Downstream 도달 여부
@@ -323,16 +397,30 @@ Agent 응답 반환 여부
 Reason Code
 ```
 
-다음 원문은 Audit에 저장하지 않는다.
+### SecurityAuthEvent
+
+인증 실패 요청도 추적을 위해 DB에 기록하되 **Business AuditEvent와 분리**한다.
+
+```text
+Request ID / Trace ID
+발생시각
+인증 실패 Reason Code
+Credential Type
+필요 시 비식별/Hash 처리한 Source Metadata
+```
+
+저장하지 않는 값:
 
 ```text
 원본 Prompt
 원본 금융 문서
 금융 API Response Payload
 실제 개인정보 원문
-Service Credential
+Service Credential 원문
 내부 Secret
 ```
+
+SecurityAuthEvent 저장 역시 `Gateway → Core API → PostgreSQL` 경로만 사용한다. DB Write 남용을 줄이기 위해 Request Size Limit과 Rate Limit을 인증 및 Security Event 저장보다 앞단에 둔다.
 
 ## 15. 기술 구성
 
