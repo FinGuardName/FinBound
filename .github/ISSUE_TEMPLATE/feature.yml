@@ -1,0 +1,43 @@
+name: Feature
+description: P0/P1 기능 구현 작업
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: input
+    id: spec
+    attributes:
+      label: 기능/인수 조건 ID
+      description: 예) F11, AC-02
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 담당 영역
+      options:
+        - backend/core-api
+        - backend/gateway
+        - backend/agent
+        - backend/mock-finance
+        - backend/audit
+        - ai-risk
+        - frontend
+        - policy
+        - infrastructure
+        - docs/contracts
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 기대 결과
+      description: 구현 후 관찰 가능한 결과를 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: 검증 시나리오
+      description: 정상, BLOCK, ERROR 및 downstream 도달 여부를 포함해 주세요.
+    validations:
+      required: true

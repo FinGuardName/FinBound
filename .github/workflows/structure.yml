@@ -1,0 +1,40 @@
+name: Structure checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  repository-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            docs/04-api-contract.md
+            docs/06-common-conventions.md
+            backend/core-api/README.md
+            backend/gateway/README.md
+            backend/agent/README.md
+            backend/mock-finance/README.md
+            ai-risk/README.md
+            frontend/README.md
+            policy/finguard_authz.rego
+            infrastructure/docker-compose.yml
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "Missing required file: $path"; exit 1; }
+          done
+      - name: Reject committed environment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          tracked_env=$(git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$' || true)
+          test -z "$tracked_env" || { echo "$tracked_env"; exit 1; }

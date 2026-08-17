@@ -1,0 +1,37 @@
+name: Bug
+description: 재현 가능한 결함 보고
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 동작
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 재현 절차
+      description: 민감정보와 Credential은 제거해 주세요.
+    validations:
+      required: true
+  - type: dropdown
+    id: security
+    attributes:
+      label: 보안 영향
+      options:
+        - 없음
+        - Fail-closed/정책 판단 영향
+        - Downstream 우회 또는 데이터 노출 가능성
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: "실제 Secret이나 개인정보가 포함된 보안 취약점은 공개 Issue로 등록하지 마세요."

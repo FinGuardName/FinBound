@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: finguard-mock-finance
+
+server:
+  port: ${MOCK_FINANCE_PORT:8083}

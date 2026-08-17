@@ -1,0 +1,14 @@
+# Temporary repository-wide owner. Replace or supplement with organization teams
+# after Backend 1/2/3 and Frontend-AI teams are created in GitHub.
+* @YEOUL0520
+
+/backend/core-api/ @YEOUL0520
+/backend/gateway/ @YEOUL0520
+/backend/agent/ @YEOUL0520
+/backend/mock-finance/ @YEOUL0520
+/backend/audit/ @YEOUL0520
+/ai-risk/ @YEOUL0520
+/frontend/ @YEOUL0520
+/policy/ @YEOUL0520
+/infrastructure/ @YEOUL0520
+/docs/ @YEOUL0520

@@ -1,0 +1,36 @@
+[project]
+name = "finguard-ai-risk"
+version = "0.1.0"
+description = "Prompt and behavior risk signals for FinGuard"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116,<1.0",
+  "numpy>=2.0,<3.0",
+  "pandas>=2.2,<4.0",
+  "pydantic>=2.11,<3.0",
+  "scikit-learn>=1.7,<2.0",
+  "uvicorn[standard]>=0.35,<1.0",
+]
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1.0",
+  "pytest>=8.4,<9.0",
+  "ruff>=0.12,<1.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["datasets*", "evaluate*", "models*", "tests*", "train*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

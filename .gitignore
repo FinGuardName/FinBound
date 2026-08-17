@@ -1,0 +1,43 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Java / Gradle
+.gradle/
+**/build/
+out/
+*.class
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+*.joblib
+!ai-risk/models/.gitkeep
+
+# Node
+node_modules/
+.pnpm-store/
+frontend/dist/
+*.tsbuildinfo
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# logs and runtime data
+*.log
+data/
+coverage/
+htmlcov/

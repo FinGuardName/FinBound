@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: finguard-gateway
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: ${GATEWAY_PORT:8081}
