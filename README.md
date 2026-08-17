@@ -23,7 +23,7 @@ Task Passport
 
 | 경로 | 책임 |
 |---|---|
-| `backend/core-api` | Employee, Mandate, Case, Passport, Context Resolver, Dashboard API |
+| `backend/core-api` | Context, Permission, Audit/Security Persistence, Behavior History, Dashboard API |
 | `backend/gateway` | Identity, AuthorizationContext, OPA 연동, Enforcement, Idempotency |
 | `backend/agent` | AgentRun과 LoanAgent/Simulator |
 | `backend/mock-finance` | 가상 금융 API와 내부 Credential 검증 |
@@ -53,10 +53,12 @@ docker compose -f infrastructure/docker-compose.yml up -d
 
 ## 협업
 
-- 기능 브랜치: `feat/<scope>-<short-name>`
-- 수정 브랜치: `fix/<scope>-<short-name>`
-- 문서 브랜치: `docs/<short-name>`
-- 모든 변경은 Pull Request와 관련 테스트를 포함합니다.
+- 모든 기능 작업은 Issue에서 시작합니다.
+- Branch 형식: `{type}/{issue-number}-{short-description}`
+- 하나의 기능 Issue는 하나의 Branch와 PR로 분리합니다.
+- 같은 기능의 구현·테스트·필수 Contract/문서 변경은 한 PR에 함께 포함할 수 있습니다.
+- Local Test, CI, 관련 Contract, 팀원 Review를 모두 확인한 뒤 Merge합니다.
+- `main`에는 직접 Push하지 않습니다.
 - Contract 변경은 문서를 먼저 수정하고 팀 합의를 거칩니다.
 
-자세한 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
+자세한 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)와 [Git 협업 규칙](docs/08-git-collaboration-convention.md)을 참고하세요.

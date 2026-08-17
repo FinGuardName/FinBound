@@ -71,16 +71,32 @@ UNKNOWN_PROMPT_ATTACK
 
 ---
 
-## 3. Prompt 탐지 Pipeline
+## 3. Prompt 탐지 Pipeline / 입력 수명주기
 
 ```text
-Secured AgentRun Input
+새 Prompt / Document / 외부 비신뢰 입력
+→ Secured Input 저장 + inputHash 생성
 → 입력 정규화
 → Rule Detection
 → Prompt 분류 모델
 → Risk 결합
-→ promptRisk
+→ Prompt Risk Snapshot 저장
 ```
+
+### 재검사 기준
+
+```text
+동일 inputHash + modelVersion
+→ 재추론 X
+→ 기존 Snapshot 재사용
+
+inputHash 변경
+또는 새로운 Document/Prompt 추가
+또는 평가 Model Version 변경
+→ 다시 검사
+```
+
+Prompt Injection 검사는 **Tool Call 주기**가 아니라 **입력 변경 주기**로 수행한다. Runtime Authorization은 저장된 Prompt Risk Snapshot을 사용한다.
 
 ### 텍스트 전처리
 
@@ -107,16 +123,15 @@ Rule Match는 탐지 근거로 반환할 수 있지만 원문 전체는 Audit에
 
 ### Model Detection
 
-Pre-trained Prompt Guard 계열 분류 모델을 사용한다.
+P0는 사전학습 Prompt Injection Detector를 비교·검증하여 사용한다. 모델 자체를 새로 학습시키는 것이 핵심이 아니다.
 
-P0 목표는 모델 Fine-tuning 자체가 아니라:
+평가 목표:
 
-- 금융업무 문장에 대한 평가
-- 한국어 공격 유형 평가
-- Rule + Model 조합의 False Positive 분석
-- Runtime Risk Signal 제공
-
-이다.
+- 한국어 금융 정상문장 False Positive 분석
+- 공격 Recall
+- 금융 공격 유형별 Recall
+- 한국어/영어 혼합 입력 평가
+- Rule + Model 결합 Threshold 선정
 
 ### Risk 결합
 
@@ -128,11 +143,26 @@ Prompt Model Score
 promptRisk [0,1]
 ```
 
-실제 결합식과 Threshold는 평가 결과에 따라 고정하고 Config로 관리한다.
+실제 결합식과 Threshold는 Validation 결과에 따라 고정하고 Config로 관리한다.
 
----
+## 4. Prompt Evaluation Set
 
-## 4. Prompt 데이터셋
+P0 Prompt Detector는 사전학습 모델을 사용하므로 Prompt 데이터는 모델 학습용 `Train/Validation/Test`라고 부르지 않는다.
+
+### Development / Validation Set
+
+다음 용도로 사용한다.
+
+```text
+Rule 조정
+Rule + Model 결합 방식 조정
+Threshold 선정
+후보 Prompt Detector 선택
+```
+
+### Held-out Test Set
+
+최종 모델/Threshold 확정 후 한 번 평가하는 별도 Set이다. 모델 선택과 Threshold 조정에 사용하지 않는다.
 
 ### 정상 데이터
 
@@ -144,12 +174,11 @@ CUST-1001의 신용점수를 조회해줘.
 부채 정보를 조회해서 대출심사를 계속해줘.
 ```
 
-정상 데이터에는 공격 문장과 단순 Keyword가 겹치는 Hard Negative도 포함한다.
-
-예:
+Hard Negative도 포함한다.
 
 ```text
 고객이 이전 대출 신청을 취소했는지 확인해줘.
+문서에 "기존 지시를 무시하라"라는 문구가 있는지 확인해줘.
 내부 정책에 따라 신용정보를 조회해줘.
 ```
 
@@ -162,19 +191,12 @@ CUST-1001의 신용점수를 조회해줘.
 - System Prompt 추출
 - 한국어/영어 혼합 공격
 
-### 분할 기준
+### 데이터 관리 규칙
 
-```text
-Train
-Validation
-Test
-```
-
-- 문장 템플릿의 거의 동일한 변형이 서로 다른 Split에 분산되지 않게 한다.
-- Threshold는 Validation Set으로 정한다.
-- Test Set은 최종 Threshold 확정 후 평가에 사용한다.
-
----
+- 동일 원문/시나리오의 번역·변형이 Validation과 Held-out Test에 동시에 들어가지 않도록 Group Split한다.
+- 공개 영어 Banking Agent Security 시나리오를 사용할 경우 한국 금융 환경에 **번역이 아니라 현지화**하고 Label 보존을 검토한다.
+- 공개 파생 데이터만으로 최종 Test를 구성하지 않고 Native Korean 금융 Prompt/Hard Negative를 포함한다.
+- `sourceId`, `sourceType`, `attackType`, `reviewStatus`, `inputLanguage`를 기록한다.
 
 ## 5. Prompt 평가
 
@@ -193,6 +215,8 @@ False Negative 사례
 금융 정상문장을 공격으로 오판하는 False Positive를 별도로 분석한다.
 
 Prompt 모델의 응답속도 자체를 모델 선택의 핵심 성능지표로 삼지는 않지만, **전체 FinGuard System 평가에서는 Authorization Latency P50/P95를 별도 측정**한다.
+
+Runtime에서 측정하는 Prompt Risk는 매 Tool Call 재추론 결과가 아니라 현재 입력 버전에 연결된 `PromptRiskSnapshot`이다.
 
 ---
 
@@ -313,7 +337,7 @@ Hard Request Limit 미초과
 
 ```mermaid
 flowchart LR
-    HIST[최근 5분 완료 Audit] --> FB[Feature Builder]
+    HIST[Core API의 최근 완료 Audit/Outcome] --> FB[Feature Builder]
     ATT[현재 ToolCallAttempt] --> FB
     FB --> FV[Feature Vector]
     FV --> IF[Isolation Forest]
@@ -327,7 +351,8 @@ flowchart LR
 - Feature 순서와 자료형을 Version으로 고정한다.
 - 결측값 처리 규칙을 동일하게 적용한다.
 - 최근 이력이 부족하면 `historyStatus=COLD_START`를 반환한다.
-- Backend가 최근 Audit을 제공하고 FastAPI가 Feature를 계산하는 구조를 기본으로 한다.
+- Gateway가 Core Behavior History API로 최근 완료 이력을 조회하고 현재 ToolCallAttempt와 함께 FastAPI에 전달한다.
+- Gateway와 FastAPI는 PostgreSQL을 직접 조회하지 않는다.
 - Runtime 재시작 후에도 DB의 기존 Audit로 동일 Window를 재구성할 수 있어야 한다.
 
 ---

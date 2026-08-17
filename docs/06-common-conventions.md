@@ -27,6 +27,8 @@ Passport       PASS-001
 Agent          LOAN-AGENT-01
 AgentRun       RUN-001
 AuditEvent     AUD-001
+SecurityEvent  SEC-001
+InputRisk      PRS-001
 Permission     LOAN_REVIEW_STANDARD
 InputRef       INPUT-001
 Request ID     UUID
@@ -114,9 +116,9 @@ FAILED
 
 ---
 
-## 10. Audit Status
+## 10. Audit / Security Event Status
 
-AuditEvent 처리 상태:
+### Business AuditEvent
 
 ```text
 PROCESSING
@@ -124,18 +126,18 @@ COMPLETED
 ERROR
 ```
 
-정책 Decision과 혼동하지 않는다.
+`PolicyDecision=BLOCK`이 정상적으로 집행되면 `AuditStatus=COMPLETED`다.
 
-예:
+### SecurityAuthEvent
+
+인증 실패 등 Gateway 보안 Event는 Business Audit과 분리한다.
 
 ```text
-PolicyDecision = BLOCK
-AuditStatus = COMPLETED
+AUTH_FAILURE
+RATE_LIMITED       # 필요 시 집계/운영 로그로 사용
 ```
 
-정상적으로 정책이 실행되어 차단된 것이므로 시스템 ERROR가 아니다.
-
----
+Business AuditEvent는 **Agent 인증 성공 이후** 생성한다.
 
 ## 11. Policy Decision
 
@@ -312,6 +314,8 @@ UNKNOWN_PROMPT_ATTACK
 | `AGENT_IDENTITY_MISMATCH` | Verified Agent와 Passport Agent 불일치 |
 | `DUPLICATE_REQUEST` | 동일 Request ID 중복 요청 |
 | `REQUEST_RATE_LIMITED` | Gateway 요청 제한 초과 |
+| `CONTEXT_SERVICE_UNAVAILABLE` | Core Context API 조회 실패 |
+| `BEHAVIOR_HISTORY_UNAVAILABLE` | Core Behavior History 조회 실패 |
 
 ### Employee / Context / Scope
 
@@ -351,7 +355,8 @@ UNKNOWN_PROMPT_ATTACK
 |---|---|
 | `POLICY_ENGINE_UNAVAILABLE` | OPA Timeout/오류 |
 | `POLICY_DECISION_INVALID` | OPA 응답 형식 오류 |
-| `AUDIT_WRITE_FAILED` | Audit 저장 실패 |
+| `AUDIT_WRITE_FAILED` | Business Audit 저장 실패 |
+| `SECURITY_EVENT_WRITE_FAILED` | SecurityAuthEvent 저장 실패 |
 | `DOWNSTREAM_ERROR` | Mock Financial API 처리 오류 |
 | `DOWNSTREAM_TIMEOUT` | Mock Financial API Timeout |
 | `INTERNAL_CREDENTIAL_INVALID` | Gateway 내부 Credential 검증 실패 |
@@ -440,6 +445,35 @@ Timestamp
 Agent Service Credential
 Internal Credential Secret
 ```
+
+---
+
+## 24.1 DB Ownership 규칙
+
+```text
+Core → PostgreSQL O
+Gateway / Agent / Frontend / FastAPI / OPA → PostgreSQL X
+```
+
+Gateway가 Context, Audit, Security Event, Behavior History가 필요하면 Core Internal API를 호출한다.
+
+---
+
+## 24.2 Prompt Risk Lifecycle 규칙
+
+```text
+새 비신뢰 입력
+→ Prompt Injection Detection
+→ PromptRiskSnapshot
+
+동일 inputHash + modelVersion
+→ Tool Call마다 재추론하지 않음
+
+새 Prompt / Document / inputHash 변경
+→ 재검사
+```
+
+Prompt Risk는 Runtime마다 새로 계산되는 행동 점수가 아니라 **현재 입력 버전에 연결된 Snapshot**이다.
 
 ---
 

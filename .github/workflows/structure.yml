@@ -20,6 +20,8 @@ jobs:
           required=(
             docs/04-api-contract.md
             docs/06-common-conventions.md
+            docs/07-test-scenarios.md
+            docs/08-git-collaboration-convention.md
             backend/core-api/README.md
             backend/gateway/README.md
             backend/agent/README.md
