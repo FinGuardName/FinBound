@@ -1,0 +1,19 @@
+{
+  "modelVersion": "iforest-1",
+  "featureVersion": "behavior-features-1",
+  "datasetVersion": "synthetic-agent-log-1",
+  "randomSeed": 42,
+  "trainedAt": "2026-08-22T14:29:21.396500+00:00",
+  "featureNames": [
+    "requestCount1m",
+    "requestCount5m",
+    "uniqueCustomers5m",
+    "uniqueTools5m",
+    "blockRatio5m",
+    "errorRatio5m",
+    "averageRequestIntervalMs",
+    "caseSwitchCount5m",
+    "financialDataRequestCount5m",
+    "afterHoursAccess"
+  ]
+}

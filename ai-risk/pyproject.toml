@@ -5,6 +5,7 @@ description = "Prompt and behavior risk signals for FinGuard"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.116,<1.0",
+  "joblib>=1.5,<2.0",
   "numpy>=2.0,<3.0",
   "pandas>=2.2,<4.0",
   "pydantic>=2.11,<3.0",

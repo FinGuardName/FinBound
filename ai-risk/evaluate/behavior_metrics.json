@@ -1,0 +1,11 @@
+{
+  "modelVersion": "iforest-1",
+  "featureVersion": "behavior-features-1",
+  "datasetVersion": "synthetic-agent-log-1",
+  "randomSeed": 42,
+  "precisionAtCritical": 0.8813559322033898,
+  "recallAtCritical": 0.975,
+  "f1AtCritical": 0.9258160237388724,
+  "falsePositiveRateAtCritical": 0.105,
+  "rocAuc": 0.9910937499999999
+}
