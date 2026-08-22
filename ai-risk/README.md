@@ -37,6 +37,10 @@ POST /internal/v1/risk/behavior
 `evaluate/behavior_metrics.json`에 기록합니다. `behaviorRisk`는 Validation 정상 분포에서 보정한
 상대 위험 점수이며 공격 확률로 해석하지 않습니다.
 
+Synthetic Behavior 데이터는 Agent Session을 Group으로 묶어 Train/Validation/Held-out Test로
+분리합니다. Validation 정상 분포로 Calibration과 Threshold를 확인하고, Held-out Test는 모델과
+Threshold를 고정한 뒤 최종 평가에만 사용합니다.
+
 `requirements.lock`은 검증된 개발 환경의 정확한 버전을 기록합니다. pip 사용 시 `pip install -r requirements.lock` 후 `pip install -e . --no-deps`로 동일 환경을 재현할 수 있습니다.
 
 원문 Prompt를 로그나 DB에 저장하지 않으며 모델/Feature 오류를 낮은 Risk로 대체하지 않습니다.
