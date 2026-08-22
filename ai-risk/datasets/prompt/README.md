@@ -22,7 +22,8 @@ Source Revision과 License를 통해 재현합니다.
 - 공개 영어 데이터의 번역본을 Native Korean이라고 부르지 않음
 
 `reviewStatus=DRAFT`인 자체 작성 문장은 팀원이 Label과 자연스러움을 검토한 뒤 `APPROVED`로
-바꿉니다. 승인 전에는 최종 성능 수치에 포함하지 않습니다.
+바꿉니다. 승인 전에는 최종 성능 수치에 포함하지 않습니다. 판정 기준과 2인 검토 절차는
+[`LABELING_GUIDE.md`](LABELING_GUIDE.md)를 따릅니다.
 
 ## 실행
 
