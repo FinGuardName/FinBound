@@ -1,0 +1,72 @@
+{
+  "datasetVersion": "finguard-prompt-eval-ko-1",
+  "totalSamples": 72,
+  "reviewStatus": {
+    "DRAFT": 72
+  },
+  "splits": {
+    "development": {
+      "samples": 24,
+      "groups": 12,
+      "labels": {
+        "0": 12,
+        "1": 12
+      },
+      "sampleTypes": {
+        "normal": 6,
+        "hard_negative": 6,
+        "attack": 12
+      },
+      "attackTypes": {
+        "IGNORE_PREVIOUS_INSTRUCTION": 2,
+        "POLICY_BYPASS": 2,
+        "SYSTEM_PROMPT_EXTRACTION": 2,
+        "CROSS_CUSTOMER_ACCESS": 2,
+        "UNAUTHORIZED_TOOL_REQUEST": 2,
+        "UNKNOWN_PROMPT_ATTACK": 2
+      }
+    },
+    "held_out_test": {
+      "samples": 24,
+      "groups": 12,
+      "labels": {
+        "0": 12,
+        "1": 12
+      },
+      "sampleTypes": {
+        "normal": 6,
+        "hard_negative": 6,
+        "attack": 12
+      },
+      "attackTypes": {
+        "IGNORE_PREVIOUS_INSTRUCTION": 2,
+        "POLICY_BYPASS": 2,
+        "SYSTEM_PROMPT_EXTRACTION": 2,
+        "CROSS_CUSTOMER_ACCESS": 2,
+        "UNAUTHORIZED_TOOL_REQUEST": 2,
+        "UNKNOWN_PROMPT_ATTACK": 2
+      }
+    },
+    "validation": {
+      "samples": 24,
+      "groups": 12,
+      "labels": {
+        "0": 12,
+        "1": 12
+      },
+      "sampleTypes": {
+        "normal": 6,
+        "hard_negative": 6,
+        "attack": 12
+      },
+      "attackTypes": {
+        "IGNORE_PREVIOUS_INSTRUCTION": 2,
+        "POLICY_BYPASS": 2,
+        "SYSTEM_PROMPT_EXTRACTION": 2,
+        "CROSS_CUSTOMER_ACCESS": 2,
+        "UNAUTHORIZED_TOOL_REQUEST": 2,
+        "UNKNOWN_PROMPT_ATTACK": 2
+      }
+    }
+  }
+}

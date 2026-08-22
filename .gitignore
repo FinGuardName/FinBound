@@ -39,5 +39,6 @@ Thumbs.db
 # logs and runtime data
 *.log
 data/
+ai-risk/datasets/cache/
 coverage/
 htmlcov/

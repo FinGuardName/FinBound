@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-23",
+  "sources": [
+    {
+      "sourceId": "hf-deepset-prompt-injections",
+      "repository": "deepset/prompt-injections",
+      "revision": "4f61ecb038e9c3fb77e21034b22511b523772cdd",
+      "license": "apache-2.0",
+      "config": "default",
+      "splits": { "train": 546, "test": 116 },
+      "decision": "APPROVED_BASELINE",
+      "notes": "Small English binary baseline. Keep its upstream test separate from FinGuard held-out data."
+    },
+    {
+      "sourceId": "hf-neuralchemy-prompt-injection",
+      "repository": "neuralchemy/Prompt-injection-dataset",
+      "revision": "7d70432dfcf47a821612cbf9d34e9d9e3ad20e75",
+      "license": "apache-2.0",
+      "config": "core",
+      "splits": { "train": 4391, "validation": 941, "test": 942 },
+      "decision": "REVIEW_PROVENANCE",
+      "notes": "Useful groupId and hard-negative schema. Do not ingest until mixed upstream source terms are reviewed row by row."
+    },
+    {
+      "sourceId": "hf-lakera-gandalf-ignore",
+      "repository": "Lakera/gandalf_ignore_instructions",
+      "revision": "04737b65e90a6794ec227012e4a255a7def6344b",
+      "license": "mit",
+      "config": "default",
+      "splits": { "train": 777, "validation": 111, "test": 112 },
+      "decision": "APPROVED_ATTACK_SUPPLEMENT",
+      "notes": "Attack-only English supplement with acknowledged automatic-filtering noise; never use as the sole evaluation set."
+    },
+    {
+      "sourceId": "hf-reshabhs-spml",
+      "repository": "reshabhs/SPML_Chatbot_Prompt_Injection",
+      "revision": "02ce8084e979bc7d4c24ee35d22ecb7f2db96ff5",
+      "license": "mit",
+      "config": "default",
+      "splits": { "train": 16012 },
+      "decision": "REFERENCE_ONLY",
+      "notes": "Contains useful finance-role scenarios but uses generated system prompts derived from leaked prompt seeds."
+    },
+    {
+      "sourceId": "hf-promptwall-injection",
+      "repository": "cyberec/promptwall-injection-dataset",
+      "revision": "ff1840ff2e36a8037fd5d851c88d04d3d08b028f",
+      "license": "mit",
+      "config": "default",
+      "splits": { "train": 500 },
+      "decision": "REJECT_KOREAN_EVALUATION",
+      "notes": "430 attacks and 70 safe prompts, but only four Korean attacks, zero Korean safe prompts, and uneven translation quality."
+    }
+  ]
+}
