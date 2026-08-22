@@ -3,7 +3,7 @@
   "featureVersion": "behavior-features-1",
   "datasetVersion": "synthetic-agent-log-1",
   "randomSeed": 42,
-  "trainedAt": "2026-08-22T14:29:21.396500+00:00",
+  "trainedAt": "2026-08-22T15:14:11.988770+00:00",
   "featureNames": [
     "requestCount1m",
     "requestCount5m",
@@ -15,5 +15,19 @@
     "caseSwitchCount5m",
     "financialDataRequestCount5m",
     "afterHoursAccess"
-  ]
+  ],
+  "splitSummary": {
+    "train": {
+      "samples": 560,
+      "sessions": 70
+    },
+    "validation": {
+      "samples": 200,
+      "sessions": 25
+    },
+    "heldOutTest": {
+      "samples": 200,
+      "sessions": 25
+    }
+  }
 }

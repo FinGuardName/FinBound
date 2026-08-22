@@ -3,9 +3,39 @@
   "featureVersion": "behavior-features-1",
   "datasetVersion": "synthetic-agent-log-1",
   "randomSeed": 42,
-  "precisionAtCritical": 0.8813559322033898,
-  "recallAtCritical": 0.975,
-  "f1AtCritical": 0.9258160237388724,
-  "falsePositiveRateAtCritical": 0.105,
-  "rocAuc": 0.9910937499999999
+  "criticalThreshold": 0.9,
+  "splitSummary": {
+    "train": {
+      "samples": 560,
+      "sessions": 70
+    },
+    "validation": {
+      "samples": 200,
+      "sessions": 25
+    },
+    "heldOutTest": {
+      "samples": 200,
+      "sessions": 25
+    }
+  },
+  "validation": {
+    "samples": 200,
+    "normalSamples": 120,
+    "anomalySamples": 80,
+    "precisionAtCritical": 0.8586956521739131,
+    "recallAtCritical": 0.9875,
+    "f1AtCritical": 0.9186046511627907,
+    "falsePositiveRateAtCritical": 0.10833333333333334,
+    "rocAuc": 0.9913541666666666
+  },
+  "heldOutTest": {
+    "samples": 200,
+    "normalSamples": 120,
+    "anomalySamples": 80,
+    "precisionAtCritical": 0.9036144578313253,
+    "recallAtCritical": 0.9375,
+    "f1AtCritical": 0.9202453987730062,
+    "falsePositiveRateAtCritical": 0.06666666666666667,
+    "rocAuc": 0.9914583333333334
+  }
 }
