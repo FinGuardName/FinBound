@@ -24,3 +24,7 @@ uv run pytest
 원문 Prompt를 로그나 DB에 저장하지 않으며 모델/Feature 오류를 낮은 Risk로 대체하지 않습니다.
 
 Prompt Detector는 새 Prompt, Document 또는 외부 비신뢰 입력이 생성·변경될 때 호출합니다. 동일 입력의 Tool Call은 `inputHash`에 연결된 `PromptRiskSnapshot`을 재사용하며, Behavior Risk는 행동 이력이 변하므로 Tool Call마다 계산합니다.
+
+Prompt 평가 데이터의 공개 Source Revision, License, Native Korean Seed와 Held-out 정책은
+[`datasets/prompt/README.md`](datasets/prompt/README.md)에서 관리합니다. `reviewStatus=DRAFT`인
+자체 작성 문장은 팀 검토 전 최종 성능 수치에 사용하지 않습니다.
