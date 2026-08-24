@@ -507,19 +507,41 @@ Block force pushes
 
 Merge는 PR Review와 CI 통과 후 수행한다.
 
-권장 방식:
+방식:
 
 ```text
-Squash and Merge
+Merge Commit
 ```
+
+`Squash and merge`와 `Rebase and merge`는 비활성이다. 프로젝트 전체에서 하나의 방식만 쓴다.
 
 이유:
 
-- Feature Branch의 중간 Commit을 `develop`에 모두 남기지 않는다.
-- Issue/PR 단위로 History를 깔끔하게 유지한다.
+- Feature Branch의 개별 Commit을 `develop`에 그대로 보존한다.
+- 회귀를 추적할 때 `git bisect`의 단위가 PR 전체가 아니라 Commit 하나가 된다.
 
-팀에서 개별 Commit History 보존이 더 중요하다면 Merge Commit을 사용해도 되지만,
-프로젝트 전체에서 하나의 방식을 통일한다.
+## 11.1 Commit 위생이 전제다
+
+Merge Commit은 중간 Commit을 그대로 `develop`에 남긴다.
+따라서 **남길 값어치가 없는 Commit을 만들지 않는 것이 Merge 방식의 전제 조건이다.**
+
+`develop`에 남기지 않는다:
+
+```text
+CI 재실행용 빈 Commit
+직전 Commit의 오타·문구 수정
+"wip", "fix", "수정" 같은 내용 없는 메시지
+```
+
+Push 전에 정리한다:
+
+```text
+git rebase -i develop     # 자기 교정 Commit을 앞 Commit에 squash
+git commit --amend        # 직전 Commit 수정 (아직 Push 전일 때만)
+```
+
+이미 Push한 Commit을 정리하려면 Force push가 필요한데 `main` · `develop`에서는 차단돼 있다.
+**Feature Branch에서는 가능하다** — 단, 리뷰가 시작된 뒤에는 리뷰어의 기준점이 사라지므로 하지 않는다.
 
 ---
 
@@ -749,7 +771,7 @@ APPROVED
 최종:
 
 ```text
-Squash and Merge
+Merge Commit
 ↓
 develop
 ↓
