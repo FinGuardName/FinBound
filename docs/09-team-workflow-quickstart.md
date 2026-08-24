@@ -84,6 +84,9 @@ Assignees  본인
 이렇게 만들면 Issue와 Branch가 GitHub 내부에서 연결되고, Issue 화면에 Branch가 표시된다.
 로컬에서 `git checkout -b`로 만들면 이 연결이 생기지 않는다.
 
+> 이 연결은 **Branch까지만** 이어진다. 나중에 이 Branch로 PR을 열어도 Issue와 PR은 자동으로
+> 연결되지 않는다. PR 쪽 연결은 §4.6에서 직접 지정한다.
+
 ## 2.2 반드시 source를 `develop`으로 바꾼다
 
 다이얼로그에서 **Change branch source**를 눌러 `develop`을 선택한다.
@@ -208,6 +211,20 @@ Issue에 붙인 값을 PR에도 똑같이 붙인다고 기억하면 된다.
 **Reviewers**에서 팀원 최소 1명을 지정한다. 지정하지 않으면 아무도 PR이 올라온 걸 모른다.
 본인은 Reviewer가 될 수 없다.
 
+## 4.6 Development에 Issue를 연결한다
+
+PR 화면 오른쪽 사이드바 **Development** → 해당 Issue를 선택한다.
+
+본문의 `closes #12`만으로는 부족하다. `develop`을 base로 하는 PR에서는 그 키워드가 해석되지
+않아 Issue와 PR이 **단순 참조**로만 남는다. Development에서 직접 지정해야 정식 연결이 된다.
+
+§2.1에서 Issue의 Create a branch로 Branch를 만들었더라도 **PR은 자동으로 연결되지 않는다.**
+Branch 연결과 PR 연결은 별개다.
+
+연결하면 Issue 화면에 해당 PR이 표시되어, Issue만 보고도 작업이 어디까지 갔는지 알 수 있다.
+
+> 연결해도 `develop` Merge 시 Issue가 자동으로 닫히지는 않는 것으로 본다. §6을 따른다.
+
 ---
 
 # 5. 통과해야 하는 게이트
@@ -276,12 +293,13 @@ Force push와 Branch 삭제도 `main` · `develop`에서는 차단된다.
 
 # 6. Merge 후: Issue를 직접 닫는다
 
-**PR 본문에 `closes #12`를 썼어도 Issue는 자동으로 닫히지 않는다.**
+**PR 본문에 `closes #12`를 썼어도, §4.6에서 Development로 연결했어도 Issue는 자동으로 닫히지 않는다.**
 
 GitHub의 자동 Close는 PR이 **Default Branch(`main`)에 Merge될 때만** 동작한다.
 FinGuard의 모든 작업 PR은 `develop`을 base로 하므로 이 조건을 만족하지 않는다.
 
-같은 이유로 Issue 화면에 "이 PR이 이 Issue를 닫습니다" 표시도 뜨지 않는다. 단순 참조로만 잡힌다.
+§4.6의 Development 연결은 Issue와 PR을 **서로 보이게** 하는 것이지 자동 Close를 만들어 주지 않는다.
+Merge 후 Close는 작성자가 직접 한다.
 
 ## 할 일
 
@@ -328,6 +346,7 @@ git branch -d feat/12-financial-case
 - [ ] base가 `develop`이다
 - [ ] 본문에 `closes #{issue-number}`가 있다
 - [ ] Label · Milestone · Project를 지정했다
+- [ ] Development에 Issue를 연결했다
 - [ ] Reviewer를 1명 이상 지정했다
 - [ ] 로컬 검증을 돌렸다
 

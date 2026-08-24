@@ -325,11 +325,16 @@ feat: Agent Effective Permission 계산 추가
 PR 생성 시에도 Issue와 동일하게 사이드바를 지정한다.
 
 ```text
-Labels     Issue와 같은 값    §5.2
-Milestone  Issue와 같은 값    §2.2
-Projects   Issue와 같은 값    §2.3
-Reviewers  팀원 1명 이상      §10
+Labels       Issue와 같은 값    §5.2
+Milestone    Issue와 같은 값    §2.2
+Projects     Issue와 같은 값    §2.3
+Reviewers    팀원 1명 이상      §10
+Development  해당 Issue
 ```
+
+`Development`는 PR과 Issue를 정식으로 연결한다. 본문의 `closes #12` 표기만으로는
+`develop`을 base로 하는 PR에서 단순 참조로만 남으므로, 사이드바에서 직접 지정한다.
+Branch를 Issue의 `Create a branch`로 만들었더라도 PR 연결은 따로 지정해야 한다.
 
 PR Template은 본문만 채운다. Label, Milestone, Project는 자동으로 붙지 않으므로 작성자가 직접 지정한다.
 Issue에만 지정하고 PR에 지정하지 않으면, Merge 시점의 진척도와 작업 상태가 보드에 반영되지 않는다.
