@@ -223,7 +223,7 @@ Branch 연결과 PR 연결은 별개다.
 
 연결하면 Issue 화면에 해당 PR이 표시되어, Issue만 보고도 작업이 어디까지 갔는지 알 수 있다.
 
-> 연결해도 `develop` Merge 시 Issue가 자동으로 닫히지는 않는 것으로 본다. §6을 따른다.
+> 연결해도 `develop` Merge 시 Issue가 자동으로 닫히지는 **않는다.** §6을 따른다.
 
 ---
 
@@ -300,6 +300,14 @@ FinGuard의 모든 작업 PR은 `develop`을 base로 하므로 이 조건을 만
 
 §4.6의 Development 연결은 Issue와 PR을 **서로 보이게** 하는 것이지 자동 Close를 만들어 주지 않는다.
 Merge 후 Close는 작성자가 직접 한다.
+
+저장소에서 실제로 확인한 결과다.
+
+```text
+Issue #9  ──[Development 연결]──> PR #10
+PR #10 을 develop에 Squash Merge     2026-08-24
+Issue #9 상태                        OPEN  (닫히지 않음)
+```
 
 ## 할 일
 
