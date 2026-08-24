@@ -13,7 +13,7 @@
 3. 작업 · Commit · Push
 4. PR 생성             base = develop, Label · Milestone · Project 지정
 5. 게이트 통과         CI 6개 + Review 1명
-6. Squash Merge
+6. Merge Commit
 7. Issue 수동 Close    ← 자동으로 닫히지 않는다
 ```
 
@@ -284,8 +284,11 @@ backend 잡 종료
 
 ## 5.5 Merge 방식
 
-**Squash and merge만 허용된다.** Create a merge commit과 Rebase and merge 버튼은 비활성 상태다.
-Branch의 중간 Commit은 `develop`에 남지 않고 하나로 합쳐진다.
+**Create a merge commit만 허용된다.** Squash and merge와 Rebase and merge 버튼은 비활성 상태다.
+Branch의 Commit이 하나로 합쳐지지 않고 **그대로 `develop`에 남는다.**
+
+그래서 Push하기 전에 Commit을 정리해야 한다. CI 재실행용 빈 Commit, 직전 Commit의 오타 수정,
+`wip` 같은 메시지는 `develop` History에 영구히 남는다. 정리 방법은 `docs/08` §11.1에 있다.
 
 Force push와 Branch 삭제도 `main` · `develop`에서는 차단된다.
 
@@ -309,10 +312,13 @@ PR #10 을 develop에 Squash Merge     2026-08-24
 Issue #9 상태                        OPEN  (닫히지 않음)
 ```
 
+이 관측은 §5.5의 Merge 방식 변경 이전 기록이라 Squash로 돼 있다.
+자동 Close 여부는 Merge 방식과 무관하게 **base가 Default Branch인지**로만 갈리므로 결론은 그대로다.
+
 ## 할 일
 
 ```text
-1. Squash Merge 완료
+1. Merge 완료
 2. Issue 화면으로 이동
 3. Close issue 클릭
 ```

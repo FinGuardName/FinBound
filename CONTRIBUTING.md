@@ -39,7 +39,8 @@
 - `ALLOW/BLOCK`과 시스템 `ERROR`를 구분합니다.
 - Local Test와 적용 가능한 CI를 모두 통과시킵니다.
 - 최소 1명의 팀원 Review와 열린 대화의 해결을 확인합니다.
-- 확인이 끝난 뒤 Squash and Merge를 기본으로 사용합니다.
+- Push 전에 CI 재실행용 빈 Commit이나 자기 교정 Commit을 정리합니다(`docs/08` §11.1).
+- 확인이 끝난 뒤 Create a merge commit으로 Merge합니다. Squash와 Rebase는 비활성입니다.
 
 검증 범위는 변경 종류에 맞게 적용합니다. 기능 PR은 관련 Unit/Contract/Integration 테스트가 필수이고, 문서 전용 PR은 문서·링크·Contract 정합성 검사를 우선합니다. Coverage 80%와 SonarQube Quality Gate는 해당 CI가 구성된 영역부터 Merge 조건으로 적용합니다.
 
