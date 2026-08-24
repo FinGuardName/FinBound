@@ -289,7 +289,15 @@ FinGuard의 모든 작업 PR은 `develop`을 base로 하므로 이 조건을 만
 1. Squash Merge 완료
 2. Issue 화면으로 이동
 3. Close issue 클릭
-4. Branch 삭제 (PR 화면의 Delete branch)
+```
+
+Branch는 직접 지우지 않아도 된다. 저장소가 `delete_branch_on_merge`로 설정돼 있어
+Merge와 동시에 원격 Branch가 삭제된다. 로컬에 남은 Branch만 정리한다.
+
+```bash
+git checkout develop
+git pull origin develop
+git branch -d feat/12-financial-case
 ```
 
 `closes #12` 표기는 그대로 유지한다. 자동 Close가 안 될 뿐, Issue와 PR을 잇는 표시로는 계속 쓰인다.
@@ -326,7 +334,7 @@ FinGuard의 모든 작업 PR은 `develop`을 base로 하므로 이 조건을 만
 **Merge한 뒤**
 
 - [ ] Issue를 직접 Close했다
-- [ ] Branch를 삭제했다
+- [ ] 로컬 Branch를 정리했다 (원격은 자동 삭제된다)
 
 ---
 
