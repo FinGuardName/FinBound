@@ -1,0 +1,65 @@
+name: Task
+description: 기능 추가나 결함 수정이 아닌 작업 (chore, refactor, test, style)
+title: "[CHORE] "
+labels: ["chore"]
+body:
+  - type: markdown
+    attributes:
+      value: "기본 Label은 `chore`입니다. 아래에서 다른 작업 유형을 선택했다면 등록 후 Label을 그에 맞게 바꿔 주세요."
+  - type: dropdown
+    id: type
+    attributes:
+      label: 작업 유형
+      description: "`08-git-collaboration-convention.md` §5 Commit Type을 따릅니다."
+      options:
+        - chore (Build, Dependency, 환경설정)
+        - refactor (동작 변경 없는 구조 개선)
+        - test (테스트 코드 추가/수정)
+        - style (포맷팅, 띄어쓰기, 줄바꿈)
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 목적
+      description: 이 작업이 필요한 이유를 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: work
+    attributes:
+      label: 작업 내용
+      description: 같은 Branch와 PR에서 완료할 범위를 적어 주세요.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 담당 영역
+      options:
+        - backend/core-api
+        - backend/gateway
+        - backend/agent
+        - backend/mock-finance
+        - backend/audit
+        - ai-risk
+        - frontend
+        - policy
+        - infrastructure
+        - docs/contracts
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 조건
+      description: 작업 후 확인할 수 있는 결과를 적어 주세요.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: 담당자
+      description: 담당 GitHub ID 또는 역할을 적어 주세요.
+    validations:
+      required: true
