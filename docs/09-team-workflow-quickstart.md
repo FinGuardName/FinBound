@@ -220,7 +220,7 @@ Issue에 붙인 값을 PR에도 똑같이 붙인다고 기억하면 된다.
 전부 초록이어야 Merge 버튼이 열린다.
 
 ```text
-backend                   Gradle test + Checkstyle + Coverage
+backend                   Gradle test + Checkstyle + Coverage + SonarQube 분석 실행
 ai-risk                   pytest
 frontend                  pnpm build
 policy                    opa test
@@ -230,13 +230,33 @@ SonarCloud Code Analysis  Quality Gate
 
 Coverage는 **LINE 80%** 이며 `backend` 잡 안에서 검증된다. 미달이면 그 잡이 실패한다.
 
-## 5.2 Review
+## 5.2 `SonarCloud Code Analysis`는 `backend` 잡에 딸려 있다
+
+체크 목록에서는 6개가 나란히 보이지만, `SonarCloud Code Analysis`는 독립된 잡이 아니다.
+`backend` 잡의 마지막 스텝에서 `./gradlew sonar`가 실행되고, 그 결과를 SonarCloud가 받아
+별도 체크로 올리는 구조다.
+
+```text
+backend 잡 시작
+  ./gradlew check          테스트 · Checkstyle · Coverage
+  ./gradlew sonar          분석 결과 전송
+                             └→ SonarCloud Code Analysis 체크 생성
+backend 잡 종료
+```
+
+여기서 나오는 결과는 다음과 같다.
+
+- **`backend`가 실패하면 `SonarCloud Code Analysis`는 아예 뜨지 않는다.** 실패가 아니라 부재다.
+  체크 5개만 보이고 하나가 계속 안 나타난다면 Sonar가 느린 게 아니라 `backend`를 먼저 고쳐야 한다.
+- `backend`보다 `SonarCloud Code Analysis`가 조금 늦게 끝난다. `backend`가 초록이 된 뒤 잠시 기다린다.
+
+## 5.3 Review
 
 ```text
 승인 1건 이상
 ```
 
-## 5.3 자주 걸리는 4가지
+## 5.4 자주 걸리는 4가지
 
 | 설정 | 실제로 겪게 되는 일 |
 |---|---|
@@ -245,7 +265,7 @@ Coverage는 **LINE 80%** 이며 `backend` 잡 안에서 검증된다. 미달이�
 | Review 대화를 전부 Resolve해야 한다 | 답글만 달고 넘어가면 Merge 버튼이 열리지 않는다. **Resolve conversation**을 눌러야 한다. |
 | `develop`이 최신이어야 한다 | 다른 PR이 먼저 Merge되면 내 PR에 **Update branch** 버튼이 뜬다. 누르면 CI가 다시 돈다. |
 
-## 5.4 Merge 방식
+## 5.5 Merge 방식
 
 **Squash and merge만 허용된다.** Create a merge commit과 Rebase and merge 버튼은 비활성 상태다.
 Branch의 중간 Commit은 `develop`에 남지 않고 하나로 합쳐진다.
