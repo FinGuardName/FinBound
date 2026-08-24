@@ -17,6 +17,7 @@
 
 ## 검증
 
+- [ ] 오른쪽 사이드바에서 Label, Milestone, Project를 Issue와 같은 값으로 지정했습니다. (자동으로 붙지 않습니다)
 - [ ] Issue 기반 Branch(`{type}/{issue-number}-{description}`)에서 작업했습니다.
 - [ ] 관련 Unit/Contract/Integration/E2E 테스트를 추가하거나 갱신했습니다.
 - [ ] Local Test와 적용 가능한 CI가 모두 통과했습니다.
@@ -32,6 +33,7 @@
 
 - [ ] Reviewer가 확인할 핵심 파일 또는 판단 지점을 설명했습니다.
 - [ ] 모든 Review 대화를 해결한 뒤 Merge합니다.
+- [ ] Merge 후 관련 Issue를 직접 Close합니다. (`develop` base PR은 자동 Close되지 않습니다)
 - [ ] Coverage/SonarQube는 해당 CI가 구성된 영역에서 기준을 충족했습니다.
 
 ## 테스트 결과

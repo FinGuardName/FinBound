@@ -2,6 +2,10 @@
 
 > 목적: FinGuard 팀의 Issue, Branch, Commit, Pull Request, Review, Merge, CI 규칙을 통일한다.
 
+이 문서는 규칙의 **기준**이다.
+작업 중에 무엇을 클릭하고 무엇을 입력하는지는 `09-team-workflow-quickstart.md`를 본다.
+두 문서가 어긋나면 이 문서가 우선한다.
+
 ---
 
 # 1. 기본 협업 흐름
@@ -83,6 +87,51 @@ LoanAgent 실행 전에 현재 대출심사 Case를 생성한다.
 - 잘못된 Employee ID 요청 실패 테스트 통과
 - API Contract 준수
 ```
+
+---
+
+## 2.2 Milestone
+
+모든 Issue는 Milestone에 속한다.
+
+Milestone은 개발 Phase 단위로 만들고, 마감일을 지정한다.
+
+```text
+Phase 0-1 — Contract Freeze & Independent Mock
+```
+
+Milestone을 비워 두면 해당 작업이 Phase 진척도 집계에서 빠진다.
+남은 작업량과 마감 임박도를 Milestone 하나로 판단하므로, 누락되면 일정 판단이 실제와 어긋난다.
+
+Milestone은 Issue와 PR **양쪽에 모두** 지정한다.
+
+## 2.3 Project
+
+모든 Issue는 FinGuard Project 보드에 등록한다.
+
+Project는 작업의 **상태**를 추적한다.
+
+```text
+Todo → In Progress → Done
+```
+
+Label이 작업의 종류를, Milestone이 작업의 마감을, Project가 작업의 현재 상태를 나타낸다.
+셋은 서로를 대체하지 않는다.
+
+Project도 Issue와 PR **양쪽에 모두** 등록한다.
+
+## 2.4 Issue 사이드바 정리
+
+Issue 생성 시 지정하는 항목은 다음 네 가지다.
+
+```text
+Labels     작업 종류    §5.2
+Milestone  작업 마감    §2.2
+Projects   작업 상태    §2.3
+Assignees  담당자
+```
+
+Issue Template은 Label만 자동으로 붙인다. 나머지는 작성자가 지정한다.
 
 ---
 
@@ -272,6 +321,18 @@ feat: Agent Effective Permission 계산 추가
 - Local Test가 통과한다.
 - API Contract를 확인했다.
 - Code Convention을 확인했다.
+
+PR 생성 시에도 Issue와 동일하게 사이드바를 지정한다.
+
+```text
+Labels     Issue와 같은 값    §5.2
+Milestone  Issue와 같은 값    §2.2
+Projects   Issue와 같은 값    §2.3
+Reviewers  팀원 1명 이상      §10
+```
+
+PR Template은 본문만 채운다. Label, Milestone, Project는 자동으로 붙지 않으므로 작성자가 직접 지정한다.
+Issue에만 지정하고 PR에 지정하지 않으면, Merge 시점의 진척도와 작업 상태가 보드에 반영되지 않는다.
 
 ## 8.2 PR 제목
 

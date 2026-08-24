@@ -15,6 +15,7 @@
 | `06-common-conventions.md` | Enum, Reason Code, 상태값과 공통 규칙 |
 | `07-test-scenarios.md` | 핵심 E2E, AI 독립 가치, 인증·장애·우회 검증 시나리오 |
 | `08-git-collaboration-convention.md` | Issue, Branch, Commit, PR, Review와 Merge 규칙 |
+| `09-team-workflow-quickstart.md` | 위 규칙을 실제로 수행하는 순서와 화면 조작 안내 |
 
 ## 문서 우선순위
 
