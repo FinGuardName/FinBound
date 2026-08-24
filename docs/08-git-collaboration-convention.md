@@ -6,18 +6,18 @@
 
 # 1. 기본 협업 흐름
 
-FinGuard는 `main` 중심의 GitHub Flow를 사용한다.
+FinGuard는 `develop` 통합 브랜치를 두는 Git Flow 변형을 사용한다.
 
 ```text
 Issue 생성
 ↓
-Issue 기반 Branch 생성
+Issue 기반 Branch 생성 (develop에서 분기)
 ↓
 개발 + 테스트
 ↓
 Commit / Push
 ↓
-Pull Request 생성
+Pull Request 생성 (base = develop)
 ↓
 CI / Test / SonarQube 검사
 ↓
@@ -25,18 +25,32 @@ CI / Test / SonarQube 검사
 ↓
 승인
 ↓
-main Merge
+develop Merge
 ↓
 Issue Close
+```
+
+`develop`에 모인 변경은 하나의 개발 사이클이 끝났을 때 Release PR로 `main`에 Merge한다.
+
+```text
+develop
+↓
+Release PR (base = main)
+↓
+CI 통과 + Review
+↓
+main Merge
 ```
 
 핵심 원칙:
 
 > **모든 작업은 Issue에서 시작한다.**
 
-> **main 브랜치에는 직접 Push하지 않는다.**
+> **`main`과 `develop` 브랜치에는 직접 Push하지 않는다.**
 
-> **모든 변경은 Pull Request와 Review를 거쳐 main에 Merge한다.**
+> **모든 변경은 Pull Request와 Review를 거쳐 `develop`에 Merge한다.**
+
+> **`main`은 릴리스 가능한 상태만 담는다.**
 
 ---
 
@@ -94,10 +108,12 @@ Branch는 반드시 생성된 Issue를 기준으로 만든다.
 
 ```text
 main
-└─ issue 기반 feature branch
+└─ develop
+   └─ issue 기반 feature branch
 ```
 
-장기간 유지하는 `develop` 브랜치는 사용하지 않는다.
+장기간 유지하는 브랜치는 `main`과 `develop` 둘뿐이다.
+그 밖의 모든 브랜치는 Issue 단위로 만들고 Merge 후 삭제한다.
 
 ## 3.2 Branch 이름
 
@@ -125,8 +141,8 @@ Branch 이름은 영문 소문자와 `-`를 사용한다.
 Issue `#12` 기준:
 
 ```bash
-git checkout main
-git pull origin main
+git checkout develop
+git pull origin develop
 git checkout -b feat/12-financial-case
 ```
 
@@ -206,6 +222,36 @@ chore
 ```
 
 단, **Commit을 분리할 수 있다면 분리하는 것을 우선한다.**
+
+## 5.2 Label Convention
+
+GitHub Issue와 PR의 Label은 위 Commit Type과 같은 어휘를 쓴다.
+Commit Type, PR 제목 접두사, Label이 서로 다른 이름을 쓰면 분류가 갈라지기 때문이다.
+
+| Label | 의미 | PR 제목 |
+|---|---|---|
+| `fix` | Bug Fix | `[FIX]` |
+| `feat` | 새로운 기능 추가 | `[FEAT]` |
+| `refactor` | 동작 변경이 없는 코드 구조 개선 | `[REFACTOR]` |
+| `docs` | 문서만 변경 | `[DOCS]` |
+| `style` | 포맷팅, 띄어쓰기, 줄바꿈 등의 변경 | `[STYLE]` |
+| `test` | 테스트 코드 추가/수정 | `[TEST]` |
+| `chore` | Build, Dependency, 환경설정 등 Production Code 변경이 없는 작업 | `[CHORE]` |
+
+다음 두 Label은 Commit Type과 **다른 축**이며, 위 Label과 함께 붙일 수 있다.
+
+| Label | 의미 |
+|---|---|
+| `security` | 보안 및 인가 동작에 영향을 주는 작업 |
+| `contract` | API, DTO, Enum, Policy 계약 변경 (§15.2 절차 대상) |
+
+Issue Template은 세 가지이며 각각 Label을 자동으로 붙인다.
+
+```text
+Bug      → fix
+Feature  → feat
+Task     → chore  (refactor / test / style은 등록 후 Label을 바꾼다)
+```
 
 ---
 
@@ -342,7 +388,11 @@ closes #12
 fixes #12
 ```
 
-PR이 main에 Merge되면 Issue가 자동으로 닫히도록 한다.
+**주의:** GitHub의 자동 Close는 **Default Branch(`main`)에 Merge될 때만** 동작한다.
+`develop`을 base로 하는 PR은 `closes #12`를 써도 Issue가 자동으로 닫히지 않는다.
+
+따라서 `develop` Merge 후에는 **작성자가 Issue를 직접 Close한다.**
+`closes #12` 표기는 Issue와 PR을 연결하는 용도로 계속 유지한다.
 
 ---
 
@@ -375,7 +425,7 @@ Review 시 확인 항목:
 
 # 11. Merge Convention
 
-`main`은 Protected Branch로 설정한다.
+`main`과 `develop`을 모두 Protected Branch로 설정한다.
 
 권장 설정:
 
@@ -387,6 +437,8 @@ Require conversation resolution
 Block force pushes
 ```
 
+`main`은 Release PR만 받으므로 `develop`보다 느슨하게 설정하지 않는다.
+
 Merge는 PR Review와 CI 통과 후 수행한다.
 
 권장 방식:
@@ -397,8 +449,8 @@ Squash and Merge
 
 이유:
 
-- Feature Branch의 중간 Commit을 main에 모두 남기지 않는다.
-- Issue/PR 단위로 main History를 깔끔하게 유지한다.
+- Feature Branch의 중간 Commit을 `develop`에 모두 남기지 않는다.
+- Issue/PR 단위로 History를 깔끔하게 유지한다.
 
 팀에서 개별 Commit History 보존이 더 중요하다면 Merge Commit을 사용해도 되지만,
 프로젝트 전체에서 하나의 방식을 통일한다.
@@ -432,13 +484,36 @@ Coverage < 80%
 → PR Merge 제한
 ```
 
-Generated Code, Configuration, 단순 DTO 등 Coverage 제외 대상은 팀이 사전에 합의한다.
-
-권장 도구:
+JaCoCo로 강제하며, `./gradlew check`에 연결돼 있어 로컬과 CI에서 같은 기준으로 실패한다.
 
 ```text
-JaCoCo
+./gradlew check
+→ test
+→ checkstyleMain
+→ jacocoTestCoverageVerification   (LINE 80%)
+→ enforceTestPresence
 ```
+
+Generated Code, Configuration, 단순 DTO 등 Coverage 제외 대상은 팀이 사전에 합의한다.
+
+현재 합의된 제외 대상:
+
+| 패턴 | 사유 |
+|---|---|
+| `**/*Application.class` | Spring Boot 부트스트랩 클래스. 실행 진입점이며 검증할 분기가 없다 |
+
+제외 대상을 늘리려면 팀 합의를 거쳐 이 표와 `build.gradle.kts`의
+`coverageExclusions`를 함께 수정한다.
+
+### enforceTestPresence
+
+테스트 소스가 하나도 없으면 Gradle의 `test`가 `NO-SOURCE`가 되고
+`jacocoTestCoverageVerification`은 `SKIPPED`로 넘어간다.
+즉 **테스트를 전혀 작성하지 않으면 Coverage 게이트를 그냥 통과한다.**
+
+§18의 "테스트 없는 기능 PR 금지"를 지키기 위해 `enforceTestPresence` 태스크가
+그 경로를 막는다. Coverage 제외 대상이 아닌 production 코드가 있는데
+해당 모듈에 테스트 소스가 없으면 빌드를 실패시킨다.
 
 ---
 
@@ -543,7 +618,7 @@ Quality Gate
 ↓
 Code Review
 ↓
-main Merge
+develop Merge
 ```
 
 Spring 예:
@@ -610,9 +685,17 @@ APPROVED
 ```text
 Squash and Merge
 ↓
-main
+develop
 ↓
-Issue #12 Close
+Issue #12 Close  (develop Merge에서는 자동 Close되지 않으므로 직접 닫는다)
+```
+
+개발 사이클 종료 시:
+
+```text
+Release PR
+↓
+develop → main
 ```
 
 ---
@@ -622,7 +705,7 @@ Issue #12 Close
 ```text
 Issue 없는 작업 금지
 
-main 직접 Push 금지
+main / develop 직접 Push 금지
 
 테스트 없는 기능 PR 금지
 
@@ -633,4 +716,4 @@ CI 실패 PR Merge 금지
 Contract 임의 변경 금지
 ```
 
-> **Issue → Branch → Commit → Test → PR → CI → Review → main Merge**
+> **Issue → Branch → Commit → Test → PR → CI → Review → develop Merge → (사이클 종료) main Merge**

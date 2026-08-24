@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -11,15 +11,33 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    # if 조건은 step 자신의 env를 읽지 못하므로 job 레벨에 둔다.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # SonarQube가 신규 코드를 판정하려면 전체 히스토리가 필요하다.
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Test Spring modules
-        run: ./gradlew test --no-daemon
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      # check는 test, checkstyle, jacocoTestCoverageVerification(80%),
+      # enforceTestPresence를 모두 실행한다.
+      - name: Build and verify Spring modules
+        run: ./gradlew check --no-daemon
+      # SONAR_TOKEN이 없는 fork PR에서는 분석을 건너뛴다.
+      - name: SonarQube analyze
+        if: env.SONAR_TOKEN != ''
+        run: ./gradlew sonar --no-daemon -Dsonar.projectVersion=${{ github.run_number }}
 
   ai-risk:
     runs-on: ubuntu-latest

@@ -3,7 +3,7 @@ name: Structure checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -30,6 +30,8 @@ jobs:
             frontend/README.md
             policy/finguard_authz.rego
             infrastructure/docker-compose.yml
+            naver-checkstyle.xml
+            naver-checkstyle-suppressions.xml
           )
           for path in "${required[@]}"; do
             test -f "$path" || { echo "Missing required file: $path"; exit 1; }
