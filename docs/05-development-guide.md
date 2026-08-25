@@ -26,6 +26,35 @@ P1 Hardening
 Agent Effective Permission ⊆ Employee Authority
 ```
 
+### 1.1 로컬 개발 환경
+
+**JDK 21이 `JAVA_HOME`으로 잡혀 있어야 한다.** Gradle toolchain은 `build.gradle.kts`에서 21로 고정돼
+있지만, **Gradle 자체를 띄우는 JVM은 `JAVA_HOME`이 정한다.** 이 값이 없으면 `PATH`의 아무 `java`나
+잡히고, 그게 17 미만이면 빌드가 시작조차 못 한다.
+
+```text
+> Dependency requires at least JVM runtime version 17. This build uses a Java 11 JVM.
+```
+
+확인:
+
+```bash
+./gradlew -q javaToolchains
+```
+
+설정 (한 번만):
+
+```bash
+# Windows — 새 터미널부터 적용된다
+setx JAVA_HOME "C:\Program Files\Java\jdk-21"
+
+# macOS / Linux — 셸 설정 파일에 추가
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+```
+
+Docker가 필요한 것: PostgreSQL / OPA(`infrastructure/docker-compose.yml`), OPA 정책 테스트,
+그리고 Core의 영속화 테스트(Testcontainers). Docker Desktop이 떠 있지 않으면 이들이 실패한다.
+
 ---
 
 ## 2. Repository 구조
