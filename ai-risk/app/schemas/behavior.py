@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -29,23 +29,44 @@ class BehaviorRiskLevel(StrEnum):
     CRITICAL = "CRITICAL"
 
 
-class CompletedBehaviorEvent(ContractModel):
+class FinancialTool(StrEnum):
+    CREDIT_SCORE_READ = "CREDIT_SCORE_READ"
+    INCOME_READ = "INCOME_READ"
+    DEBT_READ = "DEBT_READ"
+
+
+class FinancialDataType(StrEnum):
+    CREDIT_SCORE = "CREDIT_SCORE"
+    INCOME = "INCOME"
+    DEBT = "DEBT"
+
+
+class TimezoneAwareModel(ContractModel):
+    @field_validator("requested_at", check_fields=False)
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("requestedAt must include a timezone")
+        return value
+
+
+class CompletedBehaviorEvent(TimezoneAwareModel):
     request_id: str
     case_id: str
     target_consumer_id: str
-    tool: str
+    tool: FinancialTool
     requested_at: datetime
     decision: Decision
     success: bool
     latency_ms: int = Field(ge=0)
-    requested_data: list[str] = Field(default_factory=list)
+    requested_data: list[FinancialDataType] = Field(default_factory=list)
 
 
-class CurrentToolCallAttempt(ContractModel):
+class CurrentToolCallAttempt(TimezoneAwareModel):
     case_id: str
     target_consumer_id: str
-    tool: str
-    requested_data: list[str] = Field(min_length=1)
+    tool: FinancialTool
+    requested_data: list[FinancialDataType] = Field(min_length=1)
     requested_at: datetime
 
 

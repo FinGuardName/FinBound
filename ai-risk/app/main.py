@@ -1,7 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException
 
 from app.behavior.service import BehaviorModelError, BehaviorRiskService
 from app.schemas.behavior import BehaviorRiskRequest, BehaviorRiskResponse
+from app.security import verify_internal_credential
 
 app = FastAPI(
     title="FinGuard AI Risk Engine",
@@ -22,7 +25,10 @@ def health() -> dict[str, str]:
     response_model_by_alias=True,
     tags=["risk"],
 )
-def evaluate_behavior(request: BehaviorRiskRequest) -> BehaviorRiskResponse:
+def evaluate_behavior(
+    request: BehaviorRiskRequest,
+    _internal_credential: Annotated[None, Depends(verify_internal_credential)],
+) -> BehaviorRiskResponse:
     try:
         return behavior_service.evaluate(request)
     except BehaviorModelError as error:
