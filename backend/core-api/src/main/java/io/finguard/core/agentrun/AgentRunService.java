@@ -32,6 +32,7 @@ import io.finguard.core.repository.PermissionTemplateRepository;
 import io.finguard.core.repository.PromptRiskSnapshotRepository;
 import io.finguard.core.repository.SecuredAgentInputRepository;
 import io.finguard.core.repository.TaskPassportRepository;
+import io.finguard.core.risk.PromptRiskModel;
 
 /**
  * AgentRun을 시작하고 Task Passport를 발급한다. {@code docs/04-api-contract.md} §3.
@@ -53,9 +54,6 @@ import io.finguard.core.repository.TaskPassportRepository;
  */
 @Service
 public class AgentRunService {
-
-    /** 이번 사이클은 Prompt Detector를 호출하지 않는다. 형식만 채운다. {@code docs/06} §23. */
-    private static final String PROMPT_MODEL_VERSION = "prompt-guard-1";
 
     private final EmployeeAuthorityRepository employeeAuthorities;
     private final PermissionTemplateRepository permissionTemplates;
@@ -182,11 +180,11 @@ public class AgentRunService {
         // 새로 만들 때는 NOT_EVALUATED다. false로 적으면 "검사했고 음성"이 되어 감사 기록이
         // 거짓이 된다 — docs/04 §7.
         if (promptRiskSnapshots
-                .findByInputHashAndModelVersion(inputHash, PROMPT_MODEL_VERSION)
+                .findByInputHashAndModelVersion(inputHash, PromptRiskModel.CURRENT_VERSION)
                 .isEmpty()) {
             promptRiskSnapshots.save(
                     PromptRiskSnapshot.notEvaluated(
-                            inputRef, inputHash, PROMPT_MODEL_VERSION, now));
+                            inputRef, inputHash, PromptRiskModel.CURRENT_VERSION, now));
         }
 
         return new AgentRunStarted(

@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import io.finguard.core.context.ContextLookupException;
 import io.finguard.core.permission.PermissionNotIssuableException;
 
 /**
@@ -21,6 +22,14 @@ import io.finguard.core.permission.PermissionNotIssuableException;
  */
 @RestControllerAdvice
 public class CoreApiExceptionHandler {
+
+    @ExceptionHandler(ContextLookupException.class)
+    ResponseEntity<ProblemDetail> handleContextLookup(ContextLookupException exception) {
+        return problem(
+                HttpStatus.NOT_FOUND,
+                exception.getReasonCode(),
+                "요청한 Runtime Context를 찾을 수 없습니다.");
+    }
 
     /**
      * 요청 형식은 멀쩡한데 현재 권한 상태로는 만들 수 없는 경우.
