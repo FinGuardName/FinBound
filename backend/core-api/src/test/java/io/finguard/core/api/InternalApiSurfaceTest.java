@@ -1,18 +1,14 @@
 package io.finguard.core.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import io.finguard.core.audit.AuditController;
 import io.finguard.core.history.BehaviorHistoryController;
-import io.finguard.core.securityevent.SecurityEventController;
 
 /**
  * 계약에 있는 엔드포인트가 실제로 라우팅되는지 고정한다.
@@ -23,38 +19,14 @@ import io.finguard.core.securityevent.SecurityEventController;
 class InternalApiSurfaceTest {
 
     private final MockMvc mockMvc =
-            MockMvcBuilders.standaloneSetup(
-                            new AuditController(),
-                            new SecurityEventController(),
-                            new BehaviorHistoryController())
+            MockMvcBuilders.standaloneSetup(new BehaviorHistoryController())
                     .build();
 
     // POST /api/v1/agent-runs 는 이슈 #19에서 구현됐다. 동작 검증은 AgentRunApiTest 가 한다.
     // POST /internal/v1/context/resolve 는 이슈 #20에서 구현됐다. 동작 검증은 ContextResolveApiTest 가 한다.
 
-    @Test
-    void auditCreationIsRoutedAndNotImplementedYet() throws Exception {
-        mockMvc.perform(post("/internal/v1/audits").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isNotImplemented());
-    }
-
-    @Test
-    void auditOutcomeIsRoutedAndNotImplementedYet() throws Exception {
-        mockMvc.perform(
-                        patch("/internal/v1/audits/REQ-001/outcome")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{}"))
-                .andExpect(status().isNotImplemented());
-    }
-
-    @Test
-    void authFailureEventIsRoutedAndNotImplementedYet() throws Exception {
-        mockMvc.perform(
-                        post("/internal/v1/security-events/auth-failure")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{}"))
-                .andExpect(status().isNotImplemented());
-    }
+    // Audit / Outcome / SecurityAuthEvent API는 이슈 #21에서 구현됐다.
+    // 실제 인증 필터·PostgreSQL을 포함한 검증은 AuditPersistenceApiTest가 한다.
 
     @Test
     void behaviorHistoryIsRoutedAndNotImplementedYet() throws Exception {
