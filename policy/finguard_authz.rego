@@ -4,8 +4,30 @@ import rego.v1
 
 policy_version := "loan-review-policy-1"
 
+scope_status_keys := {
+    "employeeAuthority",
+    "permissionTemplate",
+    "caseStatus",
+    "mandate",
+    "passportStatus",
+    "agentBinding",
+    "customerScope",
+    "toolScope",
+    "dataScope",
+}
+
+scope_status_values := {"OK", "VIOLATION"}
+
+valid_scope_status if {
+    object.keys(input.scopeStatus) == scope_status_keys
+    every key, status in input.scopeStatus {
+        key in scope_status_keys
+        status in scope_status_values
+    }
+}
+
 valid_input if {
-    count(input.scopeStatus) == 9
+    valid_scope_status
     input.risk.promptInjectionDetected in {true, false}
     input.risk.behaviorRiskLevel in {"LOW", "ALERT", "CRITICAL"}
     input.limits.hardRequestLimitExceeded in {true, false}
