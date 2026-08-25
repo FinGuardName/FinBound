@@ -11,7 +11,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import io.finguard.core.audit.AuditController;
-import io.finguard.core.context.ContextResolveController;
 import io.finguard.core.history.BehaviorHistoryController;
 import io.finguard.core.securityevent.SecurityEventController;
 
@@ -25,22 +24,13 @@ class InternalApiSurfaceTest {
 
     private final MockMvc mockMvc =
             MockMvcBuilders.standaloneSetup(
-                            new ContextResolveController(),
                             new AuditController(),
                             new SecurityEventController(),
                             new BehaviorHistoryController())
                     .build();
 
     // POST /api/v1/agent-runs 는 이슈 #19에서 구현됐다. 동작 검증은 AgentRunApiTest 가 한다.
-
-    @Test
-    void contextResolveIsRoutedAndNotImplementedYet() throws Exception {
-        mockMvc.perform(
-                        post("/internal/v1/context/resolve")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{}"))
-                .andExpect(status().isNotImplemented());
-    }
+    // POST /internal/v1/context/resolve 는 이슈 #20에서 구현됐다. 동작 검증은 ContextResolveApiTest 가 한다.
 
     @Test
     void auditCreationIsRoutedAndNotImplementedYet() throws Exception {
