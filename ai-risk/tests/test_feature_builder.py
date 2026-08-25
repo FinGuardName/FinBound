@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import numpy as np
 
@@ -49,3 +49,27 @@ def test_feature_builder_uses_only_completed_past_events() -> None:
     assert values["errorRatio5m"] == 0
     assert values["averageRequestIntervalMs"] == 30_000
     assert np.all(np.isfinite(list(values.values())))
+
+
+def test_after_hours_uses_korean_business_timezone() -> None:
+    kst = timezone(timedelta(hours=9))
+    kst_attempt = CurrentToolCallAttempt(
+        caseId="CASE-1",
+        targetConsumerId="CUST-1",
+        tool="CREDIT_SCORE_READ",
+        requestedData=["CREDIT_SCORE"],
+        requestedAt=datetime(2026, 8, 17, 23, 0, tzinfo=kst),
+    )
+    utc_attempt = CurrentToolCallAttempt(
+        caseId="CASE-1",
+        targetConsumerId="CUST-1",
+        tool="CREDIT_SCORE_READ",
+        requestedData=["CREDIT_SCORE"],
+        requestedAt=datetime(2026, 8, 17, 14, 0, tzinfo=UTC),
+    )
+
+    kst_values = dict(zip(FEATURE_NAMES, build_feature_vector([], kst_attempt), strict=True))
+    utc_values = dict(zip(FEATURE_NAMES, build_feature_vector([], utc_attempt), strict=True))
+
+    assert kst_values["afterHoursAccess"] == 1
+    assert utc_values["afterHoursAccess"] == 1
