@@ -16,6 +16,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -45,6 +46,9 @@ class ContextResolveApiTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void returnsAllNineStatusesAndTheNotEvaluatedPromptSnapshot() {
@@ -154,6 +158,57 @@ class ContextResolveApiTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().get("reasonCode").asText())
                 .isEqualTo("INVALID_TOOL_REQUEST");
+    }
+
+    @Test
+    void refusesContextForAnAgentRunThatIsNoLongerInFlight() {
+        RunReferences run = startAgentRun();
+        jdbcTemplate.update(
+                "update agent_runs set status = 'COMPLETED' where agent_run_id = ?", run.agentRunId());
+
+        ResponseEntity<JsonNode> response =
+                resolve(run, "LOAN-AGENT-01", "CUST-1001", "CREDIT_SCORE_READ", "CREDIT_SCORE");
+
+        // 끝난 실행은 더 이상 Tool Call의 근거가 될 수 없다. 상태를 보지 않으면 COMPLETED AgentRun으로도
+        // 모든 Scope가 OK로 나온다.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("reasonCode").asText()).isEqualTo("CONTEXT_NOT_FOUND");
+    }
+
+    @Test
+    void reportsTheWorstPromptRiskAcrossEveryInputNotJustTheLatest() {
+        RunReferences run = startAgentRun();
+
+        // 나중에 들어온 입력은 검사를 마쳤고 음성이다. 마지막 것만 보면 EVALUATED로 보고된다.
+        // 그러나 앞선 입력이 아직 미검사이므로 "검사했고 음성"이라고 말할 수 없다 — docs/04 §7.
+        jdbcTemplate.update(
+                "insert into secured_agent_inputs"
+                        + " (input_ref, agent_run_id, input_hash, content_language, registered_at)"
+                        + " values (?, ?, ?, null, now())",
+                "INPUT-LATER",
+                run.agentRunId(),
+                "sha256:later-input");
+        jdbcTemplate.update(
+                "insert into prompt_risk_snapshots"
+                        + " (input_ref, input_hash, evaluation_status, detected, prompt_risk,"
+                        + "  model_version, evaluated_at)"
+                        + " values (?, ?, 'EVALUATED', false, 0.1000, 'prompt-guard-1', now())",
+                "INPUT-LATER",
+                "sha256:later-input");
+        jdbcTemplate.update(
+                "insert into agent_run_input_refs (agent_run_id, input_ref_order, input_ref)"
+                        + " values (?, 1, ?)",
+                run.agentRunId(),
+                "INPUT-LATER");
+
+        ResponseEntity<JsonNode> response =
+                resolve(run, "LOAN-AGENT-01", "CUST-1001", "CREDIT_SCORE_READ", "CREDIT_SCORE");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("promptRiskSnapshot").get("evaluationStatus").asText())
+                .isEqualTo("NOT_EVALUATED");
     }
 
     private RunReferences startAgentRun() {
