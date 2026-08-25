@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import joblib
@@ -9,6 +10,8 @@ from app.feature_builder import FEATURE_NAMES
 from datasets import synthetic_behavior
 from datasets.synthetic_behavior import generate_behavior_samples, split_behavior_samples
 from train.train_behavior import train_bundle
+
+AI_RISK_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_training_is_reproducible_for_fixed_seed() -> None:
@@ -77,3 +80,22 @@ def test_invalid_model_thresholds_are_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(BehaviorModelError, match="thresholds are invalid"):
         service._load_bundle()
+
+
+def test_committed_artifact_and_metadata_are_consistent() -> None:
+    bundle = joblib.load(AI_RISK_ROOT / "models" / "behavior_iforest.joblib")
+    metadata = json.loads(
+        (AI_RISK_ROOT / "models" / "behavior_iforest.json").read_text(encoding="utf-8")
+    )
+    metrics = json.loads(
+        (AI_RISK_ROOT / "evaluate" / "behavior_metrics.json").read_text(encoding="utf-8")
+    )
+
+    assert metadata["modelVersion"] == bundle.model_version == metrics["modelVersion"]
+    assert metadata["featureVersion"] == bundle.feature_version == metrics["featureVersion"]
+    assert metadata["datasetVersion"] == bundle.dataset_version == metrics["datasetVersion"]
+    assert tuple(metadata["featureNames"]) == bundle.feature_names
+    assert metadata["alertThreshold"] == bundle.alert_threshold == metrics["alertThreshold"]
+    assert (
+        metadata["criticalThreshold"] == bundle.critical_threshold == metrics["criticalThreshold"]
+    )
