@@ -85,12 +85,20 @@ class InternalCredentialFilterHttpTest {
 
     @Test
     void doesNotGuardPublicApiPaths() {
-        ResponseEntity<String> response =
-                restTemplate.postForEntity(URI.create(base() + "/api/v1/agent-runs"), "{}", String.class);
+        var headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
 
+        ResponseEntity<String> response =
+                restTemplate.exchange(
+                        URI.create(base() + "/api/v1/agent-runs"),
+                        org.springframework.http.HttpMethod.POST,
+                        new org.springframework.http.HttpEntity<>("{}", headers),
+                        String.class);
+
+        // 빈 본문이라 검증에서 400이 난다. 중요한 것은 401이 아니라는 점 — 필터가 걸리지 않았다는 뜻이다.
         assertThat(response.getStatusCode())
                 .as("/api/v1/** 는 사내 화면 경로라 서비스 간 자격 증명을 요구하지 않는다")
-                .isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+                .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
