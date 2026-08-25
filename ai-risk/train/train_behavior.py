@@ -20,7 +20,49 @@ from datasets.synthetic_behavior import (
 )
 
 MODEL_VERSION = "iforest-1"
-CRITICAL_THRESHOLD = 0.90
+MAX_VALIDATION_FALSE_POSITIVE_RATE = 0.10
+ALERT_NORMAL_QUANTILE = 0.90
+
+
+def _calibrated_risks(
+    model: IsolationForest,
+    scaler: StandardScaler,
+    calibration_scores: np.ndarray,
+    features: np.ndarray,
+) -> np.ndarray:
+    raw_scores = -model.decision_function(scaler.transform(features))
+    return np.searchsorted(calibration_scores, raw_scores, side="right") / len(calibration_scores)
+
+
+def _select_thresholds(
+    normal_risks: np.ndarray,
+    anomaly_risks: np.ndarray,
+) -> tuple[float, float]:
+    labels = np.concatenate([np.zeros(len(normal_risks)), np.ones(len(anomaly_risks))])
+    risks = np.concatenate([normal_risks, anomaly_risks])
+    candidates = np.unique(risks)
+    best: tuple[float, float, float] | None = None
+
+    for candidate in candidates:
+        predictions = risks >= candidate
+        false_positive_rate = float(np.mean(predictions[labels == 0]))
+        if false_positive_rate > MAX_VALIDATION_FALSE_POSITIVE_RATE:
+            continue
+        _, recall, f1, _ = precision_recall_fscore_support(
+            labels, predictions, average="binary", zero_division=0
+        )
+        score = (float(f1), float(recall), -float(candidate))
+        if best is None or score > best:
+            best = score
+
+    if best is None:
+        raise ValueError("No critical threshold satisfies the validation FPR constraint")
+
+    critical_threshold = -best[2]
+    alert_threshold = float(np.quantile(normal_risks, ALERT_NORMAL_QUANTILE, method="higher"))
+    if alert_threshold >= critical_threshold:
+        alert_threshold = max(0.0, float(np.nextafter(critical_threshold, 0.0)))
+    return alert_threshold, critical_threshold
 
 
 def _evaluate(
@@ -29,14 +71,14 @@ def _evaluate(
     calibration_scores: np.ndarray,
     normal: np.ndarray,
     anomaly: np.ndarray,
+    alert_threshold: float,
+    critical_threshold: float,
 ) -> dict[str, float | int]:
     features = np.vstack([normal, anomaly])
     labels = np.concatenate([np.zeros(len(normal)), np.ones(len(anomaly))])
-    raw_scores = -model.decision_function(scaler.transform(features))
-    risks = np.searchsorted(calibration_scores, raw_scores, side="right") / len(
-        calibration_scores
-    )
-    predictions = risks >= CRITICAL_THRESHOLD
+    risks = _calibrated_risks(model, scaler, calibration_scores, features)
+    alert_predictions = risks >= alert_threshold
+    predictions = risks >= critical_threshold
     precision, recall, f1, _ = precision_recall_fscore_support(
         labels, predictions, average="binary", zero_division=0
     )
@@ -44,6 +86,8 @@ def _evaluate(
         "samples": len(features),
         "normalSamples": len(normal),
         "anomalySamples": len(anomaly),
+        "falsePositiveRateAtAlert": float(np.mean(alert_predictions[labels == 0])),
+        "recallAtAlert": float(np.mean(alert_predictions[labels == 1])),
         "precisionAtCritical": float(precision),
         "recallAtCritical": float(recall),
         "f1AtCritical": float(f1),
@@ -85,6 +129,15 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
     calibration_scores = np.sort(
         -model.decision_function(scaler.transform(splits.validation_normal))
     )
+    validation_normal_risks = _calibrated_risks(
+        model, scaler, calibration_scores, splits.validation_normal
+    )
+    validation_anomaly_risks = _calibrated_risks(
+        model, scaler, calibration_scores, splits.validation_anomaly
+    )
+    alert_threshold, critical_threshold = _select_thresholds(
+        validation_normal_risks, validation_anomaly_risks
+    )
     bundle = BehaviorModelBundle(
         model=model,
         scaler=scaler,
@@ -94,13 +147,21 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
         model_version=MODEL_VERSION,
         dataset_version=DATASET_VERSION,
         random_seed=random_seed,
+        alert_threshold=alert_threshold,
+        critical_threshold=critical_threshold,
     )
     metrics: dict[str, Any] = {
         "modelVersion": MODEL_VERSION,
         "featureVersion": FEATURE_VERSION,
         "datasetVersion": DATASET_VERSION,
         "randomSeed": random_seed,
-        "criticalThreshold": CRITICAL_THRESHOLD,
+        "alertThreshold": alert_threshold,
+        "criticalThreshold": critical_threshold,
+        "thresholdSelection": {
+            "method": "validation-f1-with-fpr-constraint",
+            "maxFalsePositiveRate": MAX_VALIDATION_FALSE_POSITIVE_RATE,
+            "alertNormalQuantile": ALERT_NORMAL_QUANTILE,
+        },
         "splitSummary": _split_summary(splits),
         "validation": _evaluate(
             model,
@@ -108,6 +169,8 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
             calibration_scores,
             splits.validation_normal,
             splits.validation_anomaly,
+            alert_threshold,
+            critical_threshold,
         ),
         "heldOutTest": _evaluate(
             model,
@@ -115,6 +178,8 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
             calibration_scores,
             splits.test_normal,
             splits.test_anomaly,
+            alert_threshold,
+            critical_threshold,
         ),
     }
     return bundle, metrics
@@ -124,8 +189,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--model-output", type=Path, default=Path("models/behavior_iforest.joblib"))
-    parser.add_argument("--metadata-output", type=Path, default=Path("models/behavior_iforest.json"))
-    parser.add_argument("--evaluation-output", type=Path, default=Path("evaluate/behavior_metrics.json"))
+    parser.add_argument(
+        "--metadata-output", type=Path, default=Path("models/behavior_iforest.json")
+    )
+    parser.add_argument(
+        "--evaluation-output", type=Path, default=Path("evaluate/behavior_metrics.json")
+    )
     args = parser.parse_args()
 
     bundle, metrics = train_bundle(args.seed)
@@ -139,12 +208,18 @@ def main() -> None:
         "featureVersion": bundle.feature_version,
         "datasetVersion": bundle.dataset_version,
         "randomSeed": bundle.random_seed,
+        "alertThreshold": bundle.alert_threshold,
+        "criticalThreshold": bundle.critical_threshold,
         "trainedAt": datetime.now(UTC).isoformat(),
         "featureNames": list(bundle.feature_names),
         "splitSummary": metrics["splitSummary"],
     }
-    args.metadata_output.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-    args.evaluation_output.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    args.metadata_output.write_text(
+        json.dumps(metadata, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
+    args.evaluation_output.write_text(
+        json.dumps(metrics, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
 
 
 if __name__ == "__main__":

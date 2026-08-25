@@ -3,7 +3,9 @@
   "featureVersion": "behavior-features-1",
   "datasetVersion": "synthetic-agent-log-1",
   "randomSeed": 42,
-  "trainedAt": "2026-08-22T15:14:11.988770+00:00",
+  "alertThreshold": 0.9166666666666666,
+  "criticalThreshold": 1.0,
+  "trainedAt": "2026-08-25T15:20:05.010888+00:00",
   "featureNames": [
     "requestCount1m",
     "requestCount5m",

@@ -1,12 +1,28 @@
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from math import ceil
 
 import numpy as np
 from sklearn.model_selection import GroupShuffleSplit
 
-from app.feature_builder import FEATURE_NAMES
+from app.feature_builder import FEATURE_NAMES, build_feature_vector
+from app.schemas.behavior import (
+    CompletedBehaviorEvent,
+    CurrentToolCallAttempt,
+    Decision,
+    FinancialDataType,
+    FinancialTool,
+)
 
 DATASET_VERSION = "synthetic-agent-log-1"
 SAMPLES_PER_SESSION = 8
+KST = timezone(timedelta(hours=9))
+TOOLS = tuple(FinancialTool)
+TOOL_DATA = {
+    FinancialTool.CREDIT_SCORE_READ: FinancialDataType.CREDIT_SCORE,
+    FinancialTool.INCOME_READ: FinancialDataType.INCOME,
+    FinancialTool.DEBT_READ: FinancialDataType.DEBT,
+}
 
 
 @dataclass(frozen=True)
@@ -29,10 +45,88 @@ class BehaviorDataSplits:
     test_sessions: frozenset[str]
 
 
-def _session_ids(prefix: str, count: int) -> np.ndarray:
-    return np.asarray(
-        [f"{prefix}-{index // SAMPLES_PER_SESSION:03d}" for index in range(count)]
-    )
+def _tool_for(rng: np.random.Generator) -> FinancialTool:
+    return TOOLS[int(rng.integers(0, len(TOOLS)))]
+
+
+def _session_vectors(
+    rng: np.random.Generator,
+    session_index: int,
+    anomalous: bool,
+) -> np.ndarray:
+    mode = session_index % 3
+    warmup_events = 24 if anomalous else 7
+    start_hour = 22 if anomalous else int(rng.integers(10, 16))
+    current_time = datetime(2026, 8, 17, start_hour, 0, tzinfo=KST)
+    history: list[CompletedBehaviorEvent] = []
+    vectors: list[np.ndarray] = []
+    base_case_id = f"CASE-{session_index:03d}"
+    base_consumer_id = f"CUST-{session_index:04d}"
+    session_tool = _tool_for(rng)
+
+    for event_index in range(warmup_events + SAMPLES_PER_SESSION):
+        interval_seconds = int(rng.integers(2, 9)) if anomalous else int(rng.integers(20, 51))
+        current_time += timedelta(seconds=interval_seconds)
+        tool = session_tool if not anomalous and mode == 1 else _tool_for(rng)
+
+        if anomalous and mode == 1:
+            case_id = f"{base_case_id}-{event_index % 4}"
+            consumer_id = f"{base_consumer_id}-{event_index % 4}"
+        else:
+            case_id = base_case_id
+            consumer_id = base_consumer_id
+
+        current_attempt = CurrentToolCallAttempt(
+            caseId=case_id,
+            targetConsumerId=consumer_id,
+            tool=tool,
+            requestedData=[TOOL_DATA[tool]],
+            requestedAt=current_time,
+        )
+        if event_index >= warmup_events:
+            vectors.append(build_feature_vector(history, current_attempt))
+
+        if anomalous and mode == 2:
+            success = bool(rng.random() >= 0.65)
+            decision = Decision.ALLOW
+        elif anomalous and mode == 1:
+            decision = Decision.BLOCK if rng.random() < 0.35 else Decision.ALLOW
+            success = decision is Decision.ALLOW
+        else:
+            decision = Decision.BLOCK if rng.random() < 0.02 else Decision.ALLOW
+            success = decision is Decision.ALLOW and rng.random() >= 0.02
+
+        history.append(
+            CompletedBehaviorEvent(
+                requestId=f"REQ-{session_index:03d}-{event_index:03d}",
+                caseId=case_id,
+                targetConsumerId=consumer_id,
+                tool=tool,
+                requestedData=[TOOL_DATA[tool]],
+                requestedAt=current_time,
+                decision=decision,
+                success=success,
+                latencyMs=int(rng.integers(40, 800)),
+            )
+        )
+
+    return np.vstack(vectors)
+
+
+def _generate_grouped_vectors(
+    rng: np.random.Generator,
+    prefix: str,
+    count: int,
+    anomalous: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    vectors: list[np.ndarray] = []
+    groups: list[str] = []
+    for session_index in range(ceil(count / SAMPLES_PER_SESSION)):
+        session_id = f"{prefix}-{session_index:03d}"
+        session_vectors = _session_vectors(rng, session_index, anomalous)
+        vectors.extend(session_vectors)
+        groups.extend([session_id] * len(session_vectors))
+    return np.vstack(vectors[:count]), np.asarray(groups[:count])
 
 
 def generate_behavior_samples(
@@ -40,45 +134,23 @@ def generate_behavior_samples(
     normal_count: int = 800,
     anomaly_count: int = 160,
 ) -> SyntheticBehaviorSamples:
+    if normal_count <= 0 or anomaly_count <= 0:
+        raise ValueError("Behavior sample counts must be positive")
     rng = np.random.default_rng(random_seed)
-
-    normal = np.column_stack(
-        [
-            rng.integers(1, 6, normal_count),
-            rng.integers(2, 16, normal_count),
-            rng.integers(1, 3, normal_count),
-            rng.integers(1, 4, normal_count),
-            rng.beta(1, 15, normal_count),
-            rng.beta(1, 20, normal_count),
-            rng.lognormal(np.log(45_000), 0.45, normal_count),
-            rng.integers(0, 2, normal_count),
-            rng.integers(2, 18, normal_count),
-            rng.binomial(1, 0.08, normal_count),
-        ]
-    ).astype(np.float64)
-
-    anomaly = np.column_stack(
-        [
-            rng.integers(10, 25, anomaly_count),
-            rng.integers(20, 55, anomaly_count),
-            np.ones(anomaly_count),
-            rng.integers(1, 4, anomaly_count),
-            rng.beta(2, 8, anomaly_count),
-            rng.beta(2, 8, anomaly_count),
-            rng.lognormal(np.log(1_200), 0.35, anomaly_count),
-            np.zeros(anomaly_count),
-            rng.integers(20, 60, anomaly_count),
-            rng.binomial(1, 0.85, anomaly_count),
-        ]
-    ).astype(np.float64)
+    normal, normal_sessions = _generate_grouped_vectors(
+        rng, "normal-session", normal_count, anomalous=False
+    )
+    anomaly, anomaly_sessions = _generate_grouped_vectors(
+        rng, "anomaly-session", anomaly_count, anomalous=True
+    )
 
     if normal.shape[1] != len(FEATURE_NAMES):
         raise ValueError("Synthetic dataset does not match the feature schema")
     return SyntheticBehaviorSamples(
         normal=normal,
         anomaly=anomaly,
-        normal_sessions=_session_ids("normal-session", normal_count),
-        anomaly_sessions=_session_ids("anomaly-session", anomaly_count),
+        normal_sessions=normal_sessions,
+        anomaly_sessions=anomaly_sessions,
     )
 
 
@@ -105,13 +177,11 @@ def split_behavior_samples(
     validation_normal, test_normal, validation_normal_groups, test_normal_groups = _group_split(
         remainder_normal, remainder_groups, test_size=0.50, random_seed=random_seed + 1
     )
-    validation_anomaly, test_anomaly, validation_anomaly_groups, test_anomaly_groups = (
-        _group_split(
-            samples.anomaly,
-            samples.anomaly_sessions,
-            test_size=0.50,
-            random_seed=random_seed + 2,
-        )
+    validation_anomaly, test_anomaly, validation_anomaly_groups, test_anomaly_groups = _group_split(
+        samples.anomaly,
+        samples.anomaly_sessions,
+        test_size=0.50,
+        random_seed=random_seed + 2,
     )
 
     return BehaviorDataSplits(
