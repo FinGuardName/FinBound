@@ -287,6 +287,7 @@ POST /internal/v1/context/resolve
     "dataScope": "OK"
   },
   "promptRiskSnapshot": {
+    "evaluationStatus": "EVALUATED",
     "promptRisk": 0.05,
     "detected": false,
     "inputHash": "sha256:...",
@@ -296,6 +297,13 @@ POST /internal/v1/context/resolve
 ```
 
 Context Resolver가 Scope 비교의 Single Source of Truth다.
+
+`evaluationStatus`는 `EVALUATED` 또는 `NOT_EVALUATED`다. **`detected: false` 하나만으로는
+"검사했고 음성"과 "검사하지 않았음"이 구분되지 않는다.** Audit이 이 프로젝트의 산출물이므로
+두 상태를 섞으면 기록이 거짓이 된다.
+
+Detector가 아직 없는 단계에서는 `NOT_EVALUATED`로 채우고 Audit·대시보드에 그대로 노출한다.
+Detector가 붙은 뒤에는 `NOT_EVALUATED`를 **fail-closed로 처리한다** — `false`로 번역하지 않는다.
 
 ---
 
@@ -421,6 +429,14 @@ POST /internal/v1/risk/behavior
 ```
 
 현재 Attempt의 `success`, `recordsRead`, `latencyMs` 같은 미래값은 입력하지 않는다.
+
+**이 응답은 `hardRequestLimitExceeded`를 생산하지 않는다.** `requestCount1m`은 Tool Call *Attempt* 수인데
+(`docs/03-ai-spec.md` §8) 이 엔드포인트가 받는 History는 `completedEvents`뿐이라 진행 중이거나 완료되지
+못한 시도가 빠진다. 또한 Rate Limit은 Credential 검증 이전 단계이므로(§6) AI를 호출하지 않는 경로에서도
+한도가 평가돼야 한다.
+
+따라서 `AuthorizationContext.limits.hardRequestLimitExceeded`는 **Gateway가 자체 카운터로 판정한다.**
+AI는 `requestCount1m`을 관측 Feature로만 사용하며 집행 카운터와 분리한다.
 
 ---
 
