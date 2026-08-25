@@ -1,6 +1,15 @@
 name: finguard
 
+networks:
+  public-zone:
+    driver: bridge
+  internal-zone:
+    driver: bridge
+  data-zone:
+    driver: bridge
+
 services:
+  # data-zone
   postgres:
     image: postgres:17.10-alpine
     environment:
@@ -8,7 +17,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-finguard}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"   # dev용
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -16,27 +25,72 @@ services:
       retries: 10
     volumes:
       - finguard-postgres:/var/lib/postgresql/data
-    networks: [finguard]
+    networks: [data-zone]
 
+  # internal-zone
   opa:
     image: openpolicyagent/opa:1.17.0-static
-    command:
-      - run
-      - --server
-      - --addr=0.0.0.0:8181
-      - /policy
-    ports:
-      - "${OPA_PORT:-8181}:8181"
+    command: [run, --server, --addr=0.0.0.0:8181, /policy]
     volumes:
       - ../policy:/policy:ro
     read_only: true
     security_opt:
       - no-new-privileges:true
-    networks: [finguard]
+    networks: [internal-zone]
 
-networks:
-  finguard:
-    driver: bridge
+
+  # core-api:
+  #   build:
+  #     context: ../backend/core-api
+  #   environment:
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finguard}
+  #     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-finguard}
+  #     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+  #     AI_URL: http://ai-risk:8000
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #   ports:
+  #     - "127.0.0.1:8080:8080"     # 프로덕션은 제거.
+  #   networks: [internal-zone, data-zone]
+  #   read_only: true
+  #   security_opt: [no-new-privileges:true]
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: backend/gateway/Dockerfile
+    environment:
+      CORE_URL: http://core-api:8080
+      AI_URL: http://ai-risk:8000
+      OPA_URL: http://opa:8181
+      MOCK_FINANCE_URL: http://mock-finance:8082
+    depends_on:
+      - opa
+    ports:
+      - "127.0.0.1:${GATEWAY_HOST_PORT:-8091}:8081"
+    networks: [public-zone, internal-zone]
+    security_opt: [no-new-privileges:true]
+
+  # agent:
+  #   build:
+  #     context: ../backend/agent
+  #   environment:
+  #     CORE_URL: http://core-api:8080
+  #     GATEWAY_URL: http://gateway:8081
+  #   depends_on:
+  #     - core-api
+  #     - gateway
+  #   networks: [internal-zone]
+
+  # mock-finance:
+  #   build:
+  #     context: ../backend/mock-finance
+  #   networks: [internal-zone]
+
+  # ai-risk:
+  #   build:
+  #     context: ../ai-risk
+  #   networks: [internal-zone]
 
 volumes:
   finguard-postgres:
