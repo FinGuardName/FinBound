@@ -181,13 +181,13 @@ public class AgentRunService {
         // Prompt Risk는 실행마다 새로 계산하는 값이 아니라 입력 버전에 붙은 스냅샷이다.
         // 새로 만들 때는 NOT_EVALUATED다. false로 적으면 "검사했고 음성"이 되어 감사 기록이
         // 거짓이 된다 — docs/04 §7.
-        promptRiskSnapshots
+        if (promptRiskSnapshots
                 .findByInputHashAndModelVersion(inputHash, PROMPT_MODEL_VERSION)
-                .orElseGet(
-                        () ->
-                                promptRiskSnapshots.save(
-                                        PromptRiskSnapshot.notEvaluated(
-                                                inputRef, inputHash, PROMPT_MODEL_VERSION, now)));
+                .isEmpty()) {
+            promptRiskSnapshots.save(
+                    PromptRiskSnapshot.notEvaluated(
+                            inputRef, inputHash, PROMPT_MODEL_VERSION, now));
+        }
 
         return new AgentRunStarted(
                 agentRun.getAgentRunId(),
