@@ -15,6 +15,7 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('CUST-1001 · CUST-9999')
     expect(wrapper.text()).toContain('Agent Effective Permission')
     expect(wrapper.text()).toContain('Employee Authority')
+    expect(wrapper.text()).toContain('AI는 담당 직원보다 더 많은 정보에 접근할 수 없습니다')
   })
 
   it('allows an in-scope Agent task and reaches downstream once', async () => {
@@ -24,9 +25,10 @@ describe('FinGuard P0 application', () => {
     await wrapper.get('.agent-task-form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('허용된 업무를 안전하게 실행했습니다')
+    expect(wrapper.text()).toContain('심사자료 확인이 완료되었습니다')
     expect(wrapper.text()).toContain('POLICY_REQUIREMENTS_MET')
-    expect(wrapper.text()).toContain('YES · 1회')
+    expect(wrapper.text()).toContain('완료 · 1회')
+    expect(wrapper.text()).toContain('심사 의견을 작성해 주세요')
   })
 
   it('blocks an out-of-case customer before the financial API', async () => {
@@ -37,10 +39,10 @@ describe('FinGuard P0 application', () => {
     await wrapper.get('.agent-task-form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('권한 외 고객 조회를 차단했습니다')
+    expect(wrapper.text()).toContain('현재 신청 건과 관련 없는 자료는 확인하지 않았습니다')
     expect(wrapper.text()).toContain('CASE_SCOPE_VIOLATION')
-    expect(wrapper.text()).toContain('NO · 0회')
-    expect(wrapper.text()).toContain('Downstream 보호 완료')
+    expect(wrapper.text()).toContain('조회 안 함 · 0회')
+    expect(wrapper.text()).toContain('현재 신청 고객의 심사자료 확인')
   })
 
   it('fails closed for an unsupported Agent task scenario', async () => {
@@ -61,6 +63,7 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.findAll('.event-row')).toHaveLength(1)
     expect(wrapper.text()).toContain('CUST-9999')
     expect(wrapper.text()).toContain('CASE_SCOPE_VIOLATION')
-    expect(wrapper.text()).toContain('Downstream reached')
+    expect(wrapper.text()).toContain('현재 대출 신청 건과 관련 없는 고객 자료')
+    expect(wrapper.text()).toContain('금융시스템 조회')
   })
 })

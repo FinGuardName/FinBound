@@ -1,6 +1,8 @@
 # Frontend
 
-Frontend & AI 담당의 Vue 3 애플리케이션입니다. P0 화면은 은행 대출 업무 안에서 동작하는 LoanAgent 실행 화면과 Security Dashboard로 구성합니다. Employee Authority와 Agent Effective Permission 비교 근거는 별도 메뉴로 분리하지 않고 Agent 실행 화면의 FinGuard 권한 경계에서 함께 제공합니다.
+Frontend & AI 담당의 Vue 3 애플리케이션입니다. P0 화면은 은행 직원의 일반적인 대출심사 흐름에 AI 업무 도우미를 결합한 화면과, 임직원이 이해하기 쉬운 AI 업무 안전 현황으로 구성합니다. Employee Authority와 Agent Effective Permission 비교 근거는 별도 메뉴로 분리하지 않고 대출심사 화면의 AI 업무 보호 설정에서 함께 제공합니다.
+
+기본 화면에는 신청 정보, 자료 확인, 처리 결과와 다음 업무를 일상적인 은행 업무 용어로 표시합니다. Request ID, Reason Code, Tool 같은 기술 정보는 보안 처리 내역에 접어 두어 필요한 사용자만 확인할 수 있습니다.
 
 ```bash
 cd frontend
