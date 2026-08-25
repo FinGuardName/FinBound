@@ -18,10 +18,12 @@ scope_status_keys := {
 
 scope_status_values := {"OK", "VIOLATION"}
 
+# 키 집합이 정확히 일치해야 하고, 값도 정해진 두 가지여야 한다.
+# 개수만 세면 필수 키를 빼고 오타 키를 넣어도 통과하고, "UNKNOWN" 같은 값이
+# 어떤 deny 규칙과도 매치되지 않아 ALLOW로 흐른다.
 valid_scope_status if {
     object.keys(input.scopeStatus) == scope_status_keys
-    every key, status in input.scopeStatus {
-        key in scope_status_keys
+    every status in input.scopeStatus {
         status in scope_status_values
     }
 }
