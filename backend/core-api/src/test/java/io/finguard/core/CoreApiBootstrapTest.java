@@ -34,18 +34,18 @@ class CoreApiBootstrapTest {
     @Autowired
     private Flyway flyway;
 
-    // 마이그레이션 파일이 아직 없으므로 이 단언이 증명하는 것은 "Flyway가 배선돼 스키마 이력을
-    // 소유한다"까지다. 실제 테이블 생성 검증은 baseline이 들어오는 이슈 #18에서 한다.
     @Test
-    void flywayIsWiredAndOwnsSchemaHistory() {
-        Integer historyTables =
+    void flywayAppliesTheBaselineAndOwnsSchemaHistory() {
+        Integer requiredTables =
                 jdbcTemplate.queryForObject(
-                        "select count(*) from information_schema.tables where table_name = 'flyway_schema_history'",
+                        "select count(*) from information_schema.tables"
+                                + " where table_schema = current_schema()"
+                                + " and table_name in ('flyway_schema_history', 'employees', 'audit_events')",
                         Integer.class);
 
-        assertThat(historyTables)
-                .as("Flyway가 스키마를 소유하면 이력 테이블이 생긴다")
-                .isEqualTo(1);
+        assertThat(requiredTables)
+                .as("Flyway 이력과 baseline의 대표 업무 테이블이 함께 생겨야 한다")
+                .isEqualTo(3);
     }
 
     @Test
