@@ -32,14 +32,26 @@ Runtime Endpoint:
 POST /internal/v1/risk/behavior
 ```
 
-학습과 Runtime은 `app/feature_builder`의 동일한 Feature Schema를 사용합니다. 학습 결과는
+요청에는 `X-FinGuard-Service-Credential` Header가 필요하며 서버는
+`FINGUARD_INTERNAL_CREDENTIAL` 환경변수와 상수 시간 비교합니다. 서버 Credential이 없거나 모델
+Artifact가 유효하지 않으면 낮은 Risk로 대체하지 않고 `503 BEHAVIOR_RISK_UNAVAILABLE`로
+fail-closed 처리합니다.
+
+학습 데이터는 합성 Agent Event Sequence를 생성한 뒤 Runtime과 동일한
+`app/feature_builder` 코드로 변환합니다. 학습 결과는
 `models/behavior_iforest.joblib`, Metadata는 `models/behavior_iforest.json`, 평가 지표는
 `evaluate/behavior_metrics.json`에 기록합니다. `behaviorRisk`는 Validation 정상 분포에서 보정한
 상대 위험 점수이며 공격 확률로 해석하지 않습니다.
 
+`requestedAt`은 Timezone이 필수이며 `afterHoursAccess`는 `Asia/Seoul` 업무시간을 기준으로
+계산합니다. 최근 5분의 유효한 완료 이력이 5개 미만이면 Isolation Forest 판단에 필요한 근거가
+부족한 `COLD_START`로 분류하고 중립 `LOW` 신호를 반환합니다. 이는 모델 장애를 낮은 Risk로
+대체하는 동작이 아니며, Scope·Prompt Risk·Hard Limit 정책은 계속 적용됩니다.
+
 Synthetic Behavior 데이터는 Agent Session을 Group으로 묶어 Train/Validation/Held-out Test로
-분리합니다. Validation 정상 분포로 Calibration과 Threshold를 확인하고, Held-out Test는 모델과
-Threshold를 고정한 뒤 최종 평가에만 사용합니다.
+분리합니다. Validation 정상 분포로 Calibration하고 Validation FPR 제약 안에서 Critical
+Threshold를 선택합니다. 선택한 Alert/Critical Threshold는 모델 Bundle에 한 번만 저장하고 Runtime은
+동일 값을 사용합니다. Held-out Test는 모델과 Threshold를 고정한 뒤 최종 평가에만 사용합니다.
 
 `requirements.lock`은 검증된 개발 환경의 정확한 버전을 기록합니다. pip 사용 시 `pip install -r requirements.lock` 후 `pip install -e . --no-deps`로 동일 환경을 재현할 수 있습니다.
 
