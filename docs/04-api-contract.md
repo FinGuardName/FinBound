@@ -85,6 +85,54 @@ Employee Authority / Permission Template / Mandate 조회
 
 ---
 
+## 3.1 Agent Simulator — Contract 제안
+
+> **팀 합의 전 제안이다.** Backend 3의 결정론적 Simulator 독립 구현을 위해 임시로
+> 사용한다. Core에서 Agent를 호출하는 정식 경로가 확정되면 Endpoint와 DTO, 테스트를
+> 같은 PR에서 함께 변경한다.
+
+### Endpoint
+
+```http
+POST /internal/v1/agent-simulations
+X-FinGuard-Internal-Credential: <internal-service-credential>
+Content-Type: application/json
+```
+
+### Request
+
+```json
+{
+  "agentRunId": "RUN-001",
+  "passportId": "PASS-001",
+  "scenario": "NORMAL_CREDIT_SCORE"
+}
+```
+
+임시 Scenario:
+
+```text
+NORMAL_CREDIT_SCORE → CREDIT_SCORE_READ(CUST-1001)
+CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
+```
+
+Simulator는 Scenario를 §5의 Gateway Tool Call로 변환한다. Gateway 응답의 `ALLOW/BLOCK`은
+정책 결과로 그대로 반환하며, Timeout·5xx·본문 누락은 성공이나 `ALLOW`로 바꾸지 않는다.
+
+현재 임시 오류 Code:
+
+```text
+INVALID_AGENT_SIMULATION_REQUEST
+GATEWAY_REQUEST_FAILED
+GATEWAY_RESPONSE_INVALID
+GATEWAY_TIMEOUT
+GATEWAY_UNAVAILABLE
+```
+
+위 값은 Agent Simulator 내부 오류 Code 제안이며 공통 Reason Code로 확정된 값이 아니다.
+
+---
+
 ## 4. 핵심 Domain DTO
 
 ### 4.1 TaskPassport
