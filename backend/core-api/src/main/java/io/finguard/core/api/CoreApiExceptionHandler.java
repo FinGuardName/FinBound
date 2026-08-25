@@ -10,8 +10,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
 import io.finguard.core.permission.PermissionNotIssuableException;
+import io.finguard.core.securityevent.SecurityEventWriteException;
 
 /**
  * Core API의 오류 응답. 본문은 {@code application/problem+json}이고 {@code reasonCode}를 싣는다.
@@ -22,6 +24,25 @@ import io.finguard.core.permission.PermissionNotIssuableException;
  */
 @RestControllerAdvice
 public class CoreApiExceptionHandler {
+
+    @ExceptionHandler(AuditOperationException.class)
+    ResponseEntity<ProblemDetail> handleAuditOperation(AuditOperationException exception) {
+        HttpStatus status = switch (exception.getKind()) {
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case DUPLICATE -> HttpStatus.CONFLICT;
+            case INVALID_OUTCOME -> HttpStatus.BAD_REQUEST;
+            case WRITE_FAILED -> HttpStatus.SERVICE_UNAVAILABLE;
+        };
+        return problem(status, exception.getReasonCode(), "Business Audit 요청을 처리할 수 없습니다.");
+    }
+
+    @ExceptionHandler(SecurityEventWriteException.class)
+    ResponseEntity<ProblemDetail> handleSecurityEventWrite(SecurityEventWriteException exception) {
+        return problem(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "SECURITY_EVENT_WRITE_FAILED",
+                "Security Event를 저장할 수 없습니다.");
+    }
 
     @ExceptionHandler(ContextLookupException.class)
     ResponseEntity<ProblemDetail> handleContextLookup(ContextLookupException exception) {

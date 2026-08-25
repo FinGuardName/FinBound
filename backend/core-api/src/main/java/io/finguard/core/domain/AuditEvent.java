@@ -215,4 +215,23 @@ public class AuditEvent {
     public Instant getCompletedAt() {
         return completedAt;
     }
+
+    /** PROCESSING 기록에 최종 결과를 한 번만 적용한다. 감사 증거의 사후 덮어쓰기를 허용하지 않는다. */
+    public void complete(AuditCompletion completion) {
+        if (status != AuditStatus.PROCESSING) {
+            throw new IllegalStateException("AuditEvent is already finalized");
+        }
+        if (completion.completedAt().isBefore(requestedAt)) {
+            throw new IllegalArgumentException("completedAt must not precede requestedAt");
+        }
+        this.decision = completion.decision();
+        this.reasonCodes.clear();
+        this.reasonCodes.addAll(completion.reasonCodes());
+        this.downstreamReached = completion.downstreamReached();
+        this.responseReleased = completion.responseReleased();
+        this.behaviorRisk = completion.behaviorRisk();
+        this.policyVersion = completion.policyVersion();
+        this.status = completion.systemOutcome();
+        this.completedAt = completion.completedAt();
+    }
 }
