@@ -18,7 +18,13 @@ const scopeLabels = {
   dataScope: '자료 범위',
   mandate: '고객 동의',
 }
-const consumerLabels = { 'CUST-1001': '김○○ 고객', 'CUST-9999': '박○○ 고객' }
+const consumerLabels = {
+  'CUST-1001': '김○○ 고객',
+  'CUST-2001': '이○○ 고객',
+  'CUST-2099': '최○○ 고객',
+  'CUST-3001': '박○○ 고객',
+  'CUST-9999': '정○○ 고객',
+}
 const toolLabels = {
   CREDIT_SCORE_READ: '신용정보 확인',
   INCOME_READ: '소득자료 확인',
@@ -26,6 +32,7 @@ const toolLabels = {
 }
 const reasonDescriptions = {
   CASE_SCOPE_VIOLATION: '현재 대출 신청 건과 관련 없는 고객 자료가 포함되었습니다.',
+  MANDATE_SCOPE_VIOLATION: '현재 고객 동의 범위에 포함되지 않은 자료가 요청되었습니다.',
   DOWNSTREAM_TIMEOUT: '금융시스템 응답이 지연되어 결과를 제공하지 못했습니다.',
 }
 

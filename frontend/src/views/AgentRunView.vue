@@ -1,17 +1,27 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import StatusBadge from '../components/StatusBadge.vue'
 import { finguardApi } from '../services/finguardApi'
 
-const workContext = ref(null)
+const workCatalog = ref([])
+const selectedWorkId = ref('')
 const selectedScenario = ref('IN_SCOPE')
 const execution = ref(null)
 const executionError = ref('')
 const loading = ref(false)
 
 onMounted(async () => {
-  workContext.value = await finguardApi.getBankWorkContext()
+  workCatalog.value = await finguardApi.getBankWorkCatalog()
+  selectedWorkId.value = workCatalog.value[0]?.id ?? ''
+})
+
+const workContext = computed(() => workCatalog.value.find((work) => work.id === selectedWorkId.value))
+
+watch(selectedWorkId, () => {
+  selectedScenario.value = 'IN_SCOPE'
+  execution.value = null
+  executionError.value = ''
 })
 
 async function runAgentTask() {
@@ -19,7 +29,10 @@ async function runAgentTask() {
   execution.value = null
   executionError.value = ''
   try {
-    execution.value = await finguardApi.executeAgentTask({ scenario: selectedScenario.value })
+    execution.value = await finguardApi.executeAgentTask({
+      workId: selectedWorkId.value,
+      scenario: selectedScenario.value,
+    })
   } catch {
     executionError.value = '업무를 처리하지 못했습니다. 고객 자료는 조회하지 않았습니다. 잠시 후 다시 시도해 주세요.'
   } finally {
@@ -30,9 +43,24 @@ async function runAgentTask() {
 
 <template>
   <section v-if="workContext" class="agent-workspace" aria-labelledby="run-heading">
+    <div class="panel work-catalog" aria-labelledby="catalog-heading">
+      <div class="catalog-heading">
+        <div><p class="section-kicker">AI 업무 시뮬레이션</p><h2 id="catalog-heading">확인할 여신 업무를 선택해 주세요</h2><p>업무마다 고객·자료 범위와 보호 설정이 다르게 적용됩니다.</p></div>
+        <span>{{ workCatalog.length }}개 업무</span>
+      </div>
+      <div class="work-card-grid">
+        <button v-for="work in workCatalog" :key="work.id" :data-work="work.id" :class="['work-card', { active: selectedWorkId === work.id }]" type="button" @click="selectedWorkId = work.id">
+          <span class="work-badge">{{ work.badge }}</span>
+          <strong>{{ work.shortLabel }}</strong>
+          <small>{{ work.summary }}</small>
+          <em>{{ selectedWorkId === work.id ? '선택됨' : '시뮬레이션 보기' }} <i aria-hidden="true">›</i></em>
+        </button>
+      </div>
+    </div>
+
     <div class="work-session-bar">
       <div>
-        <p class="work-breadcrumb">대출 업무 <span>›</span> 신규 심사 <span>›</span> 신청 상세</p>
+        <p class="work-breadcrumb">여신 업무 <span>›</span> {{ workContext.shortLabel }} <span>›</span> 업무 상세</p>
         <h2 id="run-heading">{{ workContext.case.productName }}</h2>
       </div>
       <div class="employee-session">
@@ -69,17 +97,11 @@ async function runAgentTask() {
           </div>
           <fieldset>
             <legend>어떤 자료를 확인할까요?</legend>
-            <label :class="['task-option', { selected: selectedScenario === 'IN_SCOPE' }]">
-              <input v-model="selectedScenario" type="radio" value="IN_SCOPE" />
-              <span class="task-option-icon safe" aria-hidden="true">✓</span>
-              <span><strong>현재 신청 고객의 심사자료 확인</strong><small>신용정보·소득·부채 자료를 한 번에 확인합니다.</small></span>
-              <em>기본</em>
-            </label>
-            <label :class="['task-option', { selected: selectedScenario === 'OUT_OF_SCOPE' }]">
-              <input v-model="selectedScenario" type="radio" value="OUT_OF_SCOPE" />
-              <span class="task-option-icon compare" aria-hidden="true">＋</span>
-              <span><strong>유사 고객 자료까지 함께 비교</strong><small>현재 신청 건 외 참고 고객 자료를 포함해 요청합니다.</small></span>
-              <em>추가 검토</em>
+            <label v-for="scenario in workContext.scenarios" :key="scenario.id" :class="['task-option', { selected: selectedScenario === scenario.id }]">
+              <input v-model="selectedScenario" type="radio" :value="scenario.id" />
+              <span :class="['task-option-icon', scenario.id === 'IN_SCOPE' ? 'safe' : 'compare']" aria-hidden="true">{{ scenario.icon }}</span>
+              <span><strong>{{ scenario.title }}</strong><small>{{ scenario.description }}</small></span>
+              <em>{{ scenario.tag }}</em>
             </label>
           </fieldset>
           <button class="primary-button run-agent-button" type="submit" :disabled="loading">
@@ -123,7 +145,7 @@ async function runAgentTask() {
           <summary>시스템 정보 보기</summary>
           <dl>
             <div><dt>업무 번호</dt><dd>{{ workContext.case.caseId }}</dd></div>
-            <div><dt>AI 실행 번호</dt><dd>RUN-001</dd></div>
+            <div><dt>AI 실행 번호</dt><dd>{{ workContext.passport.agentRunId }}</dd></div>
             <div><dt>권한 확인서</dt><dd>{{ workContext.passport.passportId }}</dd></div>
             <div><dt>유효 시간</dt><dd>{{ workContext.passport.expiresAtLabel }}</dd></div>
           </dl>
@@ -162,16 +184,9 @@ async function runAgentTask() {
 
           <aside class="result-summary">
             <p class="section-kicker">직원이 확인할 내용</p>
-            <template v-if="execution.decision === 'ALLOW'">
-              <h3>심사자료가 준비되었습니다</h3>
-              <ul><li>신용정보 확인 완료</li><li>소득·부채 자료 확인 완료</li><li>현재 신청 건에 결과 연결 완료</li></ul>
-              <div class="next-action safe"><strong>다음 업무</strong>확인된 자료를 바탕으로 심사 의견을 작성해 주세요.</div>
-            </template>
-            <template v-else>
-              <h3>요청 범위를 다시 확인해 주세요</h3>
-              <ul><li>현재 신청 고객 외 자료가 포함됨</li><li>다른 고객 자료는 조회하지 않음</li><li>현재 신청 건은 그대로 유지됨</li></ul>
-              <div class="next-action blocked"><strong>다음 업무</strong>‘현재 신청 고객의 심사자료 확인’을 선택해 다시 실행해 주세요.</div>
-            </template>
+            <h3>{{ execution.resultHeading }}</h3>
+            <ul><li v-for="item in execution.resultItems" :key="item">{{ item }}</li></ul>
+            <div :class="['next-action', execution.decision === 'ALLOW' ? 'safe' : 'blocked']"><strong>다음 업무</strong>{{ execution.nextAction }}</div>
 
             <details class="security-details result-details">
               <summary>보안 처리 내역 보기</summary>

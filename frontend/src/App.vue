@@ -5,7 +5,7 @@ import AgentRunView from './views/AgentRunView.vue'
 import DashboardView from './views/DashboardView.vue'
 
 const screens = [
-  { id: 'run', label: '대출 심사', kicker: '01' },
+  { id: 'run', label: 'AI 업무 지원', kicker: '01' },
   { id: 'dashboard', label: 'AI 업무 안전 현황', kicker: '02' },
 ]
 const activeScreen = ref('run')
