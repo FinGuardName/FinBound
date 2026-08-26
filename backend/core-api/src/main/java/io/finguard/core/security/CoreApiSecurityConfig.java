@@ -24,9 +24,9 @@ public class CoreApiSecurityConfig implements WebMvcConfigurer {
 
     @Bean
     FilterRegistrationBean<CoreApiCredentialFilter> coreApiCredentialFilterRegistration(
-            CoreApiProperties properties) {
+            CoreApiProperties properties, CoreApiAuthEventRecorder recorder) {
         FilterRegistrationBean<CoreApiCredentialFilter> registration =
-                new FilterRegistrationBean<>(new CoreApiCredentialFilter(properties));
+                new FilterRegistrationBean<>(new CoreApiCredentialFilter(properties, recorder));
         registration.addUrlPatterns(CoreApiCredentialFilter.API_URL_PATTERN);
         // 기본값은 REQUEST뿐이라 FORWARD·INCLUDE로 같은 경로에 다시 들어오는 길을 함께 등록한다.
         //

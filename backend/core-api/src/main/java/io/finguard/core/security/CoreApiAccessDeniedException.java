@@ -1,5 +1,7 @@
 package io.finguard.core.security;
 
+import io.finguard.core.domain.ReasonCode;
+
 /**
  * 인증은 됐지만 이 요청을 할 자격이 없다. {@code docs/04-api-contract.md} §2 · §3.
  *
@@ -10,14 +12,14 @@ package io.finguard.core.security;
  */
 public class CoreApiAccessDeniedException extends RuntimeException {
 
-    private final String reasonCode;
+    private final ReasonCode reasonCode;
 
-    public CoreApiAccessDeniedException(String reasonCode, String message) {
+    public CoreApiAccessDeniedException(ReasonCode reasonCode, String message) {
         super(message);
         this.reasonCode = reasonCode;
     }
 
-    public String getReasonCode() {
+    public ReasonCode getReasonCode() {
         return reasonCode;
     }
 }

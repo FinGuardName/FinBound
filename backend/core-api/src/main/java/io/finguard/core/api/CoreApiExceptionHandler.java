@@ -15,7 +15,9 @@ import io.finguard.core.context.ContextLookupException;
 import io.finguard.core.history.InvalidBehaviorHistoryWindowException;
 import io.finguard.core.permission.PermissionNotIssuableException;
 import io.finguard.core.security.CoreApiAccessDeniedException;
+import io.finguard.core.security.CoreApiCredentialFilter;
 import io.finguard.core.securityevent.SecurityEventWriteException;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Core API의 오류 응답. 본문은 {@code application/problem+json}이고 {@code reasonCode}를 싣는다.
@@ -79,8 +81,13 @@ public class CoreApiExceptionHandler {
      * 거부 사유를 좁혀 주면 그것 자체가 탐색의 실마리가 된다({@code docs/06} §26).
      */
     @ExceptionHandler(CoreApiAccessDeniedException.class)
-    ResponseEntity<ProblemDetail> handleAccessDenied(CoreApiAccessDeniedException exception) {
-        return problem(HttpStatus.FORBIDDEN, exception.getReasonCode(), "이 요청을 수행할 자격이 없습니다.");
+    ResponseEntity<ProblemDetail> handleAccessDenied(
+            CoreApiAccessDeniedException exception, HttpServletRequest request) {
+        // 사유를 필터가 집어갈 수 있게 남긴다. 기록은 거기 한 곳에서 한다 — CoreApiCredentialFilter.
+        request.setAttribute(
+                CoreApiCredentialFilter.DENIED_REASON_ATTRIBUTE, exception.getReasonCode());
+        return problem(
+                HttpStatus.FORBIDDEN, exception.getReasonCode().name(), "이 요청을 수행할 자격이 없습니다.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.finguard.core.domain.ReasonCode;
 import io.finguard.core.security.CoreApiAccessDeniedException;
 import io.finguard.core.security.CoreApiPrincipal;
 import io.finguard.core.security.CoreApiRole;
@@ -42,7 +43,8 @@ public class AgentRunController {
         if (!principal.employeeId().equals(request.employeeId())) {
             // 어느 쪽 값도 메시지에 담지 않는다 — docs/06 §26.
             throw new CoreApiAccessDeniedException(
-                    "EMPLOYEE_IDENTITY_MISMATCH", "요청한 Employee가 Credential에 묶인 Employee와 다릅니다.");
+                    ReasonCode.EMPLOYEE_IDENTITY_MISMATCH,
+                    "요청한 Employee가 Credential에 묶인 Employee와 다릅니다.");
         }
 
         AgentRunStarted started =

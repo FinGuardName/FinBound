@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import io.finguard.core.domain.ReasonCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,21 +35,41 @@ public class CoreApiCredentialFilter extends OncePerRequestFilter {
     /** 검증을 통과한 호출자를 담는 request attribute. */
     public static final String PRINCIPAL_ATTRIBUTE = CoreApiCredentialFilter.class.getName() + ".principal";
 
+    /**
+     * 인가 거부 사유를 필터까지 되돌려 보내는 request attribute.
+     *
+     * <p>403은 여기서 나지 않는다 — Interceptor나 Controller가 예외를 던지고
+     * {@code CoreApiExceptionHandler}가 응답을 만든다. 그 사유를 이 칸에 적어 두면 필터가 기록할 때
+     * 집어갈 수 있다.
+     */
+    public static final String DENIED_REASON_ATTRIBUTE =
+            CoreApiCredentialFilter.class.getName() + ".deniedReason";
+
     private static final Logger log = LoggerFactory.getLogger(CoreApiCredentialFilter.class);
 
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String REASON_CODE = "CORE_API_CREDENTIAL_INVALID";
+    private static final ReasonCode REASON_CODE = ReasonCode.CORE_API_CREDENTIAL_INVALID;
 
     private final byte[] viewerDigest;
     private final byte[] operatorDigest;
     private final String operatorEmployeeId;
+    private final CoreApiAuthEventRecorder recorder;
 
-    public CoreApiCredentialFilter(CoreApiProperties properties) {
+    public CoreApiCredentialFilter(CoreApiProperties properties, CoreApiAuthEventRecorder recorder) {
         this.viewerDigest = sha256(properties.viewerCredential());
         this.operatorDigest = sha256(properties.operatorCredential());
         this.operatorEmployeeId = properties.operatorEmployeeId();
+        this.recorder = recorder;
     }
 
+    /**
+     * 거부 기록을 여기 한 곳에서 한다.
+     *
+     * <p>401은 이 필터가, 403은 Interceptor와 Controller가 낸다. 각자 기록하게 두면 새 거부 경로가
+     * 생길 때마다 기록을 빠뜨릴 자리가 하나씩 늘고, {@code requestId}에 UNIQUE가 없어
+     * ({@code SecurityAuthEvent} Javadoc) 중복도 DB가 막아주지 않는다. 응답이 완성된 뒤 상태 코드를
+     * 보고 적으면 경로가 몇 개든 여기를 지난다.
+     */
     @Override
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -56,10 +77,20 @@ public class CoreApiCredentialFilter extends OncePerRequestFilter {
         CoreApiPrincipal principal = authenticate(request);
         if (principal == null) {
             reject(request, response);
+            recorder.record(request, REASON_CODE);
             return;
         }
         request.setAttribute(PRINCIPAL_ATTRIBUTE, principal);
+
         filterChain.doFilter(request, response);
+
+        if (response.getStatus() == HttpServletResponse.SC_FORBIDDEN) {
+            Object reason = request.getAttribute(DENIED_REASON_ATTRIBUTE);
+            // 사유를 못 받았어도 403이 났다는 사실 자체는 남긴다. 모르는 채 비워 두는 것보다 낫다.
+            recorder.record(
+                    request,
+                    reason instanceof ReasonCode denied ? denied : ReasonCode.CORE_API_ROLE_FORBIDDEN);
+        }
     }
 
     private CoreApiPrincipal authenticate(HttpServletRequest request) {
@@ -108,16 +139,23 @@ public class CoreApiCredentialFilter extends OncePerRequestFilter {
 
     private void reject(HttpServletRequest request, HttpServletResponse response) throws IOException {
         // 제시된 값도 기대값도 남기지 않는다 — docs/06-common-conventions.md §26.
+        // 같은 §26이 Request ID / Trace ID는 포함하라고 한다. 그게 있어야 이 거절이 어느 요청이었는지
+        // 다른 로그와 이어붙일 수 있다.
         log.warn(
-                "Core API credential rejected. reasonCode={} method={} path={}",
+                "Core API credential rejected. reasonCode={} method={} path={} requestId={} traceId={}",
                 REASON_CODE,
                 request.getMethod(),
-                request.getRequestURI());
+                request.getRequestURI(),
+                request.getHeader("X-Request-Id"),
+                request.getHeader("Traceparent"));
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        // RFC 9110 §11.6.1 — 401은 어떤 인증을 기대하는지 밝혀야 한다. realm은 붙이지 않는다.
+        // 무엇을 지키는 문인지 알려주는 것뿐이고, 여기서는 이름 지을 만한 구획이 하나뿐이다.
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
         response.setContentType("application/problem+json");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write("{\"reasonCode\":\"" + REASON_CODE + "\"}");
+        response.getWriter().write("{\"reasonCode\":\"" + REASON_CODE.name() + "\"}");
     }
 
     private static byte[] sha256(String value) {

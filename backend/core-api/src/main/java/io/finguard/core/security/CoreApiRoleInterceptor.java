@@ -5,6 +5,7 @@ import java.util.Set;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import io.finguard.core.domain.ReasonCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -22,7 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 public class CoreApiRoleInterceptor implements HandlerInterceptor {
 
-    static final String REASON_CODE = "CORE_API_ROLE_FORBIDDEN";
+    static final ReasonCode REASON_CODE = ReasonCode.CORE_API_ROLE_FORBIDDEN;
 
     @Override
     public boolean preHandle(

@@ -145,6 +145,87 @@ class CoreApiCredentialFilterHttpTest {
         assertThat(passportCount()).isEqualTo(before);
     }
 
+    /**
+     * 401은 어떤 인증을 기대하는지 밝혀야 한다 — RFC 9110 §11.6.1이 {@code WWW-Authenticate}를
+     * 필수로 요구한다.
+     *
+     * <p>{@code Bearer}는 브라우저 기본 인증 대화상자를 띄우지 않는다. {@code Basic}이었다면 팝업이
+     * 떠서 Vue 화면 위에 브라우저 UI가 겹쳤을 것이다.
+     */
+    @Test
+    void tellsTheClientWhichAuthenticationSchemeItExpects() {
+        ResponseEntity<JsonNode> response = createAgentRun(null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE)).isEqualTo("Bearer");
+    }
+
+    /**
+     * 거부된 요청도 흔적을 남긴다. {@code docs/04-api-contract.md} §2가 {@code CORE_API_BEARER}인 최소
+     * {@code SecurityAuthEvent}를 요구한다.
+     *
+     * <p>기록이 없으면 자격 증명을 반복해서 찔러보는 행위가 관측되지 않는다 — 막기는 하되 몇 번
+     * 두드렸는지 아무도 모르는 상태가 된다.
+     */
+    @Test
+    void recordsASecurityEventWhenTheCredentialIsRejected() {
+        long before = securityEventCount("CORE_API_CREDENTIAL_INVALID");
+
+        createAgentRun(null);
+
+        assertThat(securityEventCount("CORE_API_CREDENTIAL_INVALID")).isEqualTo(before + 1);
+        assertThat(latestSecurityEventColumn("CORE_API_CREDENTIAL_INVALID", "credential_type"))
+                .isEqualTo("CORE_API_BEARER");
+        assertThat(latestSecurityEventColumn("CORE_API_CREDENTIAL_INVALID", "event_type"))
+                .isEqualTo("AUTH_FAILURE");
+    }
+
+    @Test
+    void recordsASecurityEventWhenTheRoleIsNotAllowed() {
+        long before = securityEventCount("CORE_API_ROLE_FORBIDDEN");
+
+        createAgentRun("test-viewer-credential", "EMP-101");
+
+        assertThat(securityEventCount("CORE_API_ROLE_FORBIDDEN")).isEqualTo(before + 1);
+    }
+
+    @Test
+    void recordsASecurityEventWhenTheEmployeeDoesNotMatch() {
+        long before = securityEventCount("EMPLOYEE_IDENTITY_MISMATCH");
+
+        createAgentRun("test-operator-credential", ANOTHER_EMPLOYEE);
+
+        assertThat(securityEventCount("EMPLOYEE_IDENTITY_MISMATCH")).isEqualTo(before + 1);
+    }
+
+    /** 인증에 실패한 요청은 업무 감사 기록을 만들지 않는다 — {@code docs/06-common-conventions.md} §10. */
+    @Test
+    void neverCreatesABusinessAuditForARejectedRequest() {
+        long before = auditEventCount();
+
+        createAgentRun(null);
+        createAgentRun("test-viewer-credential", "EMP-101");
+        createAgentRun("test-operator-credential", ANOTHER_EMPLOYEE);
+
+        assertThat(auditEventCount()).isEqualTo(before);
+    }
+
+    /** Credential 원문은 어디에도 남지 않는다 — {@code docs/06} §26. */
+    @Test
+    void neverStoresThePresentedCredential() {
+        createAgentRun("wrong-credential-that-must-not-be-stored");
+
+        Long matches =
+                jdbcTemplate.queryForObject(
+                        "select count(*) from security_auth_events"
+                                + " where request_id like ? or trace_id like ? or source_fingerprint like ?",
+                        Long.class,
+                        "%wrong-credential%",
+                        "%wrong-credential%",
+                        "%wrong-credential%");
+        assertThat(matches).isZero();
+    }
+
     private ResponseEntity<JsonNode> createAgentRun(String bearer) {
         return createAgentRun(bearer, "EMP-101");
     }
@@ -184,6 +265,25 @@ class CoreApiCredentialFilterHttpTest {
     /** 권한 상승의 실제 산출물은 Passport다. AgentRun만 세면 Passport가 남는 경로를 놓친다. */
     private long passportCount() {
         return jdbcTemplate.queryForObject("select count(*) from task_passports", Long.class);
+    }
+
+    private long securityEventCount(String reasonCode) {
+        return jdbcTemplate.queryForObject(
+                "select count(*) from security_auth_events where reason_code = ?",
+                Long.class,
+                reasonCode);
+    }
+
+    private String latestSecurityEventColumn(String reasonCode, String column) {
+        return jdbcTemplate.queryForObject(
+                "select " + column + " from security_auth_events where reason_code = ?"
+                        + " order by occurred_at desc limit 1",
+                String.class,
+                reasonCode);
+    }
+
+    private long auditEventCount() {
+        return jdbcTemplate.queryForObject("select count(*) from audit_events", Long.class);
     }
 
     private String base() {
