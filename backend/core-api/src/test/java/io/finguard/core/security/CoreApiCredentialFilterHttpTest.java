@@ -226,6 +226,47 @@ class CoreApiCredentialFilterHttpTest {
         assertThat(matches).isZero();
     }
 
+    /**
+     * CORS preflight는 Credential을 싣지 않으므로 401을 받는다. <strong>이건 고장이 아니라 결론이다.</strong>
+     *
+     * <p>브라우저에서 Core를 직접 부르려면 preflight를 인증 없이 통과시켜야 하는데, 그건
+     * {@code docs/04-api-contract.md} §2의 "{@code /api/v1/**}에는 인증 없는 기본 경로를 두지 않는다"와
+     * 정면으로 어긋난다. 그래서 Core에 CORS를 열지 않고 Vite에 same-origin proxy를 두기로 했다 —
+     * 그 편이 Credential을 브라우저에서 더 멀리 두기도 한다.
+     *
+     * <p>이 테스트는 누군가 나중에 CORS를 켜려 할 때 그 결정을 다시 마주하게 하려고 있다.
+     */
+    @Test
+    void refusesAPreflightBecauseItCarriesNoCredential() {
+        HttpHeaders preflight = new HttpHeaders();
+        preflight.set(HttpHeaders.ORIGIN, "http://localhost:5173");
+        preflight.set(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST");
+        preflight.set(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization,content-type");
+
+        ResponseEntity<String> response =
+                restTemplate.exchange(
+                        URI.create(base() + "/api/v1/agent-runs"),
+                        HttpMethod.OPTIONS,
+                        new HttpEntity<>(preflight),
+                        String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getHeaders().getAccessControlAllowOrigin()).isNull();
+    }
+
+    /** actuator는 필터 등록 패턴 밖이다. 인증 경계가 어디까지인지 명시해 둔다. */
+    @Test
+    void leavesActuatorOutsideTheCredentialFilter() {
+        ResponseEntity<String> response =
+                restTemplate.exchange(
+                        URI.create(base() + "/actuator/health"),
+                        HttpMethod.GET,
+                        new HttpEntity<>(new HttpHeaders()),
+                        String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
     private ResponseEntity<JsonNode> createAgentRun(String bearer) {
         return createAgentRun(bearer, "EMP-101");
     }
