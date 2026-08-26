@@ -5,7 +5,7 @@ import App from './App.vue'
 import { finguardApi } from './services/finguardApi'
 
 describe('FinGuard P0 application', () => {
-  it('shows the bank workflow and keeps permission evidence in the Agent screen', async () => {
+  it('shows bank work instead of asking an employee to configure security', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
@@ -22,20 +22,21 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('AI로 이 업무 진행')
   })
 
-  it('continues the employee task while blocking an unnecessary Agent access', async () => {
+  it('completes an ordinary loan review without manufacturing a block', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
     await wrapper.get('.agent-task-form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('심사자료 확인이 완료되었습니다')
-    expect(wrapper.text()).toContain('POLICY_REQUIREMENTS_MET')
+    expect(wrapper.text()).toContain('신규 대출 심사자료 확인이 완료되었습니다')
+    expect(wrapper.text()).toContain('3건 확인 · 0건 차단')
+    expect(wrapper.text()).toContain('차단 사유 없음')
     expect(wrapper.text()).toContain('완료 · 1회')
-    expect(wrapper.text()).toContain('CASE_SCOPE_VIOLATION')
-    expect(wrapper.text()).toContain('차단 · 0회')
-    expect(wrapper.text()).toContain('3건 확인 · 1건 차단')
     expect(wrapper.text()).toContain('심사 의견을 작성해 주세요')
+    expect(wrapper.text()).not.toContain('CASE_SCOPE_VIOLATION')
+    expect(wrapper.text()).not.toContain('FinGuard 보호 작동')
+    expect(wrapper.text()).not.toContain('POLICY_REQUIREMENTS_MET')
   })
 
   it('fails closed for an unsupported Agent task', async () => {
@@ -43,23 +44,23 @@ describe('FinGuard P0 application', () => {
   })
 
   it.each([
-    ['NEW_LOAN', 3, 'CASE_SCOPE_VIOLATION'],
-    ['LIMIT_REVIEW', 2, 'CASE_SCOPE_VIOLATION'],
-    ['DOCUMENT_REVIEW', 2, 'MANDATE_SCOPE_VIOLATION'],
-  ])('keeps %s task-level permission enforcement contract', async (workId, allowedCount, reasonCode) => {
+    ['NEW_LOAN', 3, 0, null],
+    ['LIMIT_REVIEW', 2, 1, 'CASE_SCOPE_VIOLATION'],
+    ['DOCUMENT_REVIEW', 2, 1, 'MANDATE_SCOPE_VIOLATION'],
+  ])('keeps %s task-level permission enforcement contract', async (workId, allowedCount, blockedCount, reasonCode) => {
     const result = await finguardApi.executeAgentTask({ workId })
     const allowed = result.attempts.filter((attempt) => attempt.decision === 'ALLOW')
     const blocked = result.attempts.filter((attempt) => attempt.decision === 'BLOCK')
 
     expect(result.status).toBe('COMPLETED')
     expect(allowed).toHaveLength(allowedCount)
-    expect(allowed.every((attempt) => attempt.downstreamReached)).toBe(true)
-    expect(blocked).toHaveLength(1)
-    expect(blocked[0].downstreamReached).toBe(false)
-    expect(blocked[0].reasonCodes).toContain(reasonCode)
+    expect(allowed.every((attempt) => attempt.downstreamReached && attempt.responseReleased)).toBe(true)
+    expect(blocked).toHaveLength(blockedCount)
+    expect(blocked.every((attempt) => !attempt.downstreamReached && !attempt.responseReleased)).toBe(true)
+    if (reasonCode) expect(blocked[0].reasonCodes).toContain(reasonCode)
   })
 
-  it('runs a separate limit review simulation', async () => {
+  it('shows an automatically blocked extra lookup during limit review', async () => {
     const wrapper = mount(App)
     await flushPromises()
 
@@ -73,7 +74,9 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('한도 재심사 자료 확인이 완료되었습니다')
     expect(wrapper.text()).toContain('최신 소득자료 확인 완료')
     expect(wrapper.text()).toContain('가족 소득자료 추가 조회')
+    expect(wrapper.text()).toContain('AI가 참고자료로 가족 소득을 추가 확인하려 했지만')
     expect(wrapper.text()).toContain('CASE_SCOPE_VIOLATION')
+    expect(wrapper.text()).toContain('2건 확인 · 1건 차단')
   })
 
   it('blocks expired-consent data in the document review simulation', async () => {
@@ -88,21 +91,81 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('동의가 만료된 과거 소득자료 조회')
     expect(wrapper.text()).toContain('MANDATE_SCOPE_VIOLATION')
     expect(wrapper.text()).toContain('차단 · 0회')
+    expect(wrapper.text()).toContain('FinGuard 보호 작동')
   })
 
-  it('filters dashboard events by decision', async () => {
+  it('keeps policy decision and system error as separate audit facts', async () => {
+    const events = await finguardApi.getAuditEvents()
+    const timeoutEvent = events.find((event) => event.auditStatus === 'ERROR')
+
+    expect(timeoutEvent.decision).toBe('ALLOW')
+    expect(timeoutEvent.reasonCodes).toContain('DOWNSTREAM_TIMEOUT')
+    expect(timeoutEvent.downstreamReached).toBe(true)
+    expect(timeoutEvent.responseReleased).toBe(false)
+    expect(events.every((event) => ['ALLOW', 'BLOCK'].includes(event.decision))).toBe(true)
+  })
+
+  it('blocks an AI behavior anomaly even when all permission scopes are valid', async () => {
+    const events = await finguardApi.getAuditEvents()
+    const behaviorBlock = events.find((event) => event.reasonCodes.includes('BEHAVIOR_ANOMALY'))
+
+    expect(Object.keys(behaviorBlock.scopeStatus)).toHaveLength(9)
+    expect(Object.values(behaviorBlock.scopeStatus).every((value) => value === 'OK')).toBe(true)
+    expect(behaviorBlock.behaviorAnomalyDetected).toBe(true)
+    expect(behaviorBlock.behaviorRiskLevel).toBe('CRITICAL')
+    expect(behaviorBlock.decision).toBe('BLOCK')
+    expect(behaviorBlock.downstreamReached).toBe(false)
+  })
+
+  it('records prompt injection as an independent AI risk signal', async () => {
+    const events = await finguardApi.getAuditEvents()
+    const promptBlock = events.find((event) => event.reasonCodes.includes('PROMPT_INJECTION'))
+
+    expect(promptBlock.promptInjectionDetected).toBe(true)
+    expect(promptBlock.promptEvaluationStatus).toBe('EVALUATED')
+    expect(promptBlock.promptModelVersion).toBeTruthy()
+    expect(promptBlock.decision).toBe('BLOCK')
+    expect(promptBlock.downstreamReached).toBe(false)
+  })
+
+  it('supports every agreed dashboard filter and derived outcome', async () => {
     const wrapper = mount(App)
 
     await wrapper.get('[data-screen="dashboard"]').trigger('click')
     await flushPromises()
 
-    const select = wrapper.find('.filter-bar select')
-    await select.setValue('BLOCK')
+    expect(wrapper.findAll('[data-filter]')).toHaveLength(8)
+    await wrapper.get('[data-filter="outcome"]').setValue('BLOCK')
 
-    expect(wrapper.findAll('.event-row')).toHaveLength(3)
-    expect(wrapper.text()).toContain('CUST-3001')
-    expect(wrapper.text()).toContain('MANDATE_SCOPE_VIOLATION')
-    expect(wrapper.text()).toContain('현재 고객 동의 범위')
+    expect(wrapper.findAll('.event-row')).toHaveLength(5)
+    expect(wrapper.text()).toContain('BEHAVIOR_ANOMALY')
+    expect(wrapper.text()).toContain('평소 업무 흐름과 다른 AI 행동')
     expect(wrapper.text()).toContain('금융시스템 조회')
+    expect(wrapper.text()).toContain('판단 근거와 버전 정보')
+  })
+
+  it('paginates dashboard records without rendering an unbounded list', async () => {
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.event-row')).toHaveLength(5)
+    expect(wrapper.text()).toContain('1 / 2 페이지')
+
+    await wrapper.get('.pagination button:last-child').trigger('click')
+
+    expect(wrapper.findAll('.event-row')).toHaveLength(4)
+    expect(wrapper.text()).toContain('2 / 2 페이지')
+  })
+
+  it('uses UUID request identifiers and never invents an allow reason code', async () => {
+    const executions = await Promise.all(['NEW_LOAN', 'LIMIT_REVIEW', 'DOCUMENT_REVIEW'].map((workId) => finguardApi.executeAgentTask({ workId })))
+    const events = await finguardApi.getAuditEvents()
+    const requestIds = [...executions.flatMap((execution) => execution.attempts.map((attempt) => attempt.requestId)), ...events.map((event) => event.requestId)]
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/i
+
+    expect(requestIds.every((requestId) => uuidPattern.test(requestId))).toBe(true)
+    expect(events.flatMap((event) => event.reasonCodes)).not.toContain('POLICY_REQUIREMENTS_MET')
   })
 })
