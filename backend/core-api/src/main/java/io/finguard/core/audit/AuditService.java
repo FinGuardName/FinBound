@@ -37,6 +37,9 @@ public class AuditService {
                         request.traceId(),
                         trustedVerifiedAgentId,
                         request.agentRunId(),
+                        request.caseId(),
+                        request.targetConsumerId(),
+                        request.requestedTool(),
                         request.requestedAt());
         try {
             return AuditResponse.from(auditEvents.saveAndFlush(event));
@@ -76,6 +79,10 @@ public class AuditService {
                             reasonCodes,
                             request.downstreamReached(),
                             request.responseReleased(),
+                            request.success(),
+                            request.recordsRead(),
+                            request.latencyMs(),
+                            request.errorLocation(),
                             request.behaviorRisk(),
                             request.policyVersion(),
                             request.completedAt()));
