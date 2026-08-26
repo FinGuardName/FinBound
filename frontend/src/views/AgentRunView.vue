@@ -161,7 +161,7 @@ async function runAgentTask() {
         <div class="decision-banner protected">
           <div class="decision-icon" aria-hidden="true">✓</div>
           <div><p class="section-kicker">AI 업무 처리 결과</p><h2>{{ execution.title }}</h2><p>{{ execution.message }}</p></div>
-          <span class="plain-decision">업무 완료 · 보호 {{ blockedAttempts.length }}건</span>
+          <span class="plain-decision">{{ blockedAttempts.length ? `업무 완료 · 보호 ${blockedAttempts.length}건` : '업무 완료' }}</span>
         </div>
 
         <div class="execution-content">
@@ -180,9 +180,11 @@ async function runAgentTask() {
                       <div><dt>요청 번호</dt><dd>{{ attempt.requestId }}</dd></div>
                       <div><dt>요청 고객</dt><dd>{{ attempt.targetConsumerId }}</dd></div>
                       <div><dt>업무 범위</dt><dd><StatusBadge :value="attempt.scopeStatus.customerScope" /></dd></div>
-                      <div><dt>처리 코드</dt><dd class="reason-code">{{ attempt.reasonCodes[0] || 'POLICY_REQUIREMENTS_MET' }}</dd></div>
+                      <div><dt>처리 사유</dt><dd class="reason-code">{{ attempt.reasonCodes[0] || '차단 사유 없음' }}</dd></div>
                       <div><dt>금융시스템 조회</dt><dd>{{ attempt.downstreamReached ? '완료 · 1회' : '차단 · 0회' }}</dd></div>
+                      <div><dt>결과 제공</dt><dd>{{ attempt.responseReleased ? '제공함' : '제공 안 함' }}</dd></div>
                       <div><dt>도구</dt><dd>{{ attempt.tool }}</dd></div>
+                      <div><dt>자료</dt><dd>{{ attempt.requestedData.join(' · ') }}</dd></div>
                     </dl>
                   </details>
                 </div>
@@ -195,7 +197,7 @@ async function runAgentTask() {
             <p class="section-kicker">직원이 확인할 내용</p>
             <h3>{{ execution.resultHeading }}</h3>
             <ul><li v-for="item in execution.resultItems" :key="item">{{ item }}</li></ul>
-            <div class="protection-summary"><strong>FinGuard 보호 작동</strong><p>차단된 추가 조회는 금융시스템에 전달되지 않았습니다. 현재 고객의 정상 심사자료만 결과에 포함했습니다.</p></div>
+            <div v-if="blockedAttempts.length" class="protection-summary"><strong>FinGuard 보호 작동</strong><p>차단된 추가 조회는 금융시스템에 전달되지 않았습니다. 현재 고객의 정상 심사자료만 결과에 포함했습니다.</p></div>
             <div class="next-action safe"><strong>다음 업무</strong>{{ execution.nextAction }}</div>
           </aside>
         </div>

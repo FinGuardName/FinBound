@@ -99,7 +99,23 @@ export const bankWorkCatalogFixture = [
   },
 ]
 
-const okScope = { customerScope: 'OK', toolScope: 'OK', dataScope: 'OK', mandate: 'OK' }
+const okScope = {
+  employeeAuthority: 'OK',
+  permissionTemplate: 'OK',
+  caseStatus: 'OK',
+  mandate: 'OK',
+  passportStatus: 'OK',
+  agentBinding: 'OK',
+  customerScope: 'OK',
+  toolScope: 'OK',
+  dataScope: 'OK',
+}
+
+const requestedDataByTool = {
+  CREDIT_SCORE_READ: ['CREDIT_SCORE'],
+  INCOME_READ: ['INCOME'],
+  DEBT_READ: ['DEBT'],
+}
 
 function createAttempt({ requestId, label, description, targetConsumerId, tool, decision, reasonCodes = [], scopeStatus = okScope }) {
   return {
@@ -108,9 +124,12 @@ function createAttempt({ requestId, label, description, targetConsumerId, tool, 
     description,
     targetConsumerId,
     tool,
+    requestedData: requestedDataByTool[tool],
     decision,
     reasonCodes,
     downstreamReached: decision === 'ALLOW',
+    responseReleased: decision === 'ALLOW',
+    systemOutcome: 'COMPLETED',
     scopeStatus,
   }
 }
@@ -119,15 +138,14 @@ export const agentExecutionFixtures = {
   NEW_LOAN: {
     status: 'COMPLETED',
     title: '신규 대출 심사자료 확인이 완료되었습니다',
-    message: '현재 업무에 필요한 자료는 정상 확인했고, AI가 시도한 다른 고객 조회 1건은 자료 조회 전에 차단했습니다.',
+    message: '현재 신청 건에 필요한 신용·소득·부채 자료만 확인해 심사 업무에 연결했습니다.',
     resultHeading: '신규 심사자료가 준비되었습니다',
-    resultItems: ['신용정보 확인 완료', '소득·부채 자료 확인 완료', '다른 고객 조회 1건 차단', '현재 신청 건에 결과 연결 완료'],
+    resultItems: ['신용정보 확인 완료', '소득·부채 자료 확인 완료', '현재 신청 건에 결과 연결 완료'],
     nextAction: '확인된 자료를 바탕으로 심사 의견을 작성해 주세요.',
     attempts: [
-      createAttempt({ requestId: 'REQ-001-A', label: '현재 고객 신용정보 확인', description: '신규 대출 심사에 필요한 신용정보를 확인했습니다.', targetConsumerId: 'CUST-1001', tool: 'CREDIT_SCORE_READ', decision: 'ALLOW' }),
-      createAttempt({ requestId: 'REQ-001-B', label: '현재 고객 소득자료 확인', description: '상환능력 판단에 필요한 소득자료를 확인했습니다.', targetConsumerId: 'CUST-1001', tool: 'INCOME_READ', decision: 'ALLOW' }),
-      createAttempt({ requestId: 'REQ-001-C', label: '현재 고객 부채자료 확인', description: '총부채 확인에 필요한 자료를 확인했습니다.', targetConsumerId: 'CUST-1001', tool: 'DEBT_READ', decision: 'ALLOW' }),
-      createAttempt({ requestId: 'REQ-002', label: '유사 고객 신용정보 추가 조회', description: '현재 신청 건과 무관한 고객 자료이므로 금융시스템에 전달하지 않았습니다.', targetConsumerId: 'CUST-9999', tool: 'CREDIT_SCORE_READ', decision: 'BLOCK', reasonCodes: ['CASE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000101', label: '현재 고객 신용정보 확인', description: '신규 대출 심사에 필요한 신용정보를 확인했습니다.', targetConsumerId: 'CUST-1001', tool: 'CREDIT_SCORE_READ', decision: 'ALLOW' }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000102', label: '현재 고객 소득자료 확인', description: '상환능력 판단에 필요한 소득자료를 확인했습니다.', targetConsumerId: 'CUST-1001', tool: 'INCOME_READ', decision: 'ALLOW' }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000103', label: '현재 고객 부채자료 확인', description: '총부채 확인에 필요한 자료를 확인했습니다.', targetConsumerId: 'CUST-1001', tool: 'DEBT_READ', decision: 'ALLOW' }),
     ],
   },
   LIMIT_REVIEW: {
@@ -138,9 +156,9 @@ export const agentExecutionFixtures = {
     resultItems: ['최신 소득자료 확인 완료', '부채 변동자료 확인 완료', '가족 소득자료 조회 1건 차단', '한도 재심사 건에 결과 연결 완료'],
     nextAction: '변경된 상환능력을 확인하고 한도 심사 의견을 작성해 주세요.',
     attempts: [
-      createAttempt({ requestId: 'REQ-014-A', label: '현재 고객 최신 소득자료 확인', description: '한도 증액 검토에 필요한 최신 소득자료를 확인했습니다.', targetConsumerId: 'CUST-2001', tool: 'INCOME_READ', decision: 'ALLOW' }),
-      createAttempt({ requestId: 'REQ-014-B', label: '현재 고객 부채 변동 확인', description: '변경된 상환부담을 확인할 부채자료를 조회했습니다.', targetConsumerId: 'CUST-2001', tool: 'DEBT_READ', decision: 'ALLOW' }),
-      createAttempt({ requestId: 'REQ-015', label: '가족 소득자료 추가 조회', description: '가족은 현재 신청 건의 고객이 아니므로 금융시스템에 전달하지 않았습니다.', targetConsumerId: 'CUST-2099', tool: 'INCOME_READ', decision: 'BLOCK', reasonCodes: ['CASE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000141', label: '현재 고객 최신 소득자료 확인', description: '한도 증액 검토에 필요한 최신 소득자료를 확인했습니다.', targetConsumerId: 'CUST-2001', tool: 'INCOME_READ', decision: 'ALLOW' }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000142', label: '현재 고객 부채 변동 확인', description: '변경된 상환부담을 확인할 부채자료를 조회했습니다.', targetConsumerId: 'CUST-2001', tool: 'DEBT_READ', decision: 'ALLOW' }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000143', label: '가족 소득자료 추가 조회', description: 'AI가 참고자료로 가족 소득을 추가 확인하려 했지만, 가족은 현재 신청 건의 고객이 아니어서 금융시스템에 전달하지 않았습니다.', targetConsumerId: 'CUST-2099', tool: 'INCOME_READ', decision: 'BLOCK', reasonCodes: ['CASE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
     ],
   },
   DOCUMENT_REVIEW: {
@@ -151,18 +169,74 @@ export const agentExecutionFixtures = {
     resultItems: ['추가 소득자료 확인 완료', '추가 부채자료 확인 완료', '동의 만료 자료 조회 1건 차단', '심사서류 보완 건에 결과 연결 완료'],
     nextAction: '보완자료를 확인하고 서류 검토를 완료해 주세요.',
     attempts: [
-      createAttempt({ requestId: 'REQ-027-A', label: '추가 제출 소득자료 확인', description: '현재 고객 동의가 유효한 보완자료를 확인했습니다.', targetConsumerId: 'CUST-3001', tool: 'INCOME_READ', decision: 'ALLOW' }),
-      createAttempt({ requestId: 'REQ-027-B', label: '추가 제출 부채자료 확인', description: '보완 심사에 필요한 부채자료를 확인했습니다.', targetConsumerId: 'CUST-3001', tool: 'DEBT_READ', decision: 'ALLOW' }),
-      createAttempt({ requestId: 'REQ-028', label: '동의가 만료된 과거 소득자료 조회', description: '현재 고객이지만 자료 이용 동의가 만료되어 금융시스템에 전달하지 않았습니다.', targetConsumerId: 'CUST-3001', tool: 'INCOME_READ', decision: 'BLOCK', reasonCodes: ['MANDATE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, mandate: 'VIOLATION' } }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000271', label: '추가 제출 소득자료 확인', description: '현재 고객 동의가 유효한 보완자료를 확인했습니다.', targetConsumerId: 'CUST-3001', tool: 'INCOME_READ', decision: 'ALLOW' }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000272', label: '추가 제출 부채자료 확인', description: '보완 심사에 필요한 부채자료를 확인했습니다.', targetConsumerId: 'CUST-3001', tool: 'DEBT_READ', decision: 'ALLOW' }),
+      createAttempt({ requestId: '00000000-0000-4000-8000-000000000273', label: '동의가 만료된 과거 소득자료 조회', description: 'AI가 과거 자료까지 확인하려 했지만 현재 고객의 자료 이용 동의가 만료되어 금융시스템에 전달하지 않았습니다.', targetConsumerId: 'CUST-3001', tool: 'INCOME_READ', decision: 'BLOCK', reasonCodes: ['MANDATE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, mandate: 'VIOLATION' } }),
     ],
   },
 }
 
+function createAuditEvent({
+  auditEventId,
+  requestId,
+  requestedAt,
+  caseId,
+  targetConsumerId,
+  requestedTool,
+  decision,
+  severity,
+  reasonCodes = [],
+  scopeStatus = okScope,
+  auditStatus = 'COMPLETED',
+  promptRisk = 0.05,
+  promptInjectionDetected = false,
+  behaviorRisk = 0.21,
+  behaviorRiskLevel = 'LOW',
+  behaviorAnomalyDetected = false,
+  riskFlagged = decision === 'BLOCK',
+}) {
+  return {
+    auditEventId,
+    requestId,
+    requestedAt,
+    agentId: 'LOAN-AGENT-01',
+    employeeId: 'EMP-101',
+    agentRunId: caseId.replace('LOAN-2026-', 'RUN-'),
+    caseId,
+    targetConsumerId,
+    requestedTool,
+    requestedData: requestedDataByTool[requestedTool],
+    decision,
+    auditStatus,
+    systemOutcome: auditStatus,
+    severity,
+    reasonCodes,
+    riskFlagged,
+    promptRisk,
+    promptEvaluationStatus: 'EVALUATED',
+    promptInjectionDetected,
+    promptModelVersion: 'prompt-guard-1',
+    behaviorRisk,
+    behaviorRiskLevel,
+    behaviorAnomalyDetected,
+    featureVersion: 'behavior-features-1',
+    behaviorModelVersion: 'iforest-1',
+    policyVersion: 'loan-review-policy-1',
+    hardRequestLimitExceeded: false,
+    downstreamReached: decision === 'ALLOW',
+    responseReleased: decision === 'ALLOW' && auditStatus === 'COMPLETED',
+    scopeStatus,
+  }
+}
+
 export const auditEventsFixture = [
-  { auditEventId: 'AUD-006', requestedAt: '2026-08-25T18:02:31+09:00', agentId: 'LOAN-AGENT-01', employeeId: 'EMP-101', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', tool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['MANDATE_SCOPE_VIOLATION'], riskFlagged: true, promptRisk: 0.08, behaviorRisk: 0.22, downstreamReached: false, responseReleased: false, scopeStatus: { customerScope: 'OK', toolScope: 'OK', dataScope: 'OK', mandate: 'VIOLATION' } },
-  { auditEventId: 'AUD-005', requestedAt: '2026-08-25T17:58:14+09:00', agentId: 'LOAN-AGENT-01', employeeId: 'EMP-101', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', tool: 'DEBT_READ', decision: 'ALLOW', severity: 'LOW', reasonCodes: [], riskFlagged: false, promptRisk: 0.03, behaviorRisk: 0.16, downstreamReached: true, responseReleased: true, scopeStatus: okScope },
-  { auditEventId: 'AUD-004', requestedAt: '2026-08-25T17:53:10+09:00', agentId: 'LOAN-AGENT-01', employeeId: 'EMP-101', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2099', tool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], riskFlagged: true, promptRisk: 0.07, behaviorRisk: 0.24, downstreamReached: false, responseReleased: false, scopeStatus: { ...okScope, customerScope: 'VIOLATION' } },
-  { auditEventId: 'AUD-003', requestedAt: '2026-08-25T17:48:22+09:00', agentId: 'LOAN-AGENT-01', employeeId: 'EMP-101', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2001', tool: 'INCOME_READ', decision: 'ERROR', severity: 'HIGH', reasonCodes: ['DOWNSTREAM_TIMEOUT'], riskFlagged: true, promptRisk: 0.04, behaviorRisk: 0.18, downstreamReached: true, responseReleased: false, scopeStatus: okScope },
-  { auditEventId: 'AUD-002', requestedAt: '2026-08-25T17:44:06+09:00', agentId: 'LOAN-AGENT-01', employeeId: 'EMP-101', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-9999', tool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], riskFlagged: true, promptRisk: 0.12, behaviorRisk: 0.31, downstreamReached: false, responseReleased: false, scopeStatus: { ...okScope, customerScope: 'VIOLATION' } },
-  { auditEventId: 'AUD-001', requestedAt: '2026-08-25T17:39:41+09:00', agentId: 'LOAN-AGENT-01', employeeId: 'EMP-101', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-1001', tool: 'CREDIT_SCORE_READ', decision: 'ALLOW', severity: 'LOW', reasonCodes: [], riskFlagged: false, promptRisk: 0.05, behaviorRisk: 0.21, downstreamReached: true, responseReleased: true, scopeStatus: okScope },
+  createAuditEvent({ auditEventId: 'AUD-009', requestId: '00000000-0000-4000-8000-000000009009', requestedAt: '2026-08-25T18:15:42+09:00', caseId: 'LOAN-2026-031', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['BEHAVIOR_ANOMALY'], behaviorRisk: 0.97, behaviorRiskLevel: 'CRITICAL', behaviorAnomalyDetected: true, riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-008', requestId: '00000000-0000-4000-8000-000000008008', requestedAt: '2026-08-25T18:11:27+09:00', caseId: 'LOAN-2026-030', targetConsumerId: 'CUST-1001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['PROMPT_INJECTION'], promptRisk: 0.96, promptInjectionDetected: true, riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-007', requestId: '00000000-0000-4000-8000-000000007007', requestedAt: '2026-08-25T18:07:03+09:00', caseId: 'LOAN-2026-029', targetConsumerId: 'CUST-1001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'HIGH', behaviorRisk: 0.78, behaviorRiskLevel: 'ALERT', riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-006', requestId: '00000000-0000-4000-8000-000000006006', requestedAt: '2026-08-25T18:02:31+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['MANDATE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, mandate: 'VIOLATION' } }),
+  createAuditEvent({ auditEventId: 'AUD-005', requestId: '00000000-0000-4000-8000-000000005005', requestedAt: '2026-08-25T17:58:14+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'LOW', promptRisk: 0.03, behaviorRisk: 0.16 }),
+  createAuditEvent({ auditEventId: 'AUD-004', requestId: '00000000-0000-4000-8000-000000004004', requestedAt: '2026-08-25T17:53:10+09:00', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2099', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
+  createAuditEvent({ auditEventId: 'AUD-003', requestId: '00000000-0000-4000-8000-000000003003', requestedAt: '2026-08-25T17:48:22+09:00', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2001', requestedTool: 'INCOME_READ', decision: 'ALLOW', auditStatus: 'ERROR', severity: 'HIGH', reasonCodes: ['DOWNSTREAM_TIMEOUT'], promptRisk: 0.04, behaviorRisk: 0.18, riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-002', requestId: '00000000-0000-4000-8000-000000002002', requestedAt: '2026-08-25T17:44:06+09:00', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-9999', requestedTool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], promptRisk: 0.12, behaviorRisk: 0.31, scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
+  createAuditEvent({ auditEventId: 'AUD-001', requestId: '00000000-0000-4000-8000-000000001001', requestedAt: '2026-08-25T17:39:41+09:00', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'ALLOW', severity: 'LOW' }),
 ]
