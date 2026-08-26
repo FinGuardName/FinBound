@@ -254,6 +254,74 @@ class CoreApiCredentialFilterHttpTest {
         assertThat(response.getHeaders().getAccessControlAllowOrigin()).isNull();
     }
 
+    /**
+     * {@code Authorization} 헤더가 둘이면 거부한다.
+     *
+     * <p>어느 쪽을 유효한 값으로 고를지는 컨테이너·프록시마다 다르다. 앞의 것을 보는 중간 장비와 뒤의
+     * 것을 보는 Core가 섞이면, 유효한 헤더 하나와 원하는 헤더 하나를 함께 보내는 것으로 판정을 갈라놓을
+     * 수 있다. 고르지 않고 거부한다.
+     */
+    @Test
+    void rejectsARequestCarryingTwoAuthorizationHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.AUTHORIZATION, "Bearer test-operator-credential");
+        headers.add(HttpHeaders.AUTHORIZATION, "Bearer test-viewer-credential");
+
+        assertThat(postAgentRun(headers).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    /** scheme 없이 값만 보내는 것을 받아주면 {@code Bearer} 계약이 사실상 없는 것이 된다. */
+    @Test
+    void rejectsACredentialSentWithoutTheBearerScheme() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(HttpHeaders.AUTHORIZATION, "test-operator-credential");
+
+        assertThat(postAgentRun(headers).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    /**
+     * 소문자 {@code bearer}도 거부한다.
+     *
+     * <p>RFC 상 scheme은 대소문자를 가리지 않지만, 이 계약은 받아들이는 형태를 하나로 좁히기로 했다.
+     * 넓게 받으면 그만큼 필터와 다른 장비의 해석이 갈릴 여지가 생긴다.
+     */
+    @Test
+    void rejectsALowercaseBearerScheme() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(HttpHeaders.AUTHORIZATION, "bearer test-operator-credential");
+
+        assertThat(postAgentRun(headers).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void rejectsABearerSchemeWithNoTokenAfterIt() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(HttpHeaders.AUTHORIZATION, "Bearer ");
+
+        assertThat(postAgentRun(headers).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    private ResponseEntity<JsonNode> postAgentRun(HttpHeaders headers) {
+        return restTemplate.exchange(
+                URI.create(base() + "/api/v1/agent-runs"),
+                HttpMethod.POST,
+                new HttpEntity<>(
+                        """
+                        {
+                          "employeeId": "EMP-101",
+                          "consumerId": "CUST-1001",
+                          "taskType": "LOAN_REVIEW",
+                          "inputText": "대출 심사를 시작해 주세요"
+                        }
+                        """,
+                        headers),
+                JsonNode.class);
+    }
+
     /** actuator는 필터 등록 패턴 밖이다. 인증 경계가 어디까지인지 명시해 둔다. */
     @Test
     void leavesActuatorOutsideTheCredentialFilter() {
