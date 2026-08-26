@@ -1,6 +1,7 @@
 package io.finguard.core.security;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -35,17 +36,41 @@ public class CoreApiAuthEventRecorder {
 
     private final SecurityEventService securityEvents;
     private final Clock clock;
+    private final AuthFailureWriteLimiter limiter;
 
-    public CoreApiAuthEventRecorder(SecurityEventService securityEvents, Clock clock) {
+    public CoreApiAuthEventRecorder(
+            SecurityEventService securityEvents, Clock clock, AuthFailureWriteLimiter limiter) {
         this.securityEvents = securityEvents;
         this.clock = clock;
+        this.limiter = limiter;
     }
 
     public void record(HttpServletRequest request, ReasonCode reasonCode) {
         String requestId = requestId(request);
         try {
+            Instant now = clock.instant();
+            // 출처는 한도의 키로만 쓰고 저장하지 않는다. 소금 없는 IP 해시는 되돌릴 수 있어서
+            // "비식별"이 성립하지 않는다 — SecurityEventService.recordCoreApiAuthFailure Javadoc.
+            AuthFailureWriteLimiter.Decision decision =
+                    limiter.tryAcquire(request.getRemoteAddr(), now);
+
+            if (decision.droppedInClosedWindow() > 0) {
+                // 버린 건수를 한 건으로 남긴다. 이게 없으면 "조용했다"와 "폭주를 통째로 버렸다"가
+                // 기록상 같아 보인다.
+                log.warn(
+                        "Security auth event writes throttled. dropped={} requestId={}",
+                        decision.droppedInClosedWindow(),
+                        requestId);
+                securityEvents.recordCoreApiWriteThrottled(
+                        requestId, decision.droppedInClosedWindow(), now);
+            }
+
+            if (!decision.allowed()) {
+                return;
+            }
+
             securityEvents.recordCoreApiAuthFailure(
-                    requestId, request.getHeader(TRACEPARENT_HEADER), reasonCode, clock.instant());
+                    requestId, request.getHeader(TRACEPARENT_HEADER), reasonCode, now);
         } catch (RuntimeException exception) {
             // 거부는 이미 응답에 실렸다. 여기서 할 수 있는 건 기록을 못 남겼다고 알리는 것뿐이다.
             log.error(

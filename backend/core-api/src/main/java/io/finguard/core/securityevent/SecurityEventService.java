@@ -55,6 +55,29 @@ public class SecurityEventService {
                         occurredAt));
     }
 
+    /**
+     * 한도에 걸려 버린 인증 실패 기록을 한 건으로 갈음한다.
+     *
+     * <p>"실패마다 1건 기록"과 "적대적 트래픽에서 저장소 유한"은 동시에 성립하지 않는다. 후자를 택하되
+     * 버렸다는 사실 자체는 남긴다 — 그래야 조용한 구간과 통째로 버린 구간이 구분된다.
+     *
+     * <p>버린 건수는 로그에만 남는다. {@code security_auth_events}에 수량 칸이 없고, 그것 하나 때문에
+     * 공용 스키마를 바꾸는 것은 값어치에 비해 크다.
+     */
+    @Transactional
+    public void recordCoreApiWriteThrottled(String requestId, long dropped, Instant occurredAt) {
+        securityEvents.saveAndFlush(
+                new SecurityAuthEvent(
+                        RecordIdentifiers.securityEventId(),
+                        requestId,
+                        null,
+                        SecurityEventType.RATE_LIMITED,
+                        ReasonCode.REQUEST_RATE_LIMITED.name(),
+                        CORE_API_CREDENTIAL_TYPE,
+                        null,
+                        occurredAt));
+    }
+
     @Transactional
     public SecurityEventResponse recordAuthFailure(AuthFailureEventRequest request) {
         SecurityAuthEvent event =

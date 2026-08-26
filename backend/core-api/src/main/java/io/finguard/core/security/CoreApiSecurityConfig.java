@@ -1,5 +1,6 @@
 package io.finguard.core.security;
 
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -44,6 +45,20 @@ public class CoreApiSecurityConfig implements WebMvcConfigurer {
                         DispatcherType.ERROR));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;
+    }
+
+    /**
+     * 인증 실패 기록의 쓰기 한도.
+     *
+     * <p>값은 설정이 아니라 상수다. 한도를 낮춰 기록을 조용히 없앨 수 있게 만들면 그것이 은폐 수단이
+     * 된다. 조정이 필요해지면 그때 근거와 함께 설정으로 뺀다.
+     *
+     * <p>출처당 분당 20건은 사람이 자격 증명을 잘못 넣는 속도보다 한참 위이고, 자동화된 시도라면 20건
+     * 안에 이미 드러난다. 출처 1000개는 그 맵 자체가 미인증 트래픽이 키우는 자료구조이기 때문에 둔다.
+     */
+    @Bean
+    AuthFailureWriteLimiter authFailureWriteLimiter() {
+        return new AuthFailureWriteLimiter(20, 1000, Duration.ofMinutes(1));
     }
 
     @Override
