@@ -6,6 +6,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.finguard.core.security.CoreApiAccessDeniedException;
+import io.finguard.core.security.CoreApiPrincipal;
+import io.finguard.core.security.CoreApiRole;
+import io.finguard.core.security.RequiresRole;
 import jakarta.validation.Valid;
 
 /**
@@ -23,8 +27,24 @@ public class AgentRunController {
         this.agentRunService = agentRunService;
     }
 
+    /**
+     * Body의 {@code employeeId}는 조회할 업무 대상을 표시하는 값이지 인증수단이 아니다 — §3.
+     *
+     * <p>대조를 {@link AgentRunService#start} 진입 전에 끝낸다. 그 안으로 들어가면 이 값으로 해당 직원의
+     * 권한을 조회해 Task Passport가 발급되는데, 발급된 Passport는 {@code agentId}·{@code caseId}·
+     * {@code sourceVersions}가 내부적으로 일관돼서 <strong>Runtime Resolver가 나중에 되돌릴 수 없다.</strong>
+     * 그 시점에는 대조할 인증 Identity가 남아 있지 않기 때문이다.
+     */
     @PostMapping("/api/v1/agent-runs")
-    public ResponseEntity<AgentRunResponse> create(@Valid @RequestBody AgentRunCreateRequest request) {
+    @RequiresRole(CoreApiRole.OPERATOR)
+    public ResponseEntity<AgentRunResponse> create(
+            @Valid @RequestBody AgentRunCreateRequest request, CoreApiPrincipal principal) {
+        if (!principal.employeeId().equals(request.employeeId())) {
+            // 어느 쪽 값도 메시지에 담지 않는다 — docs/06 §26.
+            throw new CoreApiAccessDeniedException(
+                    "EMPLOYEE_IDENTITY_MISMATCH", "요청한 Employee가 Credential에 묶인 Employee와 다릅니다.");
+        }
+
         AgentRunStarted started =
                 agentRunService.start(
                         request.employeeId(), request.consumerId(), request.taskType(), request.inputText());

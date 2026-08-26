@@ -14,6 +14,7 @@ import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
 import io.finguard.core.history.InvalidBehaviorHistoryWindowException;
 import io.finguard.core.permission.PermissionNotIssuableException;
+import io.finguard.core.security.CoreApiAccessDeniedException;
 import io.finguard.core.securityevent.SecurityEventWriteException;
 
 /**
@@ -71,6 +72,15 @@ public class CoreApiExceptionHandler {
                 HttpStatus.UNPROCESSABLE_ENTITY,
                 exception.getReasonCode(),
                 "Task Passport를 발급할 수 없는 상태입니다.");
+    }
+
+    /**
+     * 인증은 됐지만 자격이 없다. 어느 Role이 필요한지, 어떤 Employee가 묶여 있는지는 알려주지 않는다 —
+     * 거부 사유를 좁혀 주면 그것 자체가 탐색의 실마리가 된다({@code docs/06} §26).
+     */
+    @ExceptionHandler(CoreApiAccessDeniedException.class)
+    ResponseEntity<ProblemDetail> handleAccessDenied(CoreApiAccessDeniedException exception) {
+        return problem(HttpStatus.FORBIDDEN, exception.getReasonCode(), "이 요청을 수행할 자격이 없습니다.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
