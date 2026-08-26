@@ -6,7 +6,6 @@ import { finguardApi } from '../services/finguardApi'
 
 const workCatalog = ref([])
 const selectedWorkId = ref('')
-const selectedScenario = ref('IN_SCOPE')
 const execution = ref(null)
 const executionError = ref('')
 const loading = ref(false)
@@ -17,9 +16,10 @@ onMounted(async () => {
 })
 
 const workContext = computed(() => workCatalog.value.find((work) => work.id === selectedWorkId.value))
+const allowedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'ALLOW') ?? [])
+const blockedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'BLOCK') ?? [])
 
 watch(selectedWorkId, () => {
-  selectedScenario.value = 'IN_SCOPE'
   execution.value = null
   executionError.value = ''
 })
@@ -29,10 +29,7 @@ async function runAgentTask() {
   execution.value = null
   executionError.value = ''
   try {
-    execution.value = await finguardApi.executeAgentTask({
-      workId: selectedWorkId.value,
-      scenario: selectedScenario.value,
-    })
+    execution.value = await finguardApi.executeAgentTask({ workId: selectedWorkId.value })
   } catch {
     executionError.value = '업무를 처리하지 못했습니다. 고객 자료는 조회하지 않았습니다. 잠시 후 다시 시도해 주세요.'
   } finally {
@@ -95,19 +92,15 @@ async function runAgentTask() {
             <div><h3>AI 업무 도우미</h3><p>반복적인 자료 확인을 대신하고, 결과를 현재 대출 신청 건에 정리합니다.</p></div>
             <span class="protected-label">업무 보호 적용</span>
           </div>
-          <fieldset>
-            <legend>어떤 자료를 확인할까요?</legend>
-            <label v-for="scenario in workContext.scenarios" :key="scenario.id" :class="['task-option', { selected: selectedScenario === scenario.id }]">
-              <input v-model="selectedScenario" type="radio" :value="scenario.id" />
-              <span :class="['task-option-icon', scenario.id === 'IN_SCOPE' ? 'safe' : 'compare']" aria-hidden="true">{{ scenario.icon }}</span>
-              <span><strong>{{ scenario.title }}</strong><small>{{ scenario.description }}</small></span>
-              <em>{{ scenario.tag }}</em>
-            </label>
-          </fieldset>
+          <div class="employee-request">
+            <span class="employee-request-icon" aria-hidden="true">✓</span>
+            <div><small>직원이 요청한 업무</small><strong>{{ workContext.employeeRequest.title }}</strong><p>{{ workContext.employeeRequest.description }}</p></div>
+            <span class="request-scope-label">현재 신청 건</span>
+          </div>
           <button class="primary-button run-agent-button" type="submit" :disabled="loading">
-            <span aria-hidden="true">✦</span>{{ loading ? '심사자료 확인 중…' : 'AI로 심사자료 확인' }}
+            <span aria-hidden="true">✦</span>{{ loading ? '업무 처리 중…' : 'AI로 이 업무 진행' }}
           </button>
-          <p class="employee-guide">직원은 평소처럼 필요한 업무만 선택하면 됩니다. AI의 자료 접근 범위는 시스템이 자동으로 확인합니다.</p>
+          <p class="employee-guide">직원은 업무만 요청합니다. AI가 확인할 고객과 자료 범위는 현재 신청 건을 기준으로 시스템이 자동 결정합니다.</p>
         </form>
       </article>
 
@@ -165,19 +158,35 @@ async function runAgentTask() {
       </div>
 
       <template v-else>
-        <div :class="['decision-banner', execution.decision.toLowerCase()]">
-          <div class="decision-icon" aria-hidden="true">{{ execution.decision === 'ALLOW' ? '✓' : '!' }}</div>
+        <div class="decision-banner protected">
+          <div class="decision-icon" aria-hidden="true">✓</div>
           <div><p class="section-kicker">AI 업무 처리 결과</p><h2>{{ execution.title }}</h2><p>{{ execution.message }}</p></div>
-          <span class="plain-decision">{{ execution.decision === 'ALLOW' ? '확인 완료' : '안전 중단' }}</span>
+          <span class="plain-decision">업무 완료 · 보호 {{ blockedAttempts.length }}건</span>
         </div>
 
         <div class="execution-content">
           <div class="work-progress">
-            <h3>처리 과정</h3>
-            <ol aria-label="AI 업무 처리 단계">
-              <li v-for="step in execution.steps" :key="step.id" :class="step.state.toLowerCase()">
-                <span class="timeline-marker">{{ step.state === 'ALLOW' ? '✓' : '!' }}</span>
-                <div><small>{{ step.label }}</small><strong>{{ step.title }}</strong><p>{{ step.description }}</p></div>
+            <div class="attempt-heading"><div><p class="section-kicker">AI가 시도한 작업</p><h3>자료별 접근 결과</h3></div><span>{{ allowedAttempts.length }}건 확인 · {{ blockedAttempts.length }}건 차단</span></div>
+            <ol class="attempt-list" aria-label="AI 자료 접근 결과">
+              <li v-for="attempt in execution.attempts" :key="attempt.requestId" :class="attempt.decision.toLowerCase()">
+                <span class="timeline-marker">{{ attempt.decision === 'ALLOW' ? '✓' : '!' }}</span>
+                <div class="attempt-copy">
+                  <small>{{ attempt.decision === 'ALLOW' ? '현재 업무에 필요' : '현재 업무 범위 밖' }}</small>
+                  <strong>{{ attempt.label }}</strong>
+                  <p>{{ attempt.description }}</p>
+                  <details class="attempt-details">
+                    <summary>보안 처리 내역</summary>
+                    <dl>
+                      <div><dt>요청 번호</dt><dd>{{ attempt.requestId }}</dd></div>
+                      <div><dt>요청 고객</dt><dd>{{ attempt.targetConsumerId }}</dd></div>
+                      <div><dt>업무 범위</dt><dd><StatusBadge :value="attempt.scopeStatus.customerScope" /></dd></div>
+                      <div><dt>처리 코드</dt><dd class="reason-code">{{ attempt.reasonCodes[0] || 'POLICY_REQUIREMENTS_MET' }}</dd></div>
+                      <div><dt>금융시스템 조회</dt><dd>{{ attempt.downstreamReached ? '완료 · 1회' : '차단 · 0회' }}</dd></div>
+                      <div><dt>도구</dt><dd>{{ attempt.tool }}</dd></div>
+                    </dl>
+                  </details>
+                </div>
+                <span class="attempt-decision">{{ attempt.decision === 'ALLOW' ? '확인 완료' : '조회 차단' }}</span>
               </li>
             </ol>
           </div>
@@ -186,19 +195,8 @@ async function runAgentTask() {
             <p class="section-kicker">직원이 확인할 내용</p>
             <h3>{{ execution.resultHeading }}</h3>
             <ul><li v-for="item in execution.resultItems" :key="item">{{ item }}</li></ul>
-            <div :class="['next-action', execution.decision === 'ALLOW' ? 'safe' : 'blocked']"><strong>다음 업무</strong>{{ execution.nextAction }}</div>
-
-            <details class="security-details result-details">
-              <summary>보안 처리 내역 보기</summary>
-              <dl>
-                <div><dt>요청 번호</dt><dd>{{ execution.requestId }}</dd></div>
-                <div><dt>요청 고객</dt><dd>{{ execution.targetConsumerId }}</dd></div>
-                <div><dt>업무 범위</dt><dd><StatusBadge :value="execution.scopeStatus.customerScope" /></dd></div>
-                <div><dt>처리 코드</dt><dd class="reason-code">{{ execution.reasonCodes[0] || 'POLICY_REQUIREMENTS_MET' }}</dd></div>
-                <div><dt>금융시스템 조회</dt><dd>{{ execution.downstreamReached ? '완료 · 1회' : '조회 안 함 · 0회' }}</dd></div>
-              </dl>
-              <p>Tool: {{ execution.tool }}</p>
-            </details>
+            <div class="protection-summary"><strong>FinGuard 보호 작동</strong><p>차단된 추가 조회는 금융시스템에 전달되지 않았습니다. 현재 고객의 정상 심사자료만 결과에 포함했습니다.</p></div>
+            <div class="next-action safe"><strong>다음 업무</strong>{{ execution.nextAction }}</div>
           </aside>
         </div>
       </template>
