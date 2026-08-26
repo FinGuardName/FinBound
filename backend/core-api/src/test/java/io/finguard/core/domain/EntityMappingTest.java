@@ -30,7 +30,13 @@ import jakarta.persistence.EntityManager;
  * "컬럼이 있다"까지는 기동 자체가 보증한다. 여기서 보는 것은 그 다음이다 — 값이 왕복하는가,
  * 제약이 실제로 거부하는가, 시각이 보존되는가.
  */
-@SpringBootTest(properties = "finguard.internal.credential=test-internal-credential")
+@SpringBootTest(
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @Testcontainers
 @Transactional
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)

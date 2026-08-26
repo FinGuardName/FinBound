@@ -19,7 +19,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>{@code ddl-auto: validate}는 스키마를 만들지 않는다. 스키마의 주인은 {@code db/migration}의
  * 마이그레이션이다 — docs/adr/0002-flyway-owns-core-api-schema.md.
  */
-@SpringBootTest(properties = "finguard.internal.credential=test-internal-credential")
+@SpringBootTest(
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @Testcontainers
 class CoreApiBootstrapTest {
 

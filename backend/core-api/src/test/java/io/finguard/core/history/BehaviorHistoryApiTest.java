@@ -30,7 +30,12 @@ import io.finguard.core.security.InternalCredentialFilter;
 /** Behavior History의 실제 HTTP/PostgreSQL 조회 경계. */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "finguard.internal.credential=test-internal-credential")
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @Testcontainers
 class BehaviorHistoryApiTest {
 
