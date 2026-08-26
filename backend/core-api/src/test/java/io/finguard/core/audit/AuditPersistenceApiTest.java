@@ -3,6 +3,7 @@ package io.finguard.core.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,28 @@ class AuditPersistenceApiTest {
                         String.class,
                         requestId);
         assertThat(storedAgent).isEqualTo("LOAN-AGENT-01");
+    }
+
+    /**
+     * Behavior History(§9)는 {@code caseId}·{@code targetConsumerId}·{@code tool}을 함께 돌려준다.
+     * 생성 경로가 이 Context를 받지 않으면 컬럼이 영영 비어 이력이 어떤 업무였는지 말하지 못한다.
+     */
+    @Test
+    void persistsToolAndCaseContextGivenAtCreation() {
+        String requestId = requestId();
+
+        ResponseEntity<JsonNode> response =
+                createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Map<String, Object> stored =
+                jdbcTemplate.queryForMap(
+                        "select case_id, target_consumer_id, requested_tool from audit_events"
+                                + " where request_id = ?",
+                        requestId);
+        assertThat(stored.get("case_id")).isEqualTo("LOAN-2026-001");
+        assertThat(stored.get("target_consumer_id")).isEqualTo("CUST-1001");
+        assertThat(stored.get("requested_tool")).isEqualTo("CREDIT_SCORE_READ");
     }
 
     @Test
@@ -164,6 +187,7 @@ class AuditPersistenceApiTest {
                           "reasonCodes": [],
                           "downstreamReached": true,
                           "responseReleased": true,
+                          "success": true,
                           "behaviorRisk": 0.08,
                           "policyVersion": "loan-review-policy-1",
                           "completedAt": "%s"
@@ -177,6 +201,52 @@ class AuditPersistenceApiTest {
         assertThat(response.getBody().get("status").asText()).isEqualTo("COMPLETED");
         assertThat(response.getBody().get("downstreamReached").asBoolean()).isTrue();
         assertThat(response.getBody().get("responseReleased").asBoolean()).isTrue();
+    }
+
+    /**
+     * Behavior History(§9)가 {@code success}·{@code latencyMs}를 싣기로 돼 있는데, 완료 경로가 그
+     * 값을 받지 않으면 이력이 전부 null이 되어 AI Risk에 넘길 근거가 사라진다.
+     */
+    @Test
+    void persistsExecutionMeasurementsFromTheOutcomeRequest() {
+        String requestId = requestId();
+        createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        ResponseEntity<JsonNode> response =
+                updateOutcome(
+                        requestId,
+                        "LOAN-AGENT-01",
+                        """
+                        {
+                          "decision": "ALLOW",
+                          "systemOutcome": "COMPLETED",
+                          "reasonCodes": [],
+                          "downstreamReached": true,
+                          "responseReleased": true,
+                          "success": true,
+                          "recordsRead": 1,
+                          "latencyMs": 120,
+                          "behaviorRisk": 0.08,
+                          "policyVersion": "loan-review-policy-1",
+                          "completedAt": "%s"
+                        }
+                        """
+                                .formatted(COMPLETED_AT));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("success").asBoolean()).isTrue();
+        assertThat(response.getBody().get("recordsRead").asInt()).isEqualTo(1);
+        assertThat(response.getBody().get("latencyMs").asLong()).isEqualTo(120L);
+
+        Map<String, Object> stored =
+                jdbcTemplate.queryForMap(
+                        "select success, records_read, latency_ms from audit_events"
+                                + " where request_id = ?",
+                        requestId);
+        assertThat(stored.get("success")).isEqualTo(true);
+        assertThat(stored.get("records_read")).isEqualTo(1);
+        assertThat(stored.get("latency_ms")).isEqualTo(120L);
     }
 
     @Test
@@ -195,6 +265,8 @@ class AuditPersistenceApiTest {
                           "reasonCodes": ["DOWNSTREAM_TIMEOUT"],
                           "downstreamReached": true,
                           "responseReleased": false,
+                          "success": false,
+                          "errorLocation": "MOCK_FINANCE",
                           "policyVersion": "loan-review-policy-1",
                           "completedAt": "%s"
                         }
@@ -205,8 +277,94 @@ class AuditPersistenceApiTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().get("decision").asText()).isEqualTo("ALLOW");
         assertThat(response.getBody().get("status").asText()).isEqualTo("ERROR");
+        assertThat(response.getBody().get("errorLocation").asText()).isEqualTo("MOCK_FINANCE");
         assertThat(response.getBody().get("reasonCodes").get(0).asText())
                 .isEqualTo("DOWNSTREAM_TIMEOUT");
+    }
+
+    /**
+     * {@code contracts/audit/execution-outcome.schema.json}은 ERROR에 {@code errorLocation}과
+     * {@code success=false}를 요구한다. 이걸 받지 않으면 모든 ERROR 기록이 스키마 위반으로 남는다.
+     */
+    @Test
+    void rejectsAnErrorOutcomeWithoutErrorLocation() {
+        String requestId = requestId();
+        createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        ResponseEntity<JsonNode> response =
+                updateOutcome(
+                        requestId,
+                        "LOAN-AGENT-01",
+                        """
+                        {
+                          "decision": "ALLOW",
+                          "systemOutcome": "ERROR",
+                          "reasonCodes": ["DOWNSTREAM_TIMEOUT"],
+                          "downstreamReached": true,
+                          "responseReleased": false,
+                          "success": false,
+                          "completedAt": "%s"
+                        }
+                        """
+                                .formatted(COMPLETED_AT));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(auditStatus(requestId)).isEqualTo("PROCESSING");
+    }
+
+    /** ERROR인데 {@code success=true}는 스키마가 금지한다. */
+    @Test
+    void rejectsAnErrorOutcomeThatClaimsSuccess() {
+        String requestId = requestId();
+        createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        ResponseEntity<JsonNode> response =
+                updateOutcome(
+                        requestId,
+                        "LOAN-AGENT-01",
+                        """
+                        {
+                          "decision": "ALLOW",
+                          "systemOutcome": "ERROR",
+                          "reasonCodes": ["DOWNSTREAM_TIMEOUT"],
+                          "downstreamReached": true,
+                          "responseReleased": false,
+                          "success": true,
+                          "errorLocation": "MOCK_FINANCE",
+                          "completedAt": "%s"
+                        }
+                        """
+                                .formatted(COMPLETED_AT));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(auditStatus(requestId)).isEqualTo("PROCESSING");
+    }
+
+    /** ALLOW + COMPLETED인데 {@code success}가 참이 아니면 스키마가 금지한다. */
+    @Test
+    void rejectsAnAllowedCompletionThatDidNotSucceed() {
+        String requestId = requestId();
+        createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        ResponseEntity<JsonNode> response =
+                updateOutcome(
+                        requestId,
+                        "LOAN-AGENT-01",
+                        """
+                        {
+                          "decision": "ALLOW",
+                          "systemOutcome": "COMPLETED",
+                          "reasonCodes": [],
+                          "downstreamReached": true,
+                          "responseReleased": true,
+                          "success": false,
+                          "completedAt": "%s"
+                        }
+                        """
+                                .formatted(COMPLETED_AT));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(auditStatus(requestId)).isEqualTo("PROCESSING");
     }
 
     @Test
@@ -353,6 +511,9 @@ class AuditPersistenceApiTest {
                   "traceId": "trace-21",
                   "agentRunId": "RUN-21",
                   "verifiedAgentId": "%s",
+                  "caseId": "LOAN-2026-001",
+                  "targetConsumerId": "CUST-1001",
+                  "requestedTool": "CREDIT_SCORE_READ",
                   "status": "PROCESSING",
                   "requestedAt": "%s"
                 }
