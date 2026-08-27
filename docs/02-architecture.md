@@ -276,8 +276,8 @@ Rego에서 raw Customer/Tool/Data 비교를 중복하지 않는다.
 
 ### 7.6 Vue Frontend
 
-- LoanAgent 실행 / Financial Case
-- Authority vs Effective Permission
+- AI 업무 지원 / LoanAgent 실행 / Financial Case
+  - Authority vs Effective Permission 비교를 현재 업무 보호 패널에 통합
 - Security Dashboard
 - Core/Gateway API만 호출
 - DB 직접 접근 금지

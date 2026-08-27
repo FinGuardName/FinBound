@@ -116,9 +116,9 @@ finguard/
 Frontend:
 
 ```text
-1. LoanAgent 실행 / Financial Case
-2. Employee Authority vs Agent Effective Permission
-3. Security Dashboard
+1. AI 업무 지원 / LoanAgent 실행 / Financial Case
+   - Employee Authority vs Agent Effective Permission 통합
+2. Security Dashboard
 ```
 
 AI:
@@ -217,7 +217,7 @@ SecurityAuthEvent
 
 ### Frontend & AI
 
-- Vue 3화면 Mock
+- Vue 2화면 Mock과 LoanAgent 실행 화면 내 Authority 비교 패널
 - FastAPI Skeleton
 - Behavior Feature Schema
 - Synthetic 샘플
@@ -354,21 +354,25 @@ Behavior Risk = CRITICAL
 
 ## 11. Phase 6 — Frontend Integration
 
-P0 3화면만 우선한다.
+P0는 두 개의 주요 화면을 우선한다.
 
-- LoanAgent 실행 / Case
-- Authority vs Effective Permission
+- AI 업무 지원 / LoanAgent 실행 / Case
+  - Authority vs Effective Permission 비교 근거를 현재 업무 보호 패널에 통합
 - Security Dashboard
+
+직원은 권한이나 위반 범위를 선택하지 않고 실제 금융업무만 선택한다. Agent Tool Call의
+대상·Tool·Data 범위는 서버 Context와 Task Passport로 결정한다.
 
 표시:
 
 ```text
 Scope Status
-Prompt Risk Snapshot
-Behavior Risk
-Decision
+Prompt Risk Snapshot / Evaluation Status / Model Version
+Behavior Risk / Risk Level / Feature Version / Model Version
+PolicyDecision / Audit·System Outcome
 Reason Code
-Downstream Reached
+Policy Version
+Downstream Reached / Response Released
 ```
 
 Vue는 DB를 직접 조회하지 않는다.
@@ -515,7 +519,7 @@ DB 접근은 Core Persistence Layer만 수행한다.
 
 ### Frontend
 
-- 핵심 3화면
+- 핵심 2화면과 실행 화면 내 Authority 비교 패널
 - DB 직접 접근 없음
 - Scope/Risk/Decision/Reason 표시
 
