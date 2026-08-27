@@ -116,6 +116,31 @@ def test_rapid_after_hours_pattern_is_critical() -> None:
     assert response.json()["isAnomaly"] is True
 
 
+def test_legitimate_overtime_pattern_remains_low() -> None:
+    now = datetime(2026, 8, 17, 11, 0, tzinfo=UTC)
+    history = [_event(index, now, interval_seconds=30) for index in range(7)]
+
+    response = client.post(
+        "/internal/v1/risk/behavior", json=_request(history, now), headers=INTERNAL_HEADERS
+    )
+
+    assert response.status_code == 200
+    assert response.json()["behaviorRiskLevel"] == "LOW"
+
+
+def test_rapid_business_hours_pattern_reaches_alert() -> None:
+    now = datetime(2026, 8, 17, 5, 0, tzinfo=UTC)
+    history = [_event(index, now, interval_seconds=8) for index in range(12)]
+
+    response = client.post(
+        "/internal/v1/risk/behavior", json=_request(history, now), headers=INTERNAL_HEADERS
+    )
+
+    assert response.status_code == 200
+    assert response.json()["behaviorRiskLevel"] in {"ALERT", "CRITICAL"}
+    assert response.json()["isAnomaly"] is True
+
+
 def test_behavior_endpoint_rejects_unknown_tool_and_data() -> None:
     now = datetime(2026, 8, 17, 14, 0, tzinfo=UTC)
     payload = _request([], now)

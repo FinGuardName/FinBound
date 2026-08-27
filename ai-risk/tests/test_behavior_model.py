@@ -32,12 +32,28 @@ def test_training_is_reproducible_for_fixed_seed() -> None:
     assert first_metrics == second_metrics
     assert first_metrics["validation"]["falsePositiveRateAtAlert"] <= 0.10
     assert first_metrics["heldOutTest"]["falsePositiveRateAtAlert"] <= 0.15
-    assert first_metrics["heldOutTest"]["falsePositiveRateAtCritical"] <= 0.15
+    assert first_metrics["heldOutTest"]["falsePositiveRateAtCritical"] <= 0.05
     assert 0 <= first.alert_threshold < first.critical_threshold <= 1
     assert first.alert_threshold == first_metrics["alertThreshold"]
     assert first.critical_threshold == first_metrics["criticalThreshold"]
     assert set(first_metrics["heldOutTest"]["scenarioMetrics"]) == set(NORMAL_SCENARIOS) | set(
         ANOMALY_SCENARIOS
+    )
+    stress = first_metrics["distributionShiftStressTest"]
+    assert stress["aggregate"]["rocAuc"]["minimum"] >= 0.90
+    assert stress["aggregate"]["recallAtAlert"]["minimum"] >= 0.95
+    assert stress["aggregate"]["falsePositiveRateAtCritical"]["maximum"] <= 0.10
+    assert all(
+        metrics["maxFalsePositiveRateAtCritical"] <= 0.15
+        for metrics in stress["normalScenarioWorstCase"].values()
+    )
+    assert all(
+        metrics["minRecallAtExpectedLevel"] >= 0.50
+        for metrics in stress["anomalyScenarioWorstCase"].values()
+    )
+    assert all(
+        metrics["recallAtExpectedLevel"] >= 0.90
+        for metrics in first_metrics["scenarioHoldoutTest"].values()
     )
 
 
@@ -76,6 +92,26 @@ def test_normal_samples_include_documented_variability() -> None:
     assert set(samples.normal_scenarios) == set(NORMAL_SCENARIOS)
     assert np.any(samples.normal[:, after_hours] == 1)
     assert np.any(samples.normal[:, after_hours] == 0)
+
+
+@pytest.mark.parametrize("profile", ["baseline", "shifted"])
+def test_normal_and_anomaly_feature_ranges_overlap(profile: str) -> None:
+    samples = generate_behavior_samples(random_seed=42, profile=profile)
+
+    for feature_name in (
+        "requestCount1m",
+        "requestCount5m",
+        "averageRequestIntervalMs",
+        "financialDataRequestCount5m",
+    ):
+        feature_index = FEATURE_NAMES.index(feature_name)
+        normal_min = np.min(samples.normal[:, feature_index])
+        normal_max = np.max(samples.normal[:, feature_index])
+        anomaly_min = np.min(samples.anomaly[:, feature_index])
+        anomaly_max = np.max(samples.anomaly[:, feature_index])
+
+        assert normal_min <= anomaly_max
+        assert anomaly_min <= normal_max
 
 
 def test_missing_model_is_an_explicit_error(tmp_path: Path) -> None:

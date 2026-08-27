@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from math import ceil
+from typing import Literal
 
 import numpy as np
 from sklearn.model_selection import GroupShuffleSplit
@@ -14,8 +15,9 @@ from app.schemas.behavior import (
     FinancialTool,
 )
 
-DATASET_VERSION = "synthetic-agent-log-2"
+DATASET_VERSION = "synthetic-agent-log-3"
 SAMPLES_PER_SESSION = 8
+WARMUP_EVENTS = 24
 HARD_REQUEST_LIMIT_1M = 30
 KST = timezone(timedelta(hours=9))
 TOOLS = tuple(FinancialTool)
@@ -29,8 +31,11 @@ NORMAL_SCENARIOS = (
 ANOMALY_SCENARIOS = (
     "RAPID_REPETITION",
     "AFTER_HOURS_ACCUMULATION",
-    "ERROR_BURST",
 )
+ANOMALY_EXPECTED_LEVELS = {
+    "RAPID_REPETITION": "ALERT",
+    "AFTER_HOURS_ACCUMULATION": "CRITICAL",
+}
 TOOL_DATA = {
     FinancialTool.CREDIT_SCORE_READ: FinancialDataType.CREDIT_SCORE,
     FinancialTool.INCOME_READ: FinancialDataType.INCOME,
@@ -68,14 +73,42 @@ def _tool_for(rng: np.random.Generator) -> FinancialTool:
     return TOOLS[int(rng.integers(0, len(TOOLS)))]
 
 
-def _normal_interval_seconds(rng: np.random.Generator, scenario: str, event_index: int) -> int:
+DatasetProfile = Literal["baseline", "shifted"]
+
+
+def _normal_interval_seconds(
+    rng: np.random.Generator,
+    scenario: str,
+    event_index: int,
+    profile: DatasetProfile,
+) -> int:
+    shifted = profile == "shifted"
     if scenario == "END_OF_DAY_INCREASE":
-        return int(rng.integers(10, 21))
+        return int(rng.integers(6 if shifted else 8, 36 if shifted else 31))
+    if scenario == "LEGITIMATE_OVERTIME":
+        return int(rng.integers(15 if shifted else 20, 81 if shifted else 91))
     if scenario == "HIGH_VALUE_CASE_EXTRA_READS":
-        return int(rng.integers(15, 31))
-    if scenario == "MOMENTARY_SPIKE" and 5 <= event_index % 12 <= 7:
-        return int(rng.integers(8, 16))
-    return int(rng.integers(30, 71))
+        return int(rng.integers(8 if shifted else 10, 46 if shifted else 41))
+    if scenario == "MOMENTARY_SPIKE" and 5 <= event_index % 12 <= 8:
+        return int(rng.integers(4 if shifted else 5, 26 if shifted else 21))
+    return int(rng.integers(15 if shifted else 20, 91 if shifted else 81))
+
+
+def _anomaly_interval_seconds(
+    rng: np.random.Generator,
+    scenario: str,
+    profile: DatasetProfile,
+) -> int:
+    shifted_ranges = {
+        "RAPID_REPETITION": (6, 24),
+        "AFTER_HOURS_ACCUMULATION": (6, 27),
+    }
+    baseline_ranges = {
+        "RAPID_REPETITION": (4, 19),
+        "AFTER_HOURS_ACCUMULATION": (5, 23),
+    }
+    low, high = (shifted_ranges if profile == "shifted" else baseline_ranges)[scenario]
+    return int(rng.integers(low, high))
 
 
 def _start_hour(rng: np.random.Generator, scenario: str) -> int:
@@ -101,8 +134,8 @@ def _session_vectors(
     session_index: int,
     scenario: str,
     anomalous: bool,
+    profile: DatasetProfile,
 ) -> np.ndarray:
-    warmup_events = 24 if anomalous else 9
     start_hour = _start_hour(rng, scenario)
     current_time = datetime(2026, 8, 17, start_hour, 0, tzinfo=KST)
     history: list[CompletedBehaviorEvent] = []
@@ -111,15 +144,11 @@ def _session_vectors(
     base_consumer_id = f"CUST-{session_index:04d}"
     session_tool = _tool_for(rng)
 
-    for event_index in range(warmup_events + SAMPLES_PER_SESSION):
+    for event_index in range(WARMUP_EVENTS + SAMPLES_PER_SESSION):
         if anomalous:
-            interval_seconds = {
-                "RAPID_REPETITION": int(rng.integers(3, 7)),
-                "AFTER_HOURS_ACCUMULATION": int(rng.integers(4, 10)),
-                "ERROR_BURST": int(rng.integers(5, 13)),
-            }[scenario]
+            interval_seconds = _anomaly_interval_seconds(rng, scenario, profile)
         else:
-            interval_seconds = _normal_interval_seconds(rng, scenario, event_index)
+            interval_seconds = _normal_interval_seconds(rng, scenario, event_index, profile)
         current_time += timedelta(seconds=interval_seconds)
         stable_tool_scenarios = {
             "STANDARD_BUSINESS_HOURS",
@@ -145,15 +174,13 @@ def _session_vectors(
             requestedData=[TOOL_DATA[tool]],
             requestedAt=current_time,
         )
-        if event_index >= warmup_events:
+        if event_index >= WARMUP_EVENTS:
             vectors.append(build_feature_vector(history, current_attempt))
 
-        if anomalous and scenario == "ERROR_BURST":
-            success = bool(rng.random() >= 0.65)
-            decision = Decision.ALLOW
-        else:
-            decision = Decision.BLOCK if rng.random() < 0.02 else Decision.ALLOW
-            success = decision is Decision.ALLOW and rng.random() >= 0.02
+        normal_error_probability = 0.04 if profile == "shifted" else 0.02
+        normal_block_probability = 0.03 if profile == "shifted" else 0.02
+        decision = Decision.BLOCK if rng.random() < normal_block_probability else Decision.ALLOW
+        success = decision is Decision.ALLOW and rng.random() >= normal_error_probability
 
         history.append(
             CompletedBehaviorEvent(
@@ -177,15 +204,16 @@ def _generate_grouped_vectors(
     prefix: str,
     count: int,
     anomalous: bool,
+    profile: DatasetProfile,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     vectors: list[np.ndarray] = []
     groups: list[str] = []
     scenarios: list[str] = []
     scenario_catalog = ANOMALY_SCENARIOS if anomalous else NORMAL_SCENARIOS
     for session_index in range(ceil(count / SAMPLES_PER_SESSION)):
-        session_id = f"{prefix}-{session_index:03d}"
+        session_id = f"{profile}-{prefix}-{session_index:03d}"
         scenario = scenario_catalog[session_index % len(scenario_catalog)]
-        session_vectors = _session_vectors(rng, session_index, scenario, anomalous)
+        session_vectors = _session_vectors(rng, session_index, scenario, anomalous, profile)
         vectors.extend(session_vectors)
         groups.extend([session_id] * len(session_vectors))
         scenarios.extend([scenario] * len(session_vectors))
@@ -196,15 +224,18 @@ def generate_behavior_samples(
     random_seed: int = 42,
     normal_count: int = 1600,
     anomaly_count: int = 320,
+    profile: DatasetProfile = "baseline",
 ) -> SyntheticBehaviorSamples:
     if normal_count <= 0 or anomaly_count <= 0:
         raise ValueError("Behavior sample counts must be positive")
+    if profile not in {"baseline", "shifted"}:
+        raise ValueError("Unknown synthetic behavior dataset profile")
     rng = np.random.default_rng(random_seed)
     normal, normal_sessions, normal_scenarios = _generate_grouped_vectors(
-        rng, "normal-session", normal_count, anomalous=False
+        rng, "normal-session", normal_count, anomalous=False, profile=profile
     )
     anomaly, anomaly_sessions, anomaly_scenarios = _generate_grouped_vectors(
-        rng, "anomaly-session", anomaly_count, anomalous=True
+        rng, "anomaly-session", anomaly_count, anomalous=True, profile=profile
     )
 
     if normal.shape[1] != len(FEATURE_NAMES):

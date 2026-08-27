@@ -60,10 +60,20 @@ Threshold를 선택합니다. 선택한 Alert/Critical Threshold는 모델 Bundl
 
 정상 데이터에는 표준 업무시간, 마감 전 요청 증가, 정상 야간 초과근무, 고액대출 Case 추가 조회,
 짧은 순간 Spike 및 Tool별 latency 차이를 포함합니다. 핵심 이상 데이터는 동일 Agent·Case·Consumer와
-허용 Tool/Data를 유지한 채 Hard Request Limit 이하의 빠른 반복, 야간 누적 호출, 오류 Burst를
-생성합니다. Case/Consumer 전환과 같은 Scope Violation은 Behavior 모델 학습·Calibration·핵심
-성능평가에 포함하지 않습니다. 이 합성 데이터와 평가지표는 P0 feasibility 검증용이며 실제 금융사
-환경에 대한 일반화 성능을 의미하지 않습니다.
+허용 Tool/Data를 유지한 채 Hard Request Limit 이하의 빠른 반복과 야간 누적 호출을 생성합니다.
+Case/Consumer 전환과 같은 Scope Violation은 Behavior 모델 학습·Calibration·핵심 성능평가에
+포함하지 않습니다.
+
+정상과 이상은 동일한 Warm-up Event 수를 사용하고, 요청 수·평균 간격·금융 데이터 요청 수의 생성
+범위가 서로 겹치도록 구성합니다. 따라서 특정 Label만 갖는 요청 수나 간격으로 정답을 바로 구분할 수
+없습니다. Session 분리 외에도 Scenario 계층 분할을 적용해 모든 정상·이상 Scenario가 Validation과
+Held-out Test에 포함되도록 합니다.
+
+동일 생성 분포의 Held-out Test만으로 일반화 성능을 판단하지 않습니다. 간격·오류율·정상 변동성을
+다르게 설정한 `shifted` Profile을 5개 별도 Seed로 평가하고 평균·표준편차·최악값을
+`evaluate/behavior_metrics.json`에 기록합니다. 또한 각 이상 Scenario를 Threshold 선정에서 제외한
+Scenario Hold-out 결과도 기록합니다. 이 합성 데이터와 평가지표는 P0 feasibility 검증용이며 실제
+금융사 환경에 대한 일반화 성능을 의미하지 않습니다.
 
 현재 `X-FinGuard-Service-Credential`, `FINGUARD_INTERNAL_CREDENTIAL`,
 `FINGUARD_BEHAVIOR_MODEL_PATH` 이름은 `docs/04-api-contract.md`와

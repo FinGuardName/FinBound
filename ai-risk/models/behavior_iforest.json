@@ -1,11 +1,11 @@
 {
   "modelVersion": "iforest-1",
   "featureVersion": "behavior-features-1",
-  "datasetVersion": "synthetic-agent-log-2",
+  "datasetVersion": "synthetic-agent-log-3",
   "randomSeed": 42,
   "alertThreshold": 0.9041666666666667,
-  "criticalThreshold": 0.9666666666666667,
-  "trainedAt": "2026-08-27T00:50:53.681518+00:00",
+  "criticalThreshold": 0.9916666666666667,
+  "trainedAt": "2026-08-27T09:00:59.152421+00:00",
   "featureNames": [
     "requestCount1m",
     "requestCount5m",
@@ -24,12 +24,12 @@
       "sessions": 140
     },
     "validation": {
-      "samples": 392,
-      "sessions": 49
+      "samples": 400,
+      "sessions": 50
     },
     "heldOutTest": {
-      "samples": 408,
-      "sessions": 51
+      "samples": 400,
+      "sessions": 50
     }
   }
 }
