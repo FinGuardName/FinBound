@@ -43,19 +43,27 @@ def _calibrated_risks(
 def _select_thresholds(
     normal_risks: np.ndarray,
     anomaly_risks: np.ndarray,
-    normal_scenarios: np.ndarray | None = None,
+    normal_scenarios: np.ndarray,
+    anomaly_scenarios: np.ndarray,
 ) -> tuple[float, float]:
-    labels = np.concatenate([np.zeros(len(normal_risks)), np.ones(len(anomaly_risks))])
+    alert_threshold = float(np.quantile(normal_risks, ALERT_NORMAL_QUANTILE, method="higher"))
+    critical_anomalies = np.asarray(
+        [ANOMALY_EXPECTED_LEVELS[str(scenario)] == "CRITICAL" for scenario in anomaly_scenarios]
+    )
+    if not np.any(critical_anomalies):
+        raise ValueError("Critical threshold calibration requires a CRITICAL scenario")
+
+    labels = np.concatenate([np.zeros(len(normal_risks)), critical_anomalies.astype(float)])
     risks = np.concatenate([normal_risks, anomaly_risks])
-    candidates = np.unique(risks)
+    candidates = np.unique(risks[risks > alert_threshold])
     best: tuple[float, float, float] | None = None
 
     for candidate in candidates:
         predictions = risks >= candidate
-        false_positive_rate = float(np.mean(predictions[labels == 0]))
+        false_positive_rate = float(np.mean(normal_risks >= candidate))
         if false_positive_rate > MAX_VALIDATION_FALSE_POSITIVE_RATE:
             continue
-        if normal_scenarios is not None and any(
+        if any(
             np.mean(normal_risks[normal_scenarios == scenario] >= candidate)
             > MAX_VALIDATION_FALSE_POSITIVE_RATE
             for scenario in np.unique(normal_scenarios)
@@ -72,9 +80,6 @@ def _select_thresholds(
         raise ValueError("No critical threshold satisfies the validation FPR constraint")
 
     critical_threshold = -best[2]
-    alert_threshold = float(np.quantile(normal_risks, ALERT_NORMAL_QUANTILE, method="higher"))
-    if alert_threshold >= critical_threshold:
-        alert_threshold = max(0.0, float(np.nextafter(critical_threshold, 0.0)))
     return alert_threshold, critical_threshold
 
 
@@ -94,8 +99,23 @@ def _evaluate(
     risks = _calibrated_risks(model, scaler, calibration_scores, features)
     alert_predictions = risks >= alert_threshold
     predictions = risks >= critical_threshold
-    precision, recall, f1, _ = precision_recall_fscore_support(
-        labels, predictions, average="binary", zero_division=0
+    critical_labels = np.concatenate(
+        [
+            np.zeros(len(normal)),
+            np.asarray(
+                [
+                    ANOMALY_EXPECTED_LEVELS[str(scenario)] == "CRITICAL"
+                    for scenario in anomaly_scenarios
+                ],
+                dtype=float,
+            ),
+        ]
+    )
+    critical_precision, critical_recall, critical_f1, _ = precision_recall_fscore_support(
+        critical_labels, predictions, average="binary", zero_division=0
+    )
+    alert_only_mask = np.asarray(
+        [ANOMALY_EXPECTED_LEVELS[str(scenario)] == "ALERT" for scenario in anomaly_scenarios]
     )
     scenario_metrics: dict[str, dict[str, float | int | str]] = {}
     for scenario in np.unique(normal_scenarios):
@@ -128,10 +148,13 @@ def _evaluate(
         "anomalySamples": len(anomaly),
         "falsePositiveRateAtAlert": float(np.mean(alert_predictions[labels == 0])),
         "recallAtAlert": float(np.mean(alert_predictions[labels == 1])),
-        "precisionAtCritical": float(precision),
-        "recallAtCritical": float(recall),
-        "f1AtCritical": float(f1),
+        "precisionAtCritical": float(critical_precision),
+        "recallAtCritical": float(critical_recall),
+        "f1AtCritical": float(critical_f1),
         "falsePositiveRateAtCritical": float(np.mean(predictions[labels == 0])),
+        "alertOnlyEscalationRateAtCritical": float(
+            np.mean(anomaly_critical_predictions[alert_only_mask])
+        ),
         "rocAuc": float(roc_auc_score(labels, risks)),
         "scenarioMetrics": scenario_metrics,
     }
@@ -154,50 +177,6 @@ def _split_summary(splits: BehaviorDataSplits) -> dict[str, dict[str, int]]:
     }
 
 
-def _scenario_holdout_metrics(
-    model: IsolationForest,
-    scaler: StandardScaler,
-    calibration_scores: np.ndarray,
-    splits: BehaviorDataSplits,
-) -> dict[str, dict[str, float | int | str]]:
-    validation_normal_risks = _calibrated_risks(
-        model, scaler, calibration_scores, splits.validation_normal
-    )
-    result: dict[str, dict[str, float | int | str]] = {}
-    for scenario in np.unique(splits.validation_anomaly_scenarios):
-        calibration_mask = splits.validation_anomaly_scenarios != scenario
-        held_out_mask = splits.test_anomaly_scenarios == scenario
-        calibration_anomaly_risks = _calibrated_risks(
-            model,
-            scaler,
-            calibration_scores,
-            splits.validation_anomaly[calibration_mask],
-        )
-        alert_threshold, critical_threshold = _select_thresholds(
-            validation_normal_risks,
-            calibration_anomaly_risks,
-            splits.validation_normal_scenarios,
-        )
-        held_out_risks = _calibrated_risks(
-            model,
-            scaler,
-            calibration_scores,
-            splits.test_anomaly[held_out_mask],
-        )
-        expected_level = ANOMALY_EXPECTED_LEVELS[str(scenario)]
-        expected_threshold = alert_threshold if expected_level == "ALERT" else critical_threshold
-        result[str(scenario)] = {
-            "samples": len(held_out_risks),
-            "expectedMinimumLevel": expected_level,
-            "alertThresholdWithoutScenario": alert_threshold,
-            "criticalThresholdWithoutScenario": critical_threshold,
-            "recallAtAlert": float(np.mean(held_out_risks >= alert_threshold)),
-            "recallAtCritical": float(np.mean(held_out_risks >= critical_threshold)),
-            "recallAtExpectedLevel": float(np.mean(held_out_risks >= expected_threshold)),
-        }
-    return result
-
-
 def _stress_test_metrics(
     model: IsolationForest,
     scaler: StandardScaler,
@@ -211,6 +190,7 @@ def _stress_test_metrics(
         "recallAtAlert",
         "recallAtCritical",
         "f1AtCritical",
+        "alertOnlyEscalationRateAtCritical",
         "rocAuc",
     )
     per_seed: list[dict[str, float | int]] = []
@@ -257,6 +237,7 @@ def _stress_test_metrics(
                         "expectedMinimumLevel": scenario_metrics["expectedMinimumLevel"],
                         "minRecallAtAlert": 1.0,
                         "minRecallAtCritical": 1.0,
+                        "maxRecallAtCritical": 0.0,
                         "minRecallAtExpectedLevel": 1.0,
                     },
                 )
@@ -266,6 +247,10 @@ def _stress_test_metrics(
                 )
                 current["minRecallAtCritical"] = min(
                     current["minRecallAtCritical"],
+                    float(scenario_metrics["recallAtCritical"]),
+                )
+                current["maxRecallAtCritical"] = max(
+                    current["maxRecallAtCritical"],
                     float(scenario_metrics["recallAtCritical"]),
                 )
                 expected_metric = (
@@ -324,6 +309,7 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
         validation_normal_risks,
         validation_anomaly_risks,
         splits.validation_normal_scenarios,
+        splits.validation_anomaly_scenarios,
     )
     bundle = BehaviorModelBundle(
         model=model,
@@ -358,9 +344,17 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
         "alertThreshold": alert_threshold,
         "criticalThreshold": critical_threshold,
         "thresholdSelection": {
-            "method": "validation-f1-with-global-and-per-scenario-fpr-constraints",
+            "method": "normal-quantile-alert-and-severity-aware-critical-f1",
             "maxFalsePositiveRate": MAX_VALIDATION_FALSE_POSITIVE_RATE,
             "alertNormalQuantile": ALERT_NORMAL_QUANTILE,
+            "criticalPositiveScenarios": [
+                scenario
+                for scenario, level in ANOMALY_EXPECTED_LEVELS.items()
+                if level == "CRITICAL"
+            ],
+            "alertOnlyScenarios": [
+                scenario for scenario, level in ANOMALY_EXPECTED_LEVELS.items() if level == "ALERT"
+            ],
         },
         "splitSummary": _split_summary(splits),
         "validation": _evaluate(
@@ -385,7 +379,6 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
             alert_threshold,
             critical_threshold,
         ),
-        "scenarioHoldoutTest": _scenario_holdout_metrics(model, scaler, calibration_scores, splits),
         "distributionShiftStressTest": _stress_test_metrics(
             model,
             scaler,

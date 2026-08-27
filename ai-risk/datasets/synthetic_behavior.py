@@ -15,7 +15,7 @@ from app.schemas.behavior import (
     FinancialTool,
 )
 
-DATASET_VERSION = "synthetic-agent-log-3"
+DATASET_VERSION = "synthetic-agent-log-4"
 SAMPLES_PER_SESSION = 8
 WARMUP_EVENTS = 24
 HARD_REQUEST_LIMIT_1M = 30
@@ -101,11 +101,11 @@ def _anomaly_interval_seconds(
 ) -> int:
     shifted_ranges = {
         "RAPID_REPETITION": (6, 24),
-        "AFTER_HOURS_ACCUMULATION": (6, 27),
+        "AFTER_HOURS_ACCUMULATION": (5, 22),
     }
     baseline_ranges = {
-        "RAPID_REPETITION": (4, 19),
-        "AFTER_HOURS_ACCUMULATION": (5, 23),
+        "RAPID_REPETITION": (8, 23),
+        "AFTER_HOURS_ACCUMULATION": (4, 19),
     }
     low, high = (shifted_ranges if profile == "shifted" else baseline_ranges)[scenario]
     return int(rng.integers(low, high))

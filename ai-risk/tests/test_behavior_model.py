@@ -23,16 +23,26 @@ AI_RISK_ROOT = Path(__file__).resolve().parents[1]
 def test_training_is_reproducible_for_fixed_seed() -> None:
     first, first_metrics = train_bundle(42)
     second, second_metrics = train_bundle(42)
-    sample = np.ones((1, len(first.feature_names)))
+    samples = generate_behavior_samples(random_seed=42)
+    shifted = generate_behavior_samples(
+        random_seed=2026, normal_count=80, anomaly_count=40, profile="shifted"
+    )
+    reference_features = np.vstack(
+        [samples.normal, samples.anomaly, shifted.normal, shifted.anomaly]
+    )
 
-    first_score = first.model.decision_function(first.scaler.transform(sample))
-    second_score = second.model.decision_function(second.scaler.transform(sample))
+    first_scores = first.model.decision_function(first.scaler.transform(reference_features))
+    second_scores = second.model.decision_function(second.scaler.transform(reference_features))
 
-    assert np.array_equal(first_score, second_score)
+    np.testing.assert_array_equal(first_scores, second_scores)
     assert first_metrics == second_metrics
     assert first_metrics["validation"]["falsePositiveRateAtAlert"] <= 0.10
     assert first_metrics["heldOutTest"]["falsePositiveRateAtAlert"] <= 0.15
     assert first_metrics["heldOutTest"]["falsePositiveRateAtCritical"] <= 0.05
+    held_out_scenarios = first_metrics["heldOutTest"]["scenarioMetrics"]
+    assert held_out_scenarios["RAPID_REPETITION"]["recallAtAlert"] >= 0.90
+    assert held_out_scenarios["RAPID_REPETITION"]["recallAtCritical"] <= 0.15
+    assert held_out_scenarios["AFTER_HOURS_ACCUMULATION"]["recallAtCritical"] >= 0.90
     assert 0 <= first.alert_threshold < first.critical_threshold <= 1
     assert first.alert_threshold == first_metrics["alertThreshold"]
     assert first.critical_threshold == first_metrics["criticalThreshold"]
@@ -51,10 +61,7 @@ def test_training_is_reproducible_for_fixed_seed() -> None:
         metrics["minRecallAtExpectedLevel"] >= 0.50
         for metrics in stress["anomalyScenarioWorstCase"].values()
     )
-    assert all(
-        metrics["recallAtExpectedLevel"] >= 0.90
-        for metrics in first_metrics["scenarioHoldoutTest"].values()
-    )
+    assert stress["anomalyScenarioWorstCase"]["RAPID_REPETITION"]["maxRecallAtCritical"] <= 0.25
 
 
 def test_behavior_splits_do_not_share_agent_sessions() -> None:
@@ -154,6 +161,7 @@ def test_invalid_model_thresholds_are_rejected(tmp_path: Path) -> None:
 
 def test_committed_artifact_and_metadata_are_consistent() -> None:
     bundle = joblib.load(AI_RISK_ROOT / "models" / "behavior_iforest.joblib")
+    regenerated, regenerated_metrics = train_bundle(42)
     metadata = json.loads(
         (AI_RISK_ROOT / "models" / "behavior_iforest.json").read_text(encoding="utf-8")
     )
@@ -168,4 +176,21 @@ def test_committed_artifact_and_metadata_are_consistent() -> None:
     assert metadata["alertThreshold"] == bundle.alert_threshold == metrics["alertThreshold"]
     assert (
         metadata["criticalThreshold"] == bundle.critical_threshold == metrics["criticalThreshold"]
+    )
+    assert metrics == regenerated_metrics
+
+    np.testing.assert_array_equal(bundle.scaler.mean_, regenerated.scaler.mean_)
+    np.testing.assert_array_equal(bundle.scaler.scale_, regenerated.scaler.scale_)
+    np.testing.assert_array_equal(bundle.calibration_scores, regenerated.calibration_scores)
+
+    samples = generate_behavior_samples(random_seed=42)
+    reference_features = np.vstack([samples.normal, samples.anomaly])
+    committed_scores = bundle.model.decision_function(bundle.scaler.transform(reference_features))
+    regenerated_scores = regenerated.model.decision_function(
+        regenerated.scaler.transform(reference_features)
+    )
+    np.testing.assert_allclose(committed_scores, regenerated_scores, rtol=0, atol=1e-12)
+    np.testing.assert_array_equal(
+        [bundle.risk_from_raw_score(-score) for score in committed_scores],
+        [regenerated.risk_from_raw_score(-score) for score in regenerated_scores],
     )

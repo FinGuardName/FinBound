@@ -10,7 +10,7 @@ Frontend & AI 담당 영역입니다. FastAPI는 `promptRisk`와 `behaviorRisk`�
 - `app/schemas`: camelCase 서비스 계약
 - `datasets`: 합성 데이터 생성 결과와 메타데이터
 - `train`, `evaluate`: 재현 가능한 학습·평가
-- `models`: Git에 올려도 되는 작은 메타데이터/Calibration artifact만 관리
+- `models`: 모델 Artifact, Metadata 및 Model Card 관리
 
 ```bash
 cd ai-risk
@@ -71,9 +71,17 @@ Held-out Test에 포함되도록 합니다.
 
 동일 생성 분포의 Held-out Test만으로 일반화 성능을 판단하지 않습니다. 간격·오류율·정상 변동성을
 다르게 설정한 `shifted` Profile을 5개 별도 Seed로 평가하고 평균·표준편차·최악값을
-`evaluate/behavior_metrics.json`에 기록합니다. 또한 각 이상 Scenario를 Threshold 선정에서 제외한
-Scenario Hold-out 결과도 기록합니다. 이 합성 데이터와 평가지표는 P0 feasibility 검증용이며 실제
-금융사 환경에 대한 일반화 성능을 의미하지 않습니다.
+`evaluate/behavior_metrics.json`에 기록합니다. Alert Threshold는 정상 Validation 분위수로 정하고,
+Critical Threshold는 야간 누적 시나리오를 양성, 업무시간 빠른 반복 시나리오를 Alert-only 음성으로
+두어 등급을 보정합니다. 이 합성 데이터와 평가지표는 P0 feasibility 검증용이며 실제 금융사 환경에
+대한 일반화 성능을 의미하지 않습니다.
+
+재학습 재현성은 joblib 파일 바이트의 SHA-256이 아니라 고정 평가 Feature 전체의 추론 결과,
+Scaler, Calibration, Threshold 및 평가 JSON의 의미적 동일성으로 검증합니다. 파일 SHA-256은 특정
+배포 Artifact의 무결성 확인 용도이며 서로 다른 직렬화 환경의 재학습 동일성 기준으로 사용하지 않습니다.
+
+모델의 목적, 평가 결과와 알려진 한계는
+[`models/behavior_iforest_model_card.md`](models/behavior_iforest_model_card.md)에 기록합니다.
 
 현재 `X-FinGuard-Service-Credential`, `FINGUARD_INTERNAL_CREDENTIAL`,
 `FINGUARD_BEHAVIOR_MODEL_PATH` 이름은 `docs/04-api-contract.md`와

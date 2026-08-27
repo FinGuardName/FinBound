@@ -1,11 +1,11 @@
 {
   "modelVersion": "iforest-1",
   "featureVersion": "behavior-features-1",
-  "datasetVersion": "synthetic-agent-log-3",
+  "datasetVersion": "synthetic-agent-log-4",
   "randomSeed": 42,
   "alertThreshold": 0.9041666666666667,
-  "criticalThreshold": 0.9916666666666667,
-  "trainedAt": "2026-08-27T09:00:59.152421+00:00",
+  "criticalThreshold": 1.0,
+  "trainedAt": "2026-08-27T14:13:25.938857+00:00",
   "featureNames": [
     "requestCount1m",
     "requestCount5m",

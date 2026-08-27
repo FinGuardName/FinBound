@@ -137,7 +137,7 @@ def test_rapid_business_hours_pattern_reaches_alert() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["behaviorRiskLevel"] in {"ALERT", "CRITICAL"}
+    assert response.json()["behaviorRiskLevel"] == "ALERT"
     assert response.json()["isAnomaly"] is True
 
 
