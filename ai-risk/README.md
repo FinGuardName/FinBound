@@ -1,4 +1,4 @@
-# AI Risk Engine
+# FinBound AI Risk Engine
 
 Frontend & AI 담당 영역입니다. FastAPI는 `promptRisk`와 `behaviorRisk`를 반환하며 `ALLOW/BLOCK`을 반환하지 않습니다.
 
@@ -32,6 +32,11 @@ Runtime Endpoint:
 POST /internal/v1/risk/behavior
 ```
 
+운영 Probe는 프로세스 생존 확인용 `GET /health`와 모델 Artifact 및 내부 Credential 설정을
+확인하는 `GET /ready`로 분리합니다. Docker Compose와 배포 환경은 트래픽 전달 전에 `/ready`가
+성공하는지 확인해야 합니다. 모델은 기본적으로 `models/behavior_iforest.joblib`을 사용하며,
+배포 이미지의 위치가 다르면 `FINGUARD_BEHAVIOR_MODEL_PATH`로 명시합니다.
+
 요청에는 `X-FinGuard-Service-Credential` Header가 필요하며 서버는
 `FINGUARD_INTERNAL_CREDENTIAL` 환경변수와 상수 시간 비교합니다. 서버 Credential이 없거나 모델
 Artifact가 유효하지 않으면 낮은 Risk로 대체하지 않고 `503 BEHAVIOR_RISK_UNAVAILABLE`로
@@ -52,6 +57,18 @@ Synthetic Behavior 데이터는 Agent Session을 Group으로 묶어 Train/Valida
 분리합니다. Validation 정상 분포로 Calibration하고 Validation FPR 제약 안에서 Critical
 Threshold를 선택합니다. 선택한 Alert/Critical Threshold는 모델 Bundle에 한 번만 저장하고 Runtime은
 동일 값을 사용합니다. Held-out Test는 모델과 Threshold를 고정한 뒤 최종 평가에만 사용합니다.
+
+정상 데이터에는 표준 업무시간, 마감 전 요청 증가, 정상 야간 초과근무, 고액대출 Case 추가 조회,
+짧은 순간 Spike 및 Tool별 latency 차이를 포함합니다. 핵심 이상 데이터는 동일 Agent·Case·Consumer와
+허용 Tool/Data를 유지한 채 Hard Request Limit 이하의 빠른 반복, 야간 누적 호출, 오류 Burst를
+생성합니다. Case/Consumer 전환과 같은 Scope Violation은 Behavior 모델 학습·Calibration·핵심
+성능평가에 포함하지 않습니다. 이 합성 데이터와 평가지표는 P0 feasibility 검증용이며 실제 금융사
+환경에 대한 일반화 성능을 의미하지 않습니다.
+
+현재 `X-FinGuard-Service-Credential`, `FINGUARD_INTERNAL_CREDENTIAL`,
+`FINGUARD_BEHAVIOR_MODEL_PATH` 이름은 `docs/04-api-contract.md`와
+`docs/06-common-conventions.md`의 공유 계약을 따르는 호환성 키입니다. 제품명은 FinBound지만 이 키는
+계약 문서와 모든 소비자를 함께 변경하기 전까지 유지합니다.
 
 `requirements.lock`은 검증된 개발 환경의 정확한 버전을 기록합니다. pip 사용 시 `pip install -r requirements.lock` 후 `pip install -e . --no-deps`로 동일 환경을 재현할 수 있습니다.
 

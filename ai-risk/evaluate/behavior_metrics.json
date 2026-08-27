@@ -1,10 +1,15 @@
 {
   "modelVersion": "iforest-1",
   "featureVersion": "behavior-features-1",
-  "datasetVersion": "synthetic-agent-log-1",
+  "datasetVersion": "synthetic-agent-log-2",
   "randomSeed": 42,
-  "alertThreshold": 0.9166666666666666,
-  "criticalThreshold": 1.0,
+  "scenarioPolicy": {
+    "coreAnomaliesMaintainSameScope": true,
+    "scopeViolationSamplesIncluded": false,
+    "hardRequestLimit1m": 30
+  },
+  "alertThreshold": 0.9041666666666667,
+  "criticalThreshold": 0.9666666666666667,
   "thresholdSelection": {
     "method": "validation-f1-with-fpr-constraint",
     "maxFalsePositiveRate": 0.1,
@@ -12,40 +17,134 @@
   },
   "splitSummary": {
     "train": {
-      "samples": 560,
-      "sessions": 70
+      "samples": 1120,
+      "sessions": 140
     },
     "validation": {
-      "samples": 200,
-      "sessions": 25
+      "samples": 392,
+      "sessions": 49
     },
     "heldOutTest": {
-      "samples": 200,
-      "sessions": 25
+      "samples": 408,
+      "sessions": 51
     }
   },
   "validation": {
-    "samples": 200,
-    "normalSamples": 120,
-    "anomalySamples": 80,
+    "samples": 392,
+    "normalSamples": 240,
+    "anomalySamples": 152,
     "falsePositiveRateAtAlert": 0.1,
     "recallAtAlert": 1.0,
-    "precisionAtCritical": 0.9876543209876543,
+    "precisionAtCritical": 0.9440993788819876,
     "recallAtCritical": 1.0,
-    "f1AtCritical": 0.9937888198757764,
-    "falsePositiveRateAtCritical": 0.008333333333333333,
-    "rocAuc": 0.9958333333333333
+    "f1AtCritical": 0.9712460063897763,
+    "falsePositiveRateAtCritical": 0.0375,
+    "rocAuc": 0.9907894736842106,
+    "scenarioMetrics": {
+      "END_OF_DAY_INCREASE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.20833333333333334,
+        "falsePositiveRateAtCritical": 0.10416666666666667
+      },
+      "HIGH_VALUE_CASE_EXTRA_READS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.10416666666666667,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "LEGITIMATE_OVERTIME": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.08333333333333333,
+        "falsePositiveRateAtCritical": 0.041666666666666664
+      },
+      "MOMENTARY_SPIKE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.0625,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "STANDARD_BUSINESS_HOURS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.041666666666666664,
+        "falsePositiveRateAtCritical": 0.041666666666666664
+      },
+      "AFTER_HOURS_ACCUMULATION": {
+        "classification": "ANOMALY",
+        "samples": 48,
+        "recallAtCritical": 1.0
+      },
+      "ERROR_BURST": {
+        "classification": "ANOMALY",
+        "samples": 48,
+        "recallAtCritical": 1.0
+      },
+      "RAPID_REPETITION": {
+        "classification": "ANOMALY",
+        "samples": 56,
+        "recallAtCritical": 1.0
+      }
+    }
   },
   "heldOutTest": {
-    "samples": 200,
-    "normalSamples": 120,
-    "anomalySamples": 80,
-    "falsePositiveRateAtAlert": 0.09166666666666666,
+    "samples": 408,
+    "normalSamples": 240,
+    "anomalySamples": 168,
+    "falsePositiveRateAtAlert": 0.0875,
     "recallAtAlert": 1.0,
-    "precisionAtCritical": 0.9411764705882353,
+    "precisionAtCritical": 0.9710982658959537,
     "recallAtCritical": 1.0,
-    "f1AtCritical": 0.9696969696969697,
-    "falsePositiveRateAtCritical": 0.041666666666666664,
-    "rocAuc": 0.9791666666666666
+    "f1AtCritical": 0.9853372434017595,
+    "falsePositiveRateAtCritical": 0.020833333333333332,
+    "rocAuc": 0.9961805555555556,
+    "scenarioMetrics": {
+      "END_OF_DAY_INCREASE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.1875,
+        "falsePositiveRateAtCritical": 0.041666666666666664
+      },
+      "HIGH_VALUE_CASE_EXTRA_READS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.041666666666666664,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "LEGITIMATE_OVERTIME": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.14583333333333334,
+        "falsePositiveRateAtCritical": 0.0625
+      },
+      "MOMENTARY_SPIKE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.0625,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "STANDARD_BUSINESS_HOURS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.0,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "AFTER_HOURS_ACCUMULATION": {
+        "classification": "ANOMALY",
+        "samples": 56,
+        "recallAtCritical": 1.0
+      },
+      "ERROR_BURST": {
+        "classification": "ANOMALY",
+        "samples": 56,
+        "recallAtCritical": 1.0
+      },
+      "RAPID_REPETITION": {
+        "classification": "ANOMALY",
+        "samples": 56,
+        "recallAtCritical": 1.0
+      }
+    }
   }
 }

@@ -71,6 +71,9 @@ class BehaviorRiskService:
             self._bundle = bundle
         return self._bundle
 
+    def check_ready(self) -> None:
+        self._load_bundle()
+
     def evaluate(self, request: BehaviorRiskRequest) -> BehaviorRiskResponse:
         bundle = self._load_bundle()
         valid_history = completed_events_in_window(request.history, request.current_attempt)
@@ -92,7 +95,6 @@ class BehaviorRiskService:
         try:
             scaled = bundle.scaler.transform(vector.reshape(1, -1))
             raw_score = float(-bundle.model.decision_function(scaled)[0])
-            is_anomaly = bool(bundle.model.predict(scaled)[0] == -1)
         except Exception as error:
             raise BehaviorModelError("Behavior model inference failed") from error
         if not np.isfinite(raw_score):
@@ -105,6 +107,7 @@ class BehaviorRiskService:
             level = BehaviorRiskLevel.ALERT
         else:
             level = BehaviorRiskLevel.LOW
+        is_anomaly = behavior_risk >= bundle.alert_threshold
 
         return BehaviorRiskResponse(
             behavior_risk=behavior_risk,

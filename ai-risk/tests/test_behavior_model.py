@@ -8,7 +8,13 @@ import pytest
 from app.behavior.service import BehaviorModelError, BehaviorRiskService
 from app.feature_builder import FEATURE_NAMES
 from datasets import synthetic_behavior
-from datasets.synthetic_behavior import generate_behavior_samples, split_behavior_samples
+from datasets.synthetic_behavior import (
+    ANOMALY_SCENARIOS,
+    HARD_REQUEST_LIMIT_1M,
+    NORMAL_SCENARIOS,
+    generate_behavior_samples,
+    split_behavior_samples,
+)
 from train.train_behavior import train_bundle
 
 AI_RISK_ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +36,9 @@ def test_training_is_reproducible_for_fixed_seed() -> None:
     assert 0 <= first.alert_threshold < first.critical_threshold <= 1
     assert first.alert_threshold == first_metrics["alertThreshold"]
     assert first.critical_threshold == first_metrics["criticalThreshold"]
+    assert set(first_metrics["heldOutTest"]["scenarioMetrics"]) == set(NORMAL_SCENARIOS) | set(
+        ANOMALY_SCENARIOS
+    )
 
 
 def test_behavior_splits_do_not_share_agent_sessions() -> None:
@@ -42,6 +51,31 @@ def test_behavior_splits_do_not_share_agent_sessions() -> None:
     assert splits.train_normal.size > 0
     assert splits.validation_anomaly.size > 0
     assert splits.test_anomaly.size > 0
+    assert set(splits.validation_normal_scenarios) == set(NORMAL_SCENARIOS)
+    assert set(splits.test_normal_scenarios) == set(NORMAL_SCENARIOS)
+    assert set(splits.validation_anomaly_scenarios) == set(ANOMALY_SCENARIOS)
+    assert set(splits.test_anomaly_scenarios) == set(ANOMALY_SCENARIOS)
+
+
+def test_core_anomaly_samples_keep_scope_and_hard_limit_separate() -> None:
+    samples = generate_behavior_samples(random_seed=42)
+    unique_customers = FEATURE_NAMES.index("uniqueCustomers5m")
+    case_switches = FEATURE_NAMES.index("caseSwitchCount5m")
+    requests_1m = FEATURE_NAMES.index("requestCount1m")
+
+    assert np.all(samples.anomaly[:, unique_customers] == 1)
+    assert np.all(samples.anomaly[:, case_switches] == 0)
+    assert np.all(samples.anomaly[:, requests_1m] <= HARD_REQUEST_LIMIT_1M)
+    assert set(samples.anomaly_scenarios) == set(ANOMALY_SCENARIOS)
+
+
+def test_normal_samples_include_documented_variability() -> None:
+    samples = generate_behavior_samples(random_seed=42)
+    after_hours = FEATURE_NAMES.index("afterHoursAccess")
+
+    assert set(samples.normal_scenarios) == set(NORMAL_SCENARIOS)
+    assert np.any(samples.normal[:, after_hours] == 1)
+    assert np.any(samples.normal[:, after_hours] == 0)
 
 
 def test_missing_model_is_an_explicit_error(tmp_path: Path) -> None:

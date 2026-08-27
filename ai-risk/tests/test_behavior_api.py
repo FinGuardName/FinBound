@@ -62,6 +62,7 @@ def test_behavior_endpoint_returns_contract_and_ready_status() -> None:
     assert payload["featureVersion"] == "behavior-features-1"
     assert payload["modelVersion"] == "iforest-1"
     assert "decision" not in payload
+    assert payload["isAnomaly"] is (payload["behaviorRiskLevel"] != "LOW")
 
 
 def test_behavior_endpoint_reports_cold_start() -> None:
@@ -112,6 +113,7 @@ def test_rapid_after_hours_pattern_is_critical() -> None:
 
     assert response.status_code == 200
     assert response.json()["behaviorRiskLevel"] == "CRITICAL"
+    assert response.json()["isAnomaly"] is True
 
 
 def test_behavior_endpoint_rejects_unknown_tool_and_data() -> None:

@@ -14,6 +14,7 @@ from app.behavior.model import BehaviorModelBundle
 from app.feature_builder import FEATURE_NAMES, FEATURE_VERSION
 from datasets.synthetic_behavior import (
     DATASET_VERSION,
+    HARD_REQUEST_LIMIT_1M,
     BehaviorDataSplits,
     generate_behavior_samples,
     split_behavior_samples,
@@ -71,9 +72,11 @@ def _evaluate(
     calibration_scores: np.ndarray,
     normal: np.ndarray,
     anomaly: np.ndarray,
+    normal_scenarios: np.ndarray,
+    anomaly_scenarios: np.ndarray,
     alert_threshold: float,
     critical_threshold: float,
-) -> dict[str, float | int]:
+) -> dict[str, Any]:
     features = np.vstack([normal, anomaly])
     labels = np.concatenate([np.zeros(len(normal)), np.ones(len(anomaly))])
     risks = _calibrated_risks(model, scaler, calibration_scores, features)
@@ -82,6 +85,26 @@ def _evaluate(
     precision, recall, f1, _ = precision_recall_fscore_support(
         labels, predictions, average="binary", zero_division=0
     )
+    scenario_metrics: dict[str, dict[str, float | int | str]] = {}
+    for scenario in np.unique(normal_scenarios):
+        scenario_mask = normal_scenarios == scenario
+        scenario_alert_predictions = alert_predictions[: len(normal)][scenario_mask]
+        scenario_critical_predictions = predictions[: len(normal)][scenario_mask]
+        scenario_metrics[str(scenario)] = {
+            "classification": "NORMAL",
+            "samples": len(scenario_alert_predictions),
+            "falsePositiveRateAtAlert": float(np.mean(scenario_alert_predictions)),
+            "falsePositiveRateAtCritical": float(np.mean(scenario_critical_predictions)),
+        }
+    anomaly_critical_predictions = predictions[len(normal) :]
+    for scenario in np.unique(anomaly_scenarios):
+        scenario_predictions = anomaly_critical_predictions[anomaly_scenarios == scenario]
+        scenario_metrics[str(scenario)] = {
+            "classification": "ANOMALY",
+            "samples": len(scenario_predictions),
+            "recallAtCritical": float(np.mean(scenario_predictions)),
+        }
+
     return {
         "samples": len(features),
         "normalSamples": len(normal),
@@ -93,6 +116,7 @@ def _evaluate(
         "f1AtCritical": float(f1),
         "falsePositiveRateAtCritical": float(np.mean(predictions[labels == 0])),
         "rocAuc": float(roc_auc_score(labels, risks)),
+        "scenarioMetrics": scenario_metrics,
     }
 
 
@@ -155,6 +179,11 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
         "featureVersion": FEATURE_VERSION,
         "datasetVersion": DATASET_VERSION,
         "randomSeed": random_seed,
+        "scenarioPolicy": {
+            "coreAnomaliesMaintainSameScope": True,
+            "scopeViolationSamplesIncluded": False,
+            "hardRequestLimit1m": HARD_REQUEST_LIMIT_1M,
+        },
         "alertThreshold": alert_threshold,
         "criticalThreshold": critical_threshold,
         "thresholdSelection": {
@@ -169,6 +198,8 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
             calibration_scores,
             splits.validation_normal,
             splits.validation_anomaly,
+            splits.validation_normal_scenarios,
+            splits.validation_anomaly_scenarios,
             alert_threshold,
             critical_threshold,
         ),
@@ -178,6 +209,8 @@ def train_bundle(random_seed: int = 42) -> tuple[BehaviorModelBundle, dict[str, 
             calibration_scores,
             splits.test_normal,
             splits.test_anomaly,
+            splits.test_normal_scenarios,
+            splits.test_anomaly_scenarios,
             alert_threshold,
             critical_threshold,
         ),
