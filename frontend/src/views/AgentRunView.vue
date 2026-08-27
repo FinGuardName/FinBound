@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import StatusBadge from '../components/StatusBadge.vue'
-import { finguardApi } from '../services/finguardApi'
+import { finboundApi } from '../services/finboundApi'
 
 const workCatalog = ref([])
 const selectedWorkId = ref('')
@@ -11,7 +11,7 @@ const executionError = ref('')
 const loading = ref(false)
 
 onMounted(async () => {
-  workCatalog.value = await finguardApi.getBankWorkCatalog()
+  workCatalog.value = await finboundApi.getBankWorkCatalog()
   selectedWorkId.value = workCatalog.value[0]?.id ?? ''
 })
 
@@ -29,9 +29,9 @@ async function runAgentTask() {
   execution.value = null
   executionError.value = ''
   try {
-    execution.value = await finguardApi.executeAgentTask({ workId: selectedWorkId.value })
+    execution.value = await finboundApi.executeAgentTask({ workId: selectedWorkId.value })
   } catch {
-    executionError.value = '업무를 처리하지 못했습니다. 고객 자료는 조회하지 않았습니다. 잠시 후 다시 시도해 주세요.'
+    executionError.value = '업무 처리 결과를 확인하지 못했습니다. 금융시스템 조회 여부는 업무 기록에서 확인해 주세요.'
   } finally {
     loading.value = false
   }
@@ -143,6 +143,7 @@ async function runAgentTask() {
             <div><dt>유효 시간</dt><dd>{{ workContext.passport.expiresAtLabel }}</dd></div>
           </dl>
           <p>허용 업무: {{ workContext.passport.allowedTools.join(' · ') }}</p>
+          <p>허용 자료: {{ workContext.passport.allowedData.join(' · ') }}</p>
           <small>Agent Effective Permission ⊆ Employee Authority</small>
         </details>
       </aside>
@@ -150,7 +151,7 @@ async function runAgentTask() {
 
     <article class="panel execution-panel" aria-live="polite">
       <div v-if="executionError" class="execution-error" role="alert">
-        <span aria-hidden="true">!</span><div><h2>자료를 조회하지 않았습니다</h2><p>{{ executionError }}</p></div>
+        <span aria-hidden="true">!</span><div><h2>업무 처리 상태를 확인할 수 없습니다</h2><p>{{ executionError }}</p></div>
       </div>
       <div v-else-if="!execution" class="execution-empty">
         <span class="empty-document" aria-hidden="true">✓</span>
@@ -197,7 +198,7 @@ async function runAgentTask() {
             <p class="section-kicker">직원이 확인할 내용</p>
             <h3>{{ execution.resultHeading }}</h3>
             <ul><li v-for="item in execution.resultItems" :key="item">{{ item }}</li></ul>
-            <div v-if="blockedAttempts.length" class="protection-summary"><strong>FinGuard 보호 작동</strong><p>차단된 추가 조회는 금융시스템에 전달되지 않았습니다. 현재 고객의 정상 심사자료만 결과에 포함했습니다.</p></div>
+            <div v-if="blockedAttempts.length" class="protection-summary"><strong>FinBound 보호 작동</strong><p>차단된 추가 조회는 금융시스템에 전달되지 않았습니다. 현재 고객의 정상 심사자료만 결과에 포함했습니다.</p></div>
             <div class="next-action safe"><strong>다음 업무</strong>{{ execution.nextAction }}</div>
           </aside>
         </div>

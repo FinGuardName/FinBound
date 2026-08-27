@@ -31,6 +31,7 @@ export const bankWorkCatalogFixture = [
       agentId: 'LOAN-AGENT-01',
       expiresAtLabel: '18:30 KST',
       allowedTools: ['CREDIT_SCORE_READ', 'INCOME_READ', 'DEBT_READ'],
+      allowedData: ['CREDIT_SCORE', 'INCOME', 'DEBT'],
     },
     employeeRequest: {
       title: '현재 고객의 신규 대출 심사자료 확인',
@@ -61,6 +62,7 @@ export const bankWorkCatalogFixture = [
       agentId: 'LOAN-AGENT-01',
       expiresAtLabel: '17:50 KST',
       allowedTools: ['INCOME_READ', 'DEBT_READ'],
+      allowedData: ['INCOME', 'DEBT'],
     },
     employeeRequest: {
       title: '현재 고객의 변경된 상환능력 재확인',
@@ -91,6 +93,7 @@ export const bankWorkCatalogFixture = [
       agentId: 'LOAN-AGENT-01',
       expiresAtLabel: '16:40 KST',
       allowedTools: ['INCOME_READ', 'DEBT_READ'],
+      allowedData: ['INCOME', 'DEBT'],
     },
     employeeRequest: {
       title: '현재 고객이 제출한 보완자료 확인',
@@ -189,7 +192,9 @@ function createAuditEvent({
   scopeStatus = okScope,
   auditStatus = 'COMPLETED',
   promptRisk = 0.05,
+  promptEvaluationStatus = 'EVALUATED',
   promptInjectionDetected = false,
+  promptModelVersion = 'prompt-guard-1',
   behaviorRisk = 0.21,
   behaviorRiskLevel = 'LOW',
   behaviorAnomalyDetected = false,
@@ -213,9 +218,9 @@ function createAuditEvent({
     reasonCodes,
     riskFlagged,
     promptRisk,
-    promptEvaluationStatus: 'EVALUATED',
+    promptEvaluationStatus,
     promptInjectionDetected,
-    promptModelVersion: 'prompt-guard-1',
+    promptModelVersion,
     behaviorRisk,
     behaviorRiskLevel,
     behaviorAnomalyDetected,
@@ -230,13 +235,13 @@ function createAuditEvent({
 }
 
 export const auditEventsFixture = [
-  createAuditEvent({ auditEventId: 'AUD-009', requestId: '00000000-0000-4000-8000-000000009009', requestedAt: '2026-08-25T18:15:42+09:00', caseId: 'LOAN-2026-031', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['BEHAVIOR_ANOMALY'], behaviorRisk: 0.97, behaviorRiskLevel: 'CRITICAL', behaviorAnomalyDetected: true, riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-009', requestId: '00000000-0000-4000-8000-000000009009', requestedAt: '2026-08-25T18:15:42+09:00', caseId: 'LOAN-2026-031', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['BEHAVIOR_ANOMALY'], behaviorRisk: 1, behaviorRiskLevel: 'CRITICAL', behaviorAnomalyDetected: true, riskFlagged: true }),
   createAuditEvent({ auditEventId: 'AUD-008', requestId: '00000000-0000-4000-8000-000000008008', requestedAt: '2026-08-25T18:11:27+09:00', caseId: 'LOAN-2026-030', targetConsumerId: 'CUST-1001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['PROMPT_INJECTION'], promptRisk: 0.96, promptInjectionDetected: true, riskFlagged: true }),
-  createAuditEvent({ auditEventId: 'AUD-007', requestId: '00000000-0000-4000-8000-000000007007', requestedAt: '2026-08-25T18:07:03+09:00', caseId: 'LOAN-2026-029', targetConsumerId: 'CUST-1001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'HIGH', behaviorRisk: 0.78, behaviorRiskLevel: 'ALERT', riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-007', requestId: '00000000-0000-4000-8000-000000007007', requestedAt: '2026-08-25T18:07:03+09:00', caseId: 'LOAN-2026-029', targetConsumerId: 'CUST-1001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'HIGH', behaviorRisk: 0.95, behaviorRiskLevel: 'ALERT', riskFlagged: true }),
   createAuditEvent({ auditEventId: 'AUD-006', requestId: '00000000-0000-4000-8000-000000006006', requestedAt: '2026-08-25T18:02:31+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['MANDATE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, mandate: 'VIOLATION' } }),
-  createAuditEvent({ auditEventId: 'AUD-005', requestId: '00000000-0000-4000-8000-000000005005', requestedAt: '2026-08-25T17:58:14+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'LOW', promptRisk: 0.03, behaviorRisk: 0.16 }),
+  createAuditEvent({ auditEventId: 'AUD-005', requestId: '00000000-0000-4000-8000-000000005005', requestedAt: '2026-08-25T17:58:14+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'MEDIUM', promptRisk: 0.03, behaviorRisk: 0.16 }),
   createAuditEvent({ auditEventId: 'AUD-004', requestId: '00000000-0000-4000-8000-000000004004', requestedAt: '2026-08-25T17:53:10+09:00', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2099', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
   createAuditEvent({ auditEventId: 'AUD-003', requestId: '00000000-0000-4000-8000-000000003003', requestedAt: '2026-08-25T17:48:22+09:00', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2001', requestedTool: 'INCOME_READ', decision: 'ALLOW', auditStatus: 'ERROR', severity: 'HIGH', reasonCodes: ['DOWNSTREAM_TIMEOUT'], promptRisk: 0.04, behaviorRisk: 0.18, riskFlagged: true }),
   createAuditEvent({ auditEventId: 'AUD-002', requestId: '00000000-0000-4000-8000-000000002002', requestedAt: '2026-08-25T17:44:06+09:00', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-9999', requestedTool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], promptRisk: 0.12, behaviorRisk: 0.31, scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
-  createAuditEvent({ auditEventId: 'AUD-001', requestId: '00000000-0000-4000-8000-000000001001', requestedAt: '2026-08-25T17:39:41+09:00', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'ALLOW', severity: 'LOW' }),
+  createAuditEvent({ auditEventId: 'AUD-001', requestId: '00000000-0000-4000-8000-000000001001', requestedAt: '2026-08-25T17:39:41+09:00', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'ALLOW', severity: 'LOW', promptRisk: 0, promptEvaluationStatus: 'NOT_EVALUATED', promptModelVersion: null }),
 ]

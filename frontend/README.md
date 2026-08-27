@@ -18,9 +18,11 @@ pnpm test
 Frontend는 Spring Core API만 호출하며 PostgreSQL에 직접 연결하지 않습니다. AI 업무 지원 화면은
 AgentRun 생성 Command API를 사용하고, 권한 비교와 Dashboard는 Spring Read-only API를 사용합니다.
 
-현재 Phase 1에서는 `src/services/finguardApi.js` 뒤에 가상 데이터를 둡니다. Spring API가 준비되면
-이 Adapter가 AgentRun 생성, Permission Comparison, AgentRun별 AuditEvent를 조합해 현재 View Model로
-변환합니다. 화면이나 Fixture에는 원본 Prompt와 금융 응답 Payload를 포함하지 않습니다.
+현재 P0 Mock에서는 `src/services/finboundApi.js` 뒤에 가상 데이터를 둡니다. 목록의 검색 조건과
+페이지 정보도 이 API 경계로 전달해 브라우저가 전체 감사 기록을 무제한으로 적재하지 않도록 합니다.
+Spring API가 준비되면 이 Adapter가 AgentRun 생성, Permission Comparison, AgentRun별 AuditEvent를
+조합해 현재 View Model로 변환합니다. 화면이나 Fixture에는 원본 Prompt와 금융 응답 Payload를
+포함하지 않습니다.
 
 | Frontend 작업 | Spring Contract |
 |---|---|

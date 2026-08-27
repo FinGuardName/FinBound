@@ -3,12 +3,16 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import RiskMeter from '../components/RiskMeter.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import { finguardApi } from '../services/finguardApi'
+import { finboundApi } from '../services/finboundApi'
 
 const events = ref([])
 const selectedId = ref(null)
 const page = ref(1)
 const pageSize = 5
+const totalPages = ref(1)
+const dashboardReady = ref(false)
+const summary = ref({ total: 0, allow: 0, block: 0, error: 0 })
+const filterOptions = ref({ agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] })
 const filters = ref({
   period: '24H',
   agentId: 'ALL',
@@ -22,7 +26,7 @@ const filters = ref({
 })
 
 const decisionLabels = { ALLOW: '정상 처리', BLOCK: '차단', ERROR: '오류' }
-const severityLabels = { LOW: '일반', HIGH: '주의', CRITICAL: '긴급' }
+const severityLabels = { LOW: '일반', MEDIUM: '관찰', HIGH: '주의', CRITICAL: '긴급' }
 const scopeLabels = {
   employeeAuthority: '담당 직원 권한',
   permissionTemplate: '업무 권한 기준',
@@ -55,53 +59,43 @@ const reasonDescriptions = {
 }
 
 const eventOutcome = (event) => event.auditStatus === 'ERROR' ? 'ERROR' : event.decision
-const uniqueValues = (key) => [...new Set(events.value.map((event) => event[key]))]
-const agentOptions = computed(() => uniqueValues('agentId'))
-const caseOptions = computed(() => uniqueValues('caseId'))
-const consumerOptions = computed(() => uniqueValues('targetConsumerId'))
-const toolOptions = computed(() => uniqueValues('requestedTool'))
-const reasonOptions = computed(() => [...new Set(events.value.flatMap((event) => event.reasonCodes))])
-const latestEventTime = computed(() => Math.max(...events.value.map((event) => new Date(event.requestedAt).getTime())))
+const selectedEvent = computed(() => events.value.find((event) => event.auditEventId === selectedId.value))
+const agentOptions = computed(() => filterOptions.value.agentIds)
+const caseOptions = computed(() => filterOptions.value.caseIds)
+const consumerOptions = computed(() => filterOptions.value.consumerIds)
+const toolOptions = computed(() => filterOptions.value.tools)
+const reasonOptions = computed(() => filterOptions.value.reasonCodes)
 
-const isInsidePeriod = (event) => {
-  if (filters.value.period === 'ALL') return true
-  const periodMs = filters.value.period === '30M' ? 30 * 60 * 1000 : 24 * 60 * 60 * 1000
-  return latestEventTime.value - new Date(event.requestedAt).getTime() <= periodMs
+const promptStatusText = (event) => {
+  if (event.promptEvaluationStatus === 'NOT_EVALUATED') return '미평가'
+  return event.promptInjectionDetected ? '위험 감지' : '위험 미감지'
 }
 
-const filteredEvents = computed(() => events.value.filter((event) => (
-  isInsidePeriod(event)
-  && (filters.value.agentId === 'ALL' || event.agentId === filters.value.agentId)
-  && (filters.value.caseId === 'ALL' || event.caseId === filters.value.caseId)
-  && (filters.value.consumerId === 'ALL' || event.targetConsumerId === filters.value.consumerId)
-  && (filters.value.tool === 'ALL' || event.requestedTool === filters.value.tool)
-  && (filters.value.outcome === 'ALL' || eventOutcome(event) === filters.value.outcome)
-  && (filters.value.severity === 'ALL' || event.severity === filters.value.severity)
-  && (filters.value.reasonCode === 'ALL' || event.reasonCodes.includes(filters.value.reasonCode))
-  && (!filters.value.riskOnly || event.riskFlagged)
-)))
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredEvents.value.length / pageSize)))
-const pagedEvents = computed(() => filteredEvents.value.slice((page.value - 1) * pageSize, page.value * pageSize))
-const selectedEvent = computed(() => events.value.find((event) => event.auditEventId === selectedId.value))
-const summary = computed(() => ({
-  total: events.value.length,
-  allow: events.value.filter((event) => eventOutcome(event) === 'ALLOW').length,
-  block: events.value.filter((event) => eventOutcome(event) === 'BLOCK').length,
-  error: events.value.filter((event) => eventOutcome(event) === 'ERROR').length,
-}))
+async function loadEvents() {
+  const result = await finboundApi.getAuditEvents({
+    filters: { ...filters.value },
+    page: page.value,
+    pageSize,
+  })
+  events.value = result.items
+  totalPages.value = result.totalPages
+  filterOptions.value = result.filterOptions
+  selectedId.value = result.items[0]?.auditEventId ?? null
+}
 
 onMounted(async () => {
-  events.value = await finguardApi.getAuditEvents()
-  selectedId.value = events.value[0]?.auditEventId
+  summary.value = await finboundApi.getDashboardSummary()
+  await loadEvents()
+  dashboardReady.value = true
 })
 
 watch(filters, () => {
-  page.value = 1
-  selectedId.value = filteredEvents.value[0]?.auditEventId ?? null
+  if (page.value === 1) loadEvents()
+  else page.value = 1
 }, { deep: true })
 
 watch(page, () => {
-  selectedId.value = pagedEvents.value[0]?.auditEventId ?? null
+  if (dashboardReady.value) loadEvents()
 })
 </script>
 
@@ -151,7 +145,7 @@ watch(page, () => {
           <label>업무 건<select v-model="filters.caseId" data-filter="case"><option value="ALL">전체</option><option v-for="value in caseOptions" :key="value" :value="value">{{ value }}</option></select></label>
           <label>고객<select v-model="filters.consumerId" data-filter="consumer"><option value="ALL">전체</option><option v-for="value in consumerOptions" :key="value" :value="value">{{ consumerLabels[value] || value }}</option></select></label>
           <label>확인 업무<select v-model="filters.tool" data-filter="tool"><option value="ALL">전체</option><option v-for="value in toolOptions" :key="value" :value="value">{{ toolLabels[value] || value }}</option></select></label>
-          <label>중요도<select v-model="filters.severity" data-filter="severity"><option value="ALL">전체</option><option value="LOW">일반</option><option value="HIGH">주의</option><option value="CRITICAL">긴급</option></select></label>
+          <label>중요도<select v-model="filters.severity" data-filter="severity"><option value="ALL">전체</option><option value="LOW">일반</option><option value="MEDIUM">관찰</option><option value="HIGH">주의</option><option value="CRITICAL">긴급</option></select></label>
           <label>처리 사유<select v-model="filters.reasonCode" data-filter="reason"><option value="ALL">전체</option><option v-for="value in reasonOptions" :key="value" :value="value">{{ value }}</option></select></label>
         </div>
       </details>
@@ -161,14 +155,14 @@ watch(page, () => {
       <div class="panel event-list-panel">
         <div class="event-table" role="table" aria-label="AI 업무 처리 내역">
           <div class="table-head" role="row"><span>시간</span><span>고객 / 확인 업무</span><span>처리 결과</span></div>
-          <button v-for="event in pagedEvents" :key="event.auditEventId" :class="['event-row', { selected: selectedId === event.auditEventId }]" type="button" role="row" @click="selectedId = event.auditEventId">
+          <button v-for="event in events" :key="event.auditEventId" :class="['event-row', { selected: selectedId === event.auditEventId }]" type="button" role="row" @click="selectedId = event.auditEventId">
             <span>{{ event.requestedAt.slice(11, 19) }}</span>
             <span><strong>{{ consumerLabels[event.targetConsumerId] || event.targetConsumerId }}</strong><small>{{ event.caseId }} · {{ toolLabels[event.requestedTool] || event.requestedTool }}</small></span>
             <StatusBadge :value="eventOutcome(event)" :label="decisionLabels[eventOutcome(event)]" />
           </button>
-          <p v-if="!filteredEvents.length" class="no-results">선택한 조건에 해당하는 업무가 없습니다.</p>
+          <p v-if="!events.length" class="no-results">선택한 조건에 해당하는 업무가 없습니다.</p>
         </div>
-        <nav v-if="filteredEvents.length" class="pagination" aria-label="업무 기록 페이지">
+        <nav v-if="events.length" class="pagination" aria-label="업무 기록 페이지">
           <button type="button" :disabled="page === 1" @click="page -= 1">이전</button>
           <span>{{ page }} / {{ totalPages }} 페이지</span>
           <button type="button" :disabled="page === totalPages" @click="page += 1">다음</button>
@@ -180,8 +174,13 @@ watch(page, () => {
           <div><p class="section-kicker">선택한 업무 내역</p><h2>업무 내역 {{ selectedEvent.auditEventId.slice(-3) }}</h2></div>
           <StatusBadge :value="selectedEvent.severity" :label="severityLabels[selectedEvent.severity]" />
         </div>
-        <RiskMeter label="입력 내용 주의도" :value="selectedEvent.promptRisk" />
-        <RiskMeter label="AI 행동 주의도" :value="selectedEvent.behaviorRisk" />
+        <RiskMeter
+          label="입력 내용 주의도"
+          :value="selectedEvent.promptRisk"
+          :status-text="promptStatusText(selectedEvent)"
+          :evaluation-status="selectedEvent.promptEvaluationStatus"
+        />
+        <RiskMeter label="AI 행동 주의도" :value="selectedEvent.behaviorRisk" :status-text="selectedEvent.behaviorRiskLevel" />
         <div class="detail-section">
           <p>업무 범위 확인</p>
           <div class="scope-list">
@@ -206,7 +205,7 @@ watch(page, () => {
             <div><dt>권한 판단</dt><dd>{{ selectedEvent.decision }}</dd></div>
             <div><dt>시스템 처리</dt><dd>{{ selectedEvent.auditStatus }}</dd></div>
             <div><dt>입력 평가</dt><dd>{{ selectedEvent.promptEvaluationStatus }}</dd></div>
-            <div><dt>입력 모델</dt><dd>{{ selectedEvent.promptModelVersion }}</dd></div>
+            <div><dt>입력 모델</dt><dd>{{ selectedEvent.promptModelVersion || '미평가' }}</dd></div>
             <div><dt>행동 위험</dt><dd>{{ selectedEvent.behaviorRiskLevel }}</dd></div>
             <div><dt>특징 버전</dt><dd>{{ selectedEvent.featureVersion }}</dd></div>
             <div><dt>행동 모델</dt><dd>{{ selectedEvent.behaviorModelVersion }}</dd></div>

@@ -1,10 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import App from './App.vue'
-import { finguardApi } from './services/finguardApi'
+import { finboundApi } from './services/finboundApi'
 
-describe('FinGuard P0 application', () => {
+const getAllAuditEvents = async () => {
+  const result = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, pageSize: 100 })
+  return result.items
+}
+
+describe('FinBound P0 application', () => {
   it('shows bank work instead of asking an employee to configure security', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -17,6 +22,8 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('Agent Effective Permission')
     expect(wrapper.text()).toContain('Employee Authority')
     expect(wrapper.text()).toContain('AI는 담당 직원보다 더 많은 정보에 접근할 수 없습니다')
+    expect(wrapper.text()).toContain('허용 자료')
+    expect(wrapper.text()).toContain('CREDIT_SCORE')
     expect(wrapper.findAll('input[type="radio"]')).toHaveLength(0)
     expect(wrapper.text()).toContain('직원이 요청한 업무')
     expect(wrapper.text()).toContain('AI로 이 업무 진행')
@@ -35,12 +42,26 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('완료 · 1회')
     expect(wrapper.text()).toContain('심사 의견을 작성해 주세요')
     expect(wrapper.text()).not.toContain('CASE_SCOPE_VIOLATION')
-    expect(wrapper.text()).not.toContain('FinGuard 보호 작동')
+    expect(wrapper.text()).not.toContain('FinBound 보호 작동')
     expect(wrapper.text()).not.toContain('POLICY_REQUIREMENTS_MET')
   })
 
   it('fails closed for an unsupported Agent task', async () => {
-    await expect(finguardApi.executeAgentTask({ workId: 'UNKNOWN' })).rejects.toThrow('Unsupported Agent task')
+    await expect(finboundApi.executeAgentTask({ workId: 'UNKNOWN' })).rejects.toThrow('Unsupported Agent task')
+  })
+
+  it('does not claim downstream non-reachability when execution status is unknown', async () => {
+    const executeAgentTask = vi.spyOn(finboundApi, 'executeAgentTask').mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('업무 처리 상태를 확인할 수 없습니다')
+    expect(wrapper.text()).toContain('금융시스템 조회 여부는 업무 기록에서 확인해 주세요')
+    expect(wrapper.text()).not.toContain('자료를 조회하지 않았습니다')
+    executeAgentTask.mockRestore()
   })
 
   it.each([
@@ -48,7 +69,7 @@ describe('FinGuard P0 application', () => {
     ['LIMIT_REVIEW', 2, 1, 'CASE_SCOPE_VIOLATION'],
     ['DOCUMENT_REVIEW', 2, 1, 'MANDATE_SCOPE_VIOLATION'],
   ])('keeps %s task-level permission enforcement contract', async (workId, allowedCount, blockedCount, reasonCode) => {
-    const result = await finguardApi.executeAgentTask({ workId })
+    const result = await finboundApi.executeAgentTask({ workId })
     const allowed = result.attempts.filter((attempt) => attempt.decision === 'ALLOW')
     const blocked = result.attempts.filter((attempt) => attempt.decision === 'BLOCK')
 
@@ -91,11 +112,11 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('동의가 만료된 과거 소득자료 조회')
     expect(wrapper.text()).toContain('MANDATE_SCOPE_VIOLATION')
     expect(wrapper.text()).toContain('차단 · 0회')
-    expect(wrapper.text()).toContain('FinGuard 보호 작동')
+    expect(wrapper.text()).toContain('FinBound 보호 작동')
   })
 
   it('keeps policy decision and system error as separate audit facts', async () => {
-    const events = await finguardApi.getAuditEvents()
+    const events = await getAllAuditEvents()
     const timeoutEvent = events.find((event) => event.auditStatus === 'ERROR')
 
     expect(timeoutEvent.decision).toBe('ALLOW')
@@ -106,7 +127,7 @@ describe('FinGuard P0 application', () => {
   })
 
   it('blocks an AI behavior anomaly even when all permission scopes are valid', async () => {
-    const events = await finguardApi.getAuditEvents()
+    const events = await getAllAuditEvents()
     const behaviorBlock = events.find((event) => event.reasonCodes.includes('BEHAVIOR_ANOMALY'))
 
     expect(Object.keys(behaviorBlock.scopeStatus)).toHaveLength(9)
@@ -118,7 +139,7 @@ describe('FinGuard P0 application', () => {
   })
 
   it('records prompt injection as an independent AI risk signal', async () => {
-    const events = await finguardApi.getAuditEvents()
+    const events = await getAllAuditEvents()
     const promptBlock = events.find((event) => event.reasonCodes.includes('PROMPT_INJECTION'))
 
     expect(promptBlock.promptInjectionDetected).toBe(true)
@@ -126,6 +147,24 @@ describe('FinGuard P0 application', () => {
     expect(promptBlock.promptModelVersion).toBeTruthy()
     expect(promptBlock.decision).toBe('BLOCK')
     expect(promptBlock.downstreamReached).toBe(false)
+  })
+
+  it('keeps transitional prompt records explicitly unevaluated', async () => {
+    const events = await getAllAuditEvents()
+    const unevaluated = events.find((event) => event.promptEvaluationStatus === 'NOT_EVALUATED')
+
+    expect(unevaluated.promptRisk).toBe(0)
+    expect(unevaluated.promptInjectionDetected).toBe(false)
+    expect(unevaluated.promptModelVersion).toBeNull()
+  })
+
+  it('uses behavior model levels without deriving thresholds in the browser', async () => {
+    const events = await getAllAuditEvents()
+    const alert = events.find((event) => event.behaviorRiskLevel === 'ALERT')
+    const critical = events.find((event) => event.behaviorRiskLevel === 'CRITICAL')
+
+    expect(alert.behaviorRisk).toBe(0.95)
+    expect(critical.behaviorRisk).toBe(1)
   })
 
   it('supports every agreed dashboard filter and derived outcome', async () => {
@@ -136,6 +175,7 @@ describe('FinGuard P0 application', () => {
 
     expect(wrapper.findAll('[data-filter]')).toHaveLength(8)
     await wrapper.get('[data-filter="outcome"]').setValue('BLOCK')
+    await flushPromises()
 
     expect(wrapper.findAll('.event-row')).toHaveLength(5)
     expect(wrapper.text()).toContain('BEHAVIOR_ANOMALY')
@@ -154,14 +194,41 @@ describe('FinGuard P0 application', () => {
     expect(wrapper.text()).toContain('1 / 2 페이지')
 
     await wrapper.get('.pagination button:last-child').trigger('click')
+    await flushPromises()
 
     expect(wrapper.findAll('.event-row')).toHaveLength(4)
     expect(wrapper.text()).toContain('2 / 2 페이지')
   })
 
+  it('renders historical prompt records as unevaluated instead of safe', async () => {
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('.pagination button:last-child').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('.event-row').at(-1).trigger('click')
+
+    expect(wrapper.findAll('.risk-meter')[0].text()).toContain('미평가')
+    expect(wrapper.text()).toContain('입력 모델미평가')
+  })
+
+  it('supports MEDIUM severity and server-style pagination at the API boundary', async () => {
+    const firstPage = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, page: 1, pageSize: 5 })
+    const secondPage = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, page: 2, pageSize: 5 })
+    const mediumOnly = await finboundApi.getAuditEvents({ filters: { period: 'ALL', severity: 'MEDIUM' } })
+
+    expect(firstPage.items).toHaveLength(5)
+    expect(firstPage.totalItems).toBe(9)
+    expect(firstPage.totalPages).toBe(2)
+    expect(secondPage.items).toHaveLength(4)
+    expect(mediumOnly.items).toHaveLength(1)
+    expect(mediumOnly.items[0].severity).toBe('MEDIUM')
+  })
+
   it('uses UUID request identifiers and never invents an allow reason code', async () => {
-    const executions = await Promise.all(['NEW_LOAN', 'LIMIT_REVIEW', 'DOCUMENT_REVIEW'].map((workId) => finguardApi.executeAgentTask({ workId })))
-    const events = await finguardApi.getAuditEvents()
+    const executions = await Promise.all(['NEW_LOAN', 'LIMIT_REVIEW', 'DOCUMENT_REVIEW'].map((workId) => finboundApi.executeAgentTask({ workId })))
+    const events = await getAllAuditEvents()
     const requestIds = [...executions.flatMap((execution) => execution.attempts.map((attempt) => attempt.requestId)), ...events.map((event) => event.requestId)]
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/i
 

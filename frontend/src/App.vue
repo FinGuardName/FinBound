@@ -18,9 +18,9 @@ const activeComponent = computed(() => ({
 <template>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="#main-content" aria-label="FinGuard 홈">
+      <a class="brand" href="#main-content" aria-label="FinBound 홈">
         <span class="brand-mark" aria-hidden="true">F</span>
-        <span>FinGuard</span>
+        <span>FinBound</span>
       </a>
       <nav aria-label="업무 메뉴">
         <button v-for="screen in screens" :key="screen.id" :data-screen="screen.id" :class="['nav-item', { active: activeScreen === screen.id }]" :aria-current="activeScreen === screen.id ? 'page' : undefined" type="button" @click="activeScreen = screen.id">
