@@ -393,7 +393,7 @@ ALLOW / BLOCK / ERROR를 모두 만든 뒤 다음을 확인한다.
 - OPA Policy Version
 - Reason Code
 - downstreamReached
-- Authority vs Effective Permission
+- LoanAgent 실행 화면에 통합된 Authority vs Effective Permission
 - 원본 Prompt/금융 응답 미표시
 - Vue DB 직접 접근 없음
 
