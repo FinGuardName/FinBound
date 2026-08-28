@@ -9,6 +9,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  flyway:
+    # 경로를 오타 내면 조용히 무시되는 대신 기동에 실패한다. 시드 경로가 무시되면 기동은 성공하는데
+    # 데모 데이터가 없어서, 원인이 로그에 남지 않는 실패가 된다.
+    fail-on-missing-locations: true
 
 finguard:
   internal:
