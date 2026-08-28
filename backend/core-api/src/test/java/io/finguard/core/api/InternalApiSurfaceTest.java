@@ -10,7 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import io.finguard.core.agentrun.AgentRunController;
 import io.finguard.core.audit.AuditController;
 import io.finguard.core.context.ContextResolveController;
 import io.finguard.core.history.BehaviorHistoryController;
@@ -26,18 +25,13 @@ class InternalApiSurfaceTest {
 
     private final MockMvc mockMvc =
             MockMvcBuilders.standaloneSetup(
-                            new AgentRunController(),
                             new ContextResolveController(),
                             new AuditController(),
                             new SecurityEventController(),
                             new BehaviorHistoryController())
                     .build();
 
-    @Test
-    void agentRunsIsRoutedAndNotImplementedYet() throws Exception {
-        mockMvc.perform(post("/api/v1/agent-runs").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isNotImplemented());
-    }
+    // POST /api/v1/agent-runs 는 이슈 #19에서 구현됐다. 동작 검증은 AgentRunApiTest 가 한다.
 
     @Test
     void contextResolveIsRoutedAndNotImplementedYet() throws Exception {
