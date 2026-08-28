@@ -29,7 +29,12 @@ import io.finguard.core.security.InternalCredentialFilter;
 /** {@code POST /internal/v1/context/resolve} 계약 및 오류 경계 테스트. */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "finguard.internal.credential=test-internal-credential")
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @ActiveProfiles("local")
 @Testcontainers
 class ContextResolveApiTest {
@@ -214,6 +219,8 @@ class ContextResolveApiTest {
     private RunReferences startAgentRun() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // docs/04 §2 — /api/v1/** 는 Operator Credential이 있어야 업무 처리를 시작한다.
+        headers.set(HttpHeaders.AUTHORIZATION, "Bearer test-operator-credential");
         ResponseEntity<JsonNode> response =
                 restTemplate.exchange(
                         URI.create(base() + "/api/v1/agent-runs"),

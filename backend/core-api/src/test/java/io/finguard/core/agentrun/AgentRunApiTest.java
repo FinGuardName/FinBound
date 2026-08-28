@@ -28,7 +28,12 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "finguard.internal.credential=test-internal-credential")
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @ActiveProfiles("local")
 @Testcontainers
 class AgentRunApiTest {
@@ -130,6 +135,10 @@ class AgentRunApiTest {
     private org.springframework.http.HttpEntity<String> jsonEntity(String json) {
         var headers = new org.springframework.http.HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // docs/04 §2 — /api/v1/** 는 Operator Credential이 있어야 업무 처리를 시작한다.
+        headers.set(
+                org.springframework.http.HttpHeaders.AUTHORIZATION,
+                "Bearer test-operator-credential");
         return new org.springframework.http.HttpEntity<>(json, headers);
     }
 

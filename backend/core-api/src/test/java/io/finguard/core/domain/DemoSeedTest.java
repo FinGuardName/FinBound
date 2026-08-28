@@ -23,7 +23,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * 막힌다"이다. 이 전제가 데이터에 갖춰져 있지 않으면 이슈 #20의 Resolver가 무엇을 계산하든
  * 데모가 성립하지 않는다.
  */
-@SpringBootTest(properties = "finguard.internal.credential=test-internal-credential")
+@SpringBootTest(
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @ActiveProfiles("local")
 @Testcontainers
 class DemoSeedTest {

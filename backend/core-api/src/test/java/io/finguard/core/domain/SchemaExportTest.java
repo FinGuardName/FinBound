@@ -23,6 +23,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(
         properties = {
             "finguard.internal.credential=schema-export",
+            "finguard.api.viewer-credential=schema-export-viewer",
+            "finguard.api.operator-credential=schema-export-operator",
+            "finguard.api.operator-employee-id=EMP-101",
             "spring.jpa.hibernate.ddl-auto=none",
             "spring.flyway.enabled=false",
             "spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create",
