@@ -130,12 +130,15 @@ ERROR
 
 ### SecurityAuthEvent
 
-인증 실패 등 Gateway 보안 Event는 Business Audit과 분리한다.
+인증·인가 실패 등 Gateway/Core API 보안 Event는 Business Audit과 분리한다.
 
 ```text
 AUTH_FAILURE
 RATE_LIMITED       # 필요 시 집계/운영 로그로 사용
 ```
+
+Core `/api/v1/**`의 Credential·Role·Employee 검증 실패도 `AUTH_FAILURE`로 기록하고
+§20의 구체적인 Reason Code로 원인을 구분한다.
 
 Business AuditEvent는 **Agent 인증 성공 이후** 생성한다.
 
@@ -312,6 +315,9 @@ UNKNOWN_PROMPT_ATTACK
 | `INVALID_TOOL_REQUEST` | Tool Call Schema 오류 |
 | `AGENT_AUTHENTICATION_FAILED` | Agent Credential 검증 실패 |
 | `AGENT_IDENTITY_MISMATCH` | Verified Agent와 Passport Agent 불일치 |
+| `CORE_API_CREDENTIAL_INVALID` | Core `/api/v1/**` Bearer Credential 누락 또는 불일치 |
+| `CORE_API_ROLE_FORBIDDEN` | 인증된 Core API 호출자의 Role 부족 |
+| `EMPLOYEE_IDENTITY_MISMATCH` | 인증된 Operator Employee와 요청 Employee 불일치 |
 | `DUPLICATE_REQUEST` | 동일 Request ID 중복 요청 |
 | `REQUEST_RATE_LIMITED` | Gateway 요청 제한 초과 |
 | `CONTEXT_SERVICE_UNAVAILABLE` | Core Context API 조회 실패 |

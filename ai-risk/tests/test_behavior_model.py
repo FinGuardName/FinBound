@@ -181,7 +181,13 @@ def test_committed_artifact_and_metadata_are_consistent() -> None:
 
     np.testing.assert_array_equal(bundle.scaler.mean_, regenerated.scaler.mean_)
     np.testing.assert_array_equal(bundle.scaler.scale_, regenerated.scaler.scale_)
-    np.testing.assert_array_equal(bundle.calibration_scores, regenerated.calibration_scores)
+    # 커밋된 아티팩트는 개발자 PC에서, 재학습본은 CI 러너에서 만들어진다. BLAS 구현과 SIMD 경로가
+    # 달라 모델 점수의 마지막 비트가 흔들린다(관측값 1.11e-16, double 1 ULP). 아래 decision_function
+    # 비교와 같은 종류의 값이므로 같은 허용 오차를 쓴다. 정확히 같기를 요구하면 어느 기계에서
+    # 학습했는지에 따라 통과 여부가 갈린다.
+    np.testing.assert_allclose(
+        bundle.calibration_scores, regenerated.calibration_scores, rtol=0, atol=1e-12
+    )
 
     samples = generate_behavior_samples(random_seed=42)
     reference_features = np.vstack([samples.normal, samples.anomaly])
