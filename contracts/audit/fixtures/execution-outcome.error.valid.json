@@ -1,0 +1,13 @@
+{
+  "requestId": "REQ-003",
+  "decision": "ALLOW",
+  "systemOutcome": "ERROR",
+  "reasonCodes": ["DOWNSTREAM_ERROR"],
+  "downstreamReached": true,
+  "responseReleased": false,
+  "success": false,
+  "recordsRead": 0,
+  "latencyMs": 95,
+  "errorLocation": "DOWNSTREAM",
+  "completedAt": "2026-08-17T21:34:11+09:00"
+}
