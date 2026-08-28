@@ -1,0 +1,13 @@
+{
+  "requestId": "REQ-001",
+  "agentId": "LOAN-AGENT-01",
+  "agentRunId": "RUN-001",
+  "caseId": "LOAN-2026-001",
+  "tool": "CREDIT_SCORE_READ",
+  "targetConsumerId": "CUST-1001",
+  "requestedData": ["CREDIT_SCORE"],
+  "requestedAt": "2026-08-17T21:32:10+09:00",
+  "success": true,
+  "recordsRead": 1,
+  "latencyMs": 120
+}

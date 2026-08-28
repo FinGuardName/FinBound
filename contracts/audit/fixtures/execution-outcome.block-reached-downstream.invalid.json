@@ -1,0 +1,10 @@
+{
+  "requestId": "REQ-002",
+  "decision": "BLOCK",
+  "systemOutcome": "COMPLETED",
+  "reasonCodes": ["CASE_SCOPE_VIOLATION"],
+  "downstreamReached": true,
+  "responseReleased": false,
+  "success": false,
+  "completedAt": "2026-08-17T21:33:11+09:00"
+}
