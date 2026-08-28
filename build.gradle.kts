@@ -53,6 +53,23 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+
+        // Windows에서 사용자 이름이 ASCII가 아니면 기본 java.io.tmpdir가
+        // C:\Users\<한글>\AppData\Local\Temp 가 된다. byte-buddy는 임시 디렉터리에 에이전트 jar를
+        // 만들어 자기 프로세스에 붙이는데 그 경로가 non-ASCII면 부착이 실패하고,
+        // Mockito가 "JDK does not supply a working agent attachment mechanism"으로 죽는다.
+        // Spring Boot의 ResetMocksTestExecutionListener는 mock을 쓰지 않는 @SpringBootTest에서도
+        // Mockito를 초기화하므로, 이 경우 통합 테스트 전체가 실행되지 못한다.
+        // 테스트 JVM의 임시 디렉터리를 프로젝트 안(ASCII 경로)으로 고정해 회피한다.
+        val testTmpDir = layout.buildDirectory.dir("tmp/test-jvm").get().asFile
+        doFirst {
+            testTmpDir.mkdirs()
+        }
+        systemProperty("java.io.tmpdir", testTmpDir.absolutePath)
+
+        // 테스트 JVM은 Gradle의 file.encoding을 물려받지 않는다. 한글 단언 메시지가 리포트에서 깨진다.
+        defaultCharacterEncoding = "UTF-8"
+
         finalizedBy(tasks.named("jacocoTestReport"))
     }
 
