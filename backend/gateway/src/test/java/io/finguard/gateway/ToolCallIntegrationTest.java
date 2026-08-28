@@ -52,6 +52,15 @@ class ToolCallIntegrationTest {
     @DynamicPropertySource
     static void overrideOpaUrl(DynamicPropertyRegistry registry) {
         registry.add("finguard.opa.base-url", () -> "http://localhost:" + opaMock.port());
+        // 운영 기본값 300ms는 connect와 read 양쪽에 걸린다. 이 테스트의 첫 왕복은 클래스 로딩과
+        // JIT, WireMock 초기화를 함께 치르느라 그 예산을 넘는다 — CI에서 1122ms가 측정됐고
+        // 그때 OPA가 stub을 정상 응답했는데도(serveEvents=1, unmatched=0) 클라이언트가 먼저
+        // 포기해 fail-closed 403 POLICY_ENGINE_UNAVAILABLE이 나왔다.
+        //
+        // 이 테스트가 검증하는 것은 BLOCK 판정이 호출자에게 그대로 전달되는지이지 타임아웃 예산이
+        // 아니다. fail-closed 경로는 opaDownTriggersFailClosedBlock이 따로 검증한다.
+        // 운영 값(300ms)이 콜드 스타트에 충분한지는 별도로 측정할 일이다.
+        registry.add("finguard.timeouts.opa-ms", () -> "5000");
     }
 
     @BeforeEach
