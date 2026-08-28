@@ -679,6 +679,77 @@ Rego는 raw Case/Customer/Tool/Data 비교를 하지 않는다.
 
 ---
 
+## 13.1 Mock Financial API — Contract 제안
+
+> **팀 합의 전 제안이다.** Backend 3의 독립 Mock 구현을 위해 임시로 사용한다.
+> Gateway 연동 전에 Backend 2와 Endpoint, DTO, 오류 매핑을 Review하고 확정한다.
+> 합의 결과가 다르면 이 절과 구현, Contract Test를 같은 PR에서 함께 변경한다.
+
+### Endpoint
+
+```http
+POST /internal/v1/finance/tool-calls
+X-FinGuard-Internal-Credential: <internal-service-credential>
+Content-Type: application/json
+```
+
+### Request
+
+```json
+{
+  "requestId": "REQ-001",
+  "tool": "CREDIT_SCORE_READ",
+  "targetConsumerId": "CUST-1001"
+}
+```
+
+### Response
+
+```json
+{
+  "requestId": "REQ-001",
+  "tool": "CREDIT_SCORE_READ",
+  "consumerId": "CUST-1001",
+  "result": {
+    "creditScore": 812
+  }
+}
+```
+
+Tool별 `result` Field:
+
+```text
+CREDIT_SCORE_READ → creditScore
+INCOME_READ       → annualIncome
+DEBT_READ         → totalDebt
+```
+
+### 임시 오류 응답
+
+```json
+{
+  "errorCode": "INTERNAL_CREDENTIAL_INVALID",
+  "message": "A valid internal service credential is required"
+}
+```
+
+현재 임시 오류 Code:
+
+```text
+INTERNAL_CREDENTIAL_INVALID
+INVALID_TOOL_REQUEST
+FINANCIAL_DATA_NOT_FOUND
+```
+
+`FINANCIAL_DATA_NOT_FOUND`는 Mock Finance 내부 오류 Code 제안이며 공통 Reason Code로
+확정된 값이 아니다. Gateway는 Mock Finance 처리 오류를 Audit의 `DOWNSTREAM_ERROR`로
+매핑한다.
+
+Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 않는다. Gateway가
+인가를 완료한 요청의 Tool 실행만 담당한다.
+
+---
+
 ## 14. AuditEvent / SecurityAuthEvent
 
 ### AuditEvent

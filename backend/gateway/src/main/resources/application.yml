@@ -1,12 +1,47 @@
 spring:
   application:
     name: finguard-gateway
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-request-size: 64KB
+      max-file-size: 64KB
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: ${GATEWAY_PORT:8081}
+  tomcat:
+    max-http-form-post-size: 64KB
+  error:
+    include-message: never
+    include-stacktrace: never
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
 
-server:
-  port: ${GATEWAY_PORT:8081}
+finguard:
+  core:
+    base-url: ${CORE_URL:http://localhost:8080}
+  ai:
+    base-url: ${AI_URL:http://localhost:8000}
+  opa:
+    base-url: ${OPA_URL:http://localhost:8181}
+  mock-finance:
+    base-url: ${MOCK_FINANCE_URL:http://localhost:8082}
+  timeouts:
+    core-ms: 800
+    ai-ms: 1500
+    opa-ms: 300
+    downstream-ms: 3000
+  rate-limit:
+    capacity: 20
+    refill-per-second: 10
+  credentials:
+    valid-agent-tokens: valid-agent-token
