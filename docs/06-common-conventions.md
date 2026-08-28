@@ -492,7 +492,7 @@ Prompt Risk는 Runtime마다 새로 계산되는 행동 점수가 아니라 **�
 - 목록/상세 조회는 페이지네이션을 사용한다.
 - 위험 이벤트는 `riskFlagged=true` 또는 `HIGH/CRITICAL`로 필터링할 수 있다.
 - Reason Code는 고정된 사용자 설명과 함께 표시한다.
-- Employee Authority와 Agent Effective Permission 비교 화면을 제공한다.
+- LoanAgent 실행 화면의 현재 업무 보호 패널에서 Employee Authority와 Agent Effective Permission 비교를 제공한다.
 
 ---
 
