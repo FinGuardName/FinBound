@@ -1,26 +1,40 @@
 <script setup>
+import { computed, ref } from 'vue'
+
+import AgentRunView from './views/AgentRunView.vue'
+import DashboardView from './views/DashboardView.vue'
+
 const screens = [
-  ['1', 'LoanAgent 실행', 'Financial Case와 Task Passport를 생성하고 Tool Call을 실행합니다.'],
-  ['2', '권한 비교', 'Employee Authority와 Agent Effective Permission을 나란히 확인합니다.'],
-  ['3', 'Security Dashboard', 'ALLOW, BLOCK, ERROR와 Scope·AI·정책 근거를 조회합니다.'],
+  { id: 'run', label: 'AI 업무 지원', kicker: '01' },
+  { id: 'dashboard', label: 'AI 업무 안전 현황', kicker: '02' },
 ]
+const activeScreen = ref('run')
+const activeComponent = computed(() => ({
+  run: AgentRunView,
+  dashboard: DashboardView,
+})[activeScreen.value])
 </script>
 
 <template>
-  <main>
-    <p class="eyebrow">RUNTIME AUTHORIZATION GATEWAY</p>
-    <h1>FinGuard</h1>
-    <p class="lead">사람이 할 수 있다고 해서, AI Agent가 지금 그 일을 해도 되는 것은 아닙니다.</p>
-
-    <section aria-labelledby="screens-title">
-      <h2 id="screens-title">P0 화면</h2>
-      <div class="grid">
-        <article v-for="screen in screens" :key="screen[0]">
-          <span>{{ screen[0] }}</span>
-          <h3>{{ screen[1] }}</h3>
-          <p>{{ screen[2] }}</p>
-        </article>
-      </div>
-    </section>
-  </main>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#main-content" aria-label="FinBound 홈">
+        <span class="brand-mark" aria-hidden="true">F</span>
+        <span>FinBound</span>
+      </a>
+      <nav aria-label="업무 메뉴">
+        <button v-for="screen in screens" :key="screen.id" :data-screen="screen.id" :class="['nav-item', { active: activeScreen === screen.id }]" :aria-current="activeScreen === screen.id ? 'page' : undefined" type="button" @click="activeScreen = screen.id">
+          <span>{{ screen.kicker }}</span>{{ screen.label }}
+        </button>
+      </nav>
+      <div class="system-state"><span class="status-dot" aria-hidden="true"></span><div><strong>AI 업무 보호 적용 중</strong><small>현재 업무 범위로 제한</small></div></div>
+    </aside>
+    <main id="main-content">
+      <header class="topbar">
+        <div><p class="eyebrow">기업금융 여신 업무 시스템</p><h1>{{ screens.find((screen) => screen.id === activeScreen)?.label }}</h1></div>
+        <div class="environment-badge"><span></span> AI 업무 보호 적용</div>
+      </header>
+      <component :is="activeComponent" />
+    </main>
+  </div>
 </template>
