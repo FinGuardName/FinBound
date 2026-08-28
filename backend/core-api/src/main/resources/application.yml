@@ -10,6 +10,11 @@ spring:
     hibernate:
       ddl-auto: validate
 
+finguard:
+  internal:
+    # 값이 없으면 기동에 실패한다. 인증이 사실상 꺼진 Internal API가 떠 있는 상태를 만들지 않는다.
+    credential: ${FINGUARD_INTERNAL_CREDENTIAL:}
+
 management:
   endpoints:
     web:
