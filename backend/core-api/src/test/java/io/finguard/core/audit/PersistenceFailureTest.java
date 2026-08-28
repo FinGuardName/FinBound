@@ -38,6 +38,9 @@ class PersistenceFailureTest {
                         "trace-fail",
                         "RUN-FAIL",
                         "UNTRUSTED-BODY-AGENT",
+                        null,
+                        null,
+                        null,
                         AuditStatus.PROCESSING,
                         NOW);
 
@@ -58,6 +61,9 @@ class PersistenceFailureTest {
                         null,
                         "RUN-FAIL",
                         "LOAN-AGENT-01",
+                        null,
+                        null,
+                        null,
                         AuditStatus.PROCESSING,
                         NOW);
 

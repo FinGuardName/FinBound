@@ -3,6 +3,7 @@ package io.finguard.core.audit;
 import java.time.Instant;
 
 import io.finguard.core.domain.AuditStatus;
+import io.finguard.core.domain.Tool;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -14,6 +15,9 @@ public record AuditCreateRequest(
         @Size(max = 128) String traceId,
         @NotBlank @Size(max = 64) String agentRunId,
         @NotBlank @Size(max = 64) String verifiedAgentId,
+        @Size(max = 64) String caseId,
+        @Size(max = 64) String targetConsumerId,
+        Tool requestedTool,
         @NotNull AuditStatus status,
         @NotNull Instant requestedAt) {
 

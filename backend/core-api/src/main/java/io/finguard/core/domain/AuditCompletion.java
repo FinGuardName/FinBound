@@ -11,6 +11,10 @@ public record AuditCompletion(
         Set<String> reasonCodes,
         boolean downstreamReached,
         boolean responseReleased,
+        Boolean success,
+        Integer recordsRead,
+        Long latencyMs,
+        String errorLocation,
         BigDecimal behaviorRisk,
         String policyVersion,
         Instant completedAt) {
@@ -24,6 +28,21 @@ public record AuditCompletion(
         }
         if (decision == PolicyDecision.BLOCK && downstreamReached) {
             throw new IllegalArgumentException("Blocked audit cannot reach downstream");
+        }
+        // contracts/audit/execution-outcome.schema.json의 조건부 불변식.
+        // 이걸 걸지 않으면 스키마가 금지한 상태가 감사 기록으로 남는다.
+        if (systemOutcome == AuditStatus.ERROR) {
+            if (errorLocation == null || errorLocation.isBlank()) {
+                throw new IllegalArgumentException("Error outcome requires an errorLocation");
+            }
+            if (!Boolean.FALSE.equals(success)) {
+                throw new IllegalArgumentException("Error outcome cannot report success");
+            }
+        }
+        if (decision == PolicyDecision.ALLOW
+                && systemOutcome == AuditStatus.COMPLETED
+                && !Boolean.TRUE.equals(success)) {
+            throw new IllegalArgumentException("Allowed completion must report success");
         }
         if (behaviorRisk != null
                 && (behaviorRisk.compareTo(BigDecimal.ZERO) < 0
