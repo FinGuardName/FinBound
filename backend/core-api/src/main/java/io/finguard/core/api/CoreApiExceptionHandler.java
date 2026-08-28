@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
+import io.finguard.core.history.InvalidBehaviorHistoryWindowException;
 import io.finguard.core.permission.PermissionNotIssuableException;
 import io.finguard.core.securityevent.SecurityEventWriteException;
 
@@ -50,6 +51,12 @@ public class CoreApiExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 exception.getReasonCode(),
                 "요청한 Runtime Context를 찾을 수 없습니다.");
+    }
+
+    @ExceptionHandler(InvalidBehaviorHistoryWindowException.class)
+    ResponseEntity<ProblemDetail> handleInvalidHistoryWindow(
+            InvalidBehaviorHistoryWindowException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_TOOL_REQUEST", "조회 시간 범위가 올바르지 않습니다.");
     }
 
     /**
