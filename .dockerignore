@@ -1,0 +1,13 @@
+# 빌드 산출물과 로컬 상태는 이미지 컨텍스트에 넣지 않는다.
+.git
+.github
+.claude
+**/build
+**/.gradle
+**/node_modules
+frontend
+ai-risk
+infrastructure
+docs
+*.md
+.env
