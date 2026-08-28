@@ -20,6 +20,7 @@ import org.springframework.web.context.WebApplicationContext;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.http.Fault;
 
 /**
  * Phase 1 회의 데모 시나리오 3개:
@@ -113,28 +114,32 @@ class ToolCallIntegrationTest {
             .andExpect(status().isUnauthorized());
     }
 
+    /**
+     * OPA에 닿지 못하는 상황을 서버를 내려서 만들지 않는다. {@code dynamicPort()}로 띄운 WireMock은
+     * {@code stop()} 후 {@code start()} 하면 다른 포트에 붙는데, {@link io.finguard.gateway.client.OpaClient}는
+     * 생성 시점의 URL을 필드에 들고 있어 되살린 서버를 다시 찾지 못한다. 그러면 이 뒤에 실행되는
+     * 모든 테스트가 실제 검증 대신 fail-closed 응답을 받는다. 연결 자체를 끊는 stub으로 같은 경로를 만든다.
+     */
     @Test
     void opaDownTriggersFailClosedBlock() throws Exception {
-        opaMock.stop();
-        try {
-            mockMvc.perform(post("/gateway/v1/tool-calls")
-                    .header("Authorization", "Bearer valid-agent-token")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
-                        {
-                          "agentRunId": "RUN-001",
-                          "passportId": "PASS-001",
-                          "tool": "CREDIT_SCORE_READ",
-                          "targetConsumerId": "CUST-1001",
-                          "requestedData": ["CREDIT_SCORE"],
-                          "action": "READ"
-                        }
-                        """))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.decision").value("BLOCK"))
-                .andExpect(jsonPath("$.reasonCodes[0]").value("POLICY_ENGINE_UNAVAILABLE"));
-        } finally {
-            opaMock.start();
-        }
+        opaMock.stubFor(WireMock.post(WireMock.urlEqualTo("/v1/data/finguard/authorization/decision"))
+            .willReturn(WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+
+        mockMvc.perform(post("/gateway/v1/tool-calls")
+                .header("Authorization", "Bearer valid-agent-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentRunId": "RUN-001",
+                      "passportId": "PASS-001",
+                      "tool": "CREDIT_SCORE_READ",
+                      "targetConsumerId": "CUST-1001",
+                      "requestedData": ["CREDIT_SCORE"],
+                      "action": "READ"
+                    }
+                    """))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.decision").value("BLOCK"))
+            .andExpect(jsonPath("$.reasonCodes[0]").value("POLICY_ENGINE_UNAVAILABLE"));
     }
 }
