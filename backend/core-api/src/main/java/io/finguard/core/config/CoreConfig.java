@@ -5,6 +5,7 @@ import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import io.finguard.core.context.FinancialContextResolver;
 import io.finguard.core.permission.EffectivePermissionCalculator;
 
 /**
@@ -27,5 +28,10 @@ public class CoreConfig {
     @Bean
     EffectivePermissionCalculator effectivePermissionCalculator() {
         return new EffectivePermissionCalculator();
+    }
+
+    @Bean
+    FinancialContextResolver financialContextResolver() {
+        return new FinancialContextResolver();
     }
 }
