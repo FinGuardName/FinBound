@@ -101,6 +101,10 @@ public class AuditEvent {
     @Column(name = "policy_version", length = 64)
     private String policyVersion;
 
+    /** systemOutcome=ERROR일 때 어느 단계에서 실패했는지. contracts/audit/execution-outcome.schema.json. */
+    @Column(name = "error_location", length = 64)
+    private String errorLocation;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     private AuditStatus status;
@@ -122,12 +126,20 @@ public class AuditEvent {
             String traceId,
             String agentId,
             String agentRunId,
+            String caseId,
+            String targetConsumerId,
+            Tool requestedTool,
             Instant requestedAt) {
         this.auditEventId = auditEventId;
         this.requestId = requestId;
         this.traceId = traceId;
         this.agentId = agentId;
         this.agentRunId = agentRunId;
+        // 어떤 업무의 어떤 도구였는지는 요청 시점에만 알 수 있다. 여기서 받지 않으면
+        // Behavior History(docs/04 §9)가 caseId·tool 없이 나가 AI가 맥락을 잃는다.
+        this.caseId = caseId;
+        this.targetConsumerId = targetConsumerId;
+        this.requestedTool = requestedTool;
         this.status = AuditStatus.PROCESSING;
         this.requestedAt = requestedAt;
     }
@@ -212,7 +224,34 @@ public class AuditEvent {
         return requestedAt;
     }
 
+    public String getErrorLocation() {
+        return errorLocation;
+    }
+
     public Instant getCompletedAt() {
         return completedAt;
+    }
+
+    /** PROCESSING 기록에 최종 결과를 한 번만 적용한다. 감사 증거의 사후 덮어쓰기를 허용하지 않는다. */
+    public void complete(AuditCompletion completion) {
+        if (status != AuditStatus.PROCESSING) {
+            throw new IllegalStateException("AuditEvent is already finalized");
+        }
+        if (completion.completedAt().isBefore(requestedAt)) {
+            throw new IllegalArgumentException("completedAt must not precede requestedAt");
+        }
+        this.decision = completion.decision();
+        this.reasonCodes.clear();
+        this.reasonCodes.addAll(completion.reasonCodes());
+        this.downstreamReached = completion.downstreamReached();
+        this.responseReleased = completion.responseReleased();
+        this.success = completion.success();
+        this.recordsRead = completion.recordsRead();
+        this.latencyMs = completion.latencyMs();
+        this.errorLocation = completion.errorLocation();
+        this.behaviorRisk = completion.behaviorRisk();
+        this.policyVersion = completion.policyVersion();
+        this.status = completion.systemOutcome();
+        this.completedAt = completion.completedAt();
     }
 }

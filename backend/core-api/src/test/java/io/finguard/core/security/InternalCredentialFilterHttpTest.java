@@ -79,8 +79,8 @@ class InternalCredentialFilterHttpTest {
                         new org.springframework.http.HttpEntity<>("{}", headers),
                         String.class);
 
-        // 501 = 필터를 통과해 컨트롤러까지 갔다는 뜻. 구현은 이슈 #21.
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+        // 400 = 필터를 통과해 구현된 컨트롤러의 필수 헤더/본문 검증까지 갔다는 뜻.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
