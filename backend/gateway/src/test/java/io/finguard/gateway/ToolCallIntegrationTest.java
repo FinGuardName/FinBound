@@ -9,11 +9,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -37,6 +39,12 @@ class ToolCallIntegrationTest {
 
     @Autowired
     private WebApplicationContext webApplicationContext;
+
+    @Value("${finguard.opa.base-url}")
+    private String configuredOpaUrl;
+
+    @Value("${finguard.timeouts.opa-ms}")
+    private long opaTimeoutMs;
 
     @BeforeAll
     static void startOpa() {
@@ -77,6 +85,34 @@ class ToolCallIntegrationTest {
                       }
                     }
                     """)));
+
+        long startedAt = System.nanoTime();
+        MvcResult result = mockMvc.perform(post("/gateway/v1/tool-calls")
+                .header("Authorization", "Bearer valid-agent-token")
+                .header("X-Request-Id", "DEMO-001")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "agentRunId": "RUN-001",
+                      "passportId": "PASS-001",
+                      "tool": "CREDIT_SCORE_READ",
+                      "targetConsumerId": "CUST-9999",
+                      "requestedData": ["CREDIT_SCORE"],
+                      "action": "READ"
+                    }
+                    """))
+            .andReturn();
+        long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+
+        System.out.println("DIAG elapsedMs=" + elapsedMs + " timeoutMs=" + opaTimeoutMs);
+        System.out.println("DIAG status=" + result.getResponse().getStatus());
+        System.out.println("DIAG body=" + result.getResponse().getContentAsString());
+        System.out.println("DIAG configuredOpaUrl=" + configuredOpaUrl + " mockPort=" + opaMock.port());
+        System.out.println("DIAG serveEvents=" + opaMock.getAllServeEvents().size());
+        System.out.println("DIAG unmatched=" + opaMock.findAllUnmatchedRequests().size());
+        for (java.net.InetAddress address : java.net.InetAddress.getAllByName("localhost")) {
+            System.out.println("DIAG localhost -> " + address);
+        }
 
         mockMvc.perform(post("/gateway/v1/tool-calls")
                 .header("Authorization", "Bearer valid-agent-token")

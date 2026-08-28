@@ -54,6 +54,12 @@ subprojects {
     tasks.withType<Test> {
         useJUnitPlatform()
 
+        // 진단용 임시 설정. 기본값은 예외 메시지를 생략해 CI 로그로 원인을 볼 수 없다.
+        testLogging {
+            showStandardStreams = true
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
+
         // Windows에서 사용자 이름이 ASCII가 아니면 기본 java.io.tmpdir가
         // C:\Users\<한글>\AppData\Local\Temp 가 된다. byte-buddy는 임시 디렉터리에 에이전트 jar를
         // 만들어 자기 프로세스에 붙이는데 그 경로가 non-ASCII면 부착이 실패하고,
