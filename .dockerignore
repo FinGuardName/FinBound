@@ -57,3 +57,6 @@ docs/
 coverage/
 htmlcov/
 *.log
+
+# Agent 설정
+.claude/

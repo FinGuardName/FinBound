@@ -208,9 +208,11 @@ Gateway 우회에 대한 NetworkPolicy 기반 차단은 P1 Hardening으로 분�
 ### Audit / Web
 
 - PostgreSQL Audit
-- LoanAgent 실행 화면
-- Employee Authority vs Agent Effective Permission 화면
+- LoanAgent 실행 화면과 Financial Case별 권한 축소 근거
 - Security Dashboard / 위험 상세
+
+P0 Web은 두 개의 주요 화면으로 구성한다. Employee Authority와 Agent Effective Permission
+비교는 별도 메뉴로 분리하지 않고 LoanAgent 실행 화면의 현재 업무 보호 패널에 통합한다.
 
 ### Deployment
 

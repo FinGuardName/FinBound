@@ -28,6 +28,40 @@ services:
     networks: [data-zone]
 
   # internal-zone
+  core-api:
+    build:
+      context: ..
+      dockerfile: backend/core-api/Dockerfile
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finguard}
+      POSTGRES_USER: ${POSTGRES_USER:-finguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      # 값이 없으면 compose가 여기서 멈춘다. 인증이 사실상 꺼진 Internal API를 띄우지 않는다.
+      FINGUARD_INTERNAL_CREDENTIAL: ${FINGUARD_INTERNAL_CREDENTIAL:?set FINGUARD_INTERNAL_CREDENTIAL in .env}
+      # 기본은 프로파일 없음 = 데모 시드를 넣지 않는다.
+      # PostgreSQL 볼륨이 영속이라 한 번 들어간 시드는 프로파일을 나중에 꺼도 남는다.
+      # 되돌릴 수 없는 쪽을 기본값으로 두지 않는다. 시드가 필요하면 docker-compose.demo.yml.
+      SPRING_PROFILES_ACTIVE: ${CORE_API_PROFILES:-}
+    # ports가 아니라 expose다. 호스트에 열지 않는다 — /internal/** 의 방어가 공유 자격 증명 하나뿐이라
+    # 1차 방어선인 네트워크 격리를 포기하지 않는다. 브라우저에서 접근이 필요하면
+    # docker-compose.expose.yml 을 함께 지정한다. README 참조.
+    expose:
+      - "8080"
+    # ENTRYPOINT의 -XX:MaxRAMPercentage=75 는 "컨테이너에 허용된 메모리의 75%"다.
+    # 상한이 없으면 호스트 전체 RAM 기준이 되어 힙이 과도하게 커진다.
+    mem_limit: ${CORE_API_MEM_LIMIT:-1g}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    # data-zone은 postgres에, internal-zone은 gateway가 닿기 위해서다. public-zone에는 두지 않는다.
+    networks: [internal-zone, data-zone]
+
   opa:
     image: openpolicyagent/opa:1.17.0-static
     command: [run, --server, --addr=0.0.0.0:8181, /policy]
@@ -37,23 +71,6 @@ services:
     security_opt:
       - no-new-privileges:true
     networks: [internal-zone]
-
-
-  # core-api:
-  #   build:
-  #     context: ../backend/core-api
-  #   environment:
-  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finguard}
-  #     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-finguard}
-  #     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
-  #     AI_URL: http://ai-risk:8000
-  #   depends_on:
-  #     postgres: { condition: service_healthy }
-  #   ports:
-  #     - "127.0.0.1:8080:8080"     # 프로덕션은 제거.
-  #   networks: [internal-zone, data-zone]
-  #   read_only: true
-  #   security_opt: [no-new-privileges:true]
 
   gateway:
     build:
