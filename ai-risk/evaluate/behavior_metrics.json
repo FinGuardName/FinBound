@@ -1,0 +1,315 @@
+{
+  "modelVersion": "iforest-1",
+  "featureVersion": "behavior-features-1",
+  "datasetVersion": "synthetic-agent-log-4",
+  "randomSeed": 42,
+  "scenarioPolicy": {
+    "coreAnomaliesMaintainSameScope": true,
+    "scopeViolationSamplesIncluded": false,
+    "hardRequestLimit1m": 30,
+    "labelIndependentWarmupEvents": 24,
+    "normalAnomalyFeatureRangesOverlap": true
+  },
+  "evaluationPolicy": {
+    "heldOutProfile": "baseline",
+    "distributionShiftProfile": "shifted",
+    "distributionShiftSeeds": [
+      7,
+      43,
+      99,
+      2026,
+      7777
+    ],
+    "claim": "synthetic-feasibility-only"
+  },
+  "alertThreshold": 0.9041666666666667,
+  "criticalThreshold": 1.0,
+  "thresholdSelection": {
+    "method": "normal-quantile-alert-and-severity-aware-critical-f1",
+    "maxFalsePositiveRate": 0.1,
+    "alertNormalQuantile": 0.9,
+    "criticalPositiveScenarios": [
+      "AFTER_HOURS_ACCUMULATION"
+    ],
+    "alertOnlyScenarios": [
+      "RAPID_REPETITION"
+    ]
+  },
+  "splitSummary": {
+    "train": {
+      "samples": 1120,
+      "sessions": 140
+    },
+    "validation": {
+      "samples": 400,
+      "sessions": 50
+    },
+    "heldOutTest": {
+      "samples": 400,
+      "sessions": 50
+    }
+  },
+  "validation": {
+    "samples": 400,
+    "normalSamples": 240,
+    "anomalySamples": 160,
+    "falsePositiveRateAtAlert": 0.1,
+    "recallAtAlert": 0.975,
+    "precisionAtCritical": 0.8791208791208791,
+    "recallAtCritical": 1.0,
+    "f1AtCritical": 0.935672514619883,
+    "falsePositiveRateAtCritical": 0.004166666666666667,
+    "alertOnlyEscalationRateAtCritical": 0.125,
+    "rocAuc": 0.982890625,
+    "scenarioMetrics": {
+      "END_OF_DAY_INCREASE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.3125,
+        "falsePositiveRateAtCritical": 0.020833333333333332
+      },
+      "HIGH_VALUE_CASE_EXTRA_READS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.041666666666666664,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "LEGITIMATE_OVERTIME": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.0,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "MOMENTARY_SPIKE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.08333333333333333,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "STANDARD_BUSINESS_HOURS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.0625,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "AFTER_HOURS_ACCUMULATION": {
+        "classification": "ANOMALY",
+        "expectedMinimumLevel": "CRITICAL",
+        "samples": 80,
+        "recallAtAlert": 1.0,
+        "recallAtCritical": 1.0
+      },
+      "RAPID_REPETITION": {
+        "classification": "ANOMALY",
+        "expectedMinimumLevel": "ALERT",
+        "samples": 80,
+        "recallAtAlert": 0.95,
+        "recallAtCritical": 0.125
+      }
+    }
+  },
+  "heldOutTest": {
+    "samples": 400,
+    "normalSamples": 240,
+    "anomalySamples": 160,
+    "falsePositiveRateAtAlert": 0.125,
+    "recallAtAlert": 1.0,
+    "precisionAtCritical": 0.9871794871794872,
+    "recallAtCritical": 0.9625,
+    "f1AtCritical": 0.9746835443037974,
+    "falsePositiveRateAtCritical": 0.0,
+    "alertOnlyEscalationRateAtCritical": 0.0125,
+    "rocAuc": 0.993984375,
+    "scenarioMetrics": {
+      "END_OF_DAY_INCREASE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.25,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "HIGH_VALUE_CASE_EXTRA_READS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.20833333333333334,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "LEGITIMATE_OVERTIME": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.08333333333333333,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "MOMENTARY_SPIKE": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.08333333333333333,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "STANDARD_BUSINESS_HOURS": {
+        "classification": "NORMAL",
+        "samples": 48,
+        "falsePositiveRateAtAlert": 0.0,
+        "falsePositiveRateAtCritical": 0.0
+      },
+      "AFTER_HOURS_ACCUMULATION": {
+        "classification": "ANOMALY",
+        "expectedMinimumLevel": "CRITICAL",
+        "samples": 80,
+        "recallAtAlert": 1.0,
+        "recallAtCritical": 0.9625
+      },
+      "RAPID_REPETITION": {
+        "classification": "ANOMALY",
+        "expectedMinimumLevel": "ALERT",
+        "samples": 80,
+        "recallAtAlert": 1.0,
+        "recallAtCritical": 0.0125
+      }
+    }
+  },
+  "distributionShiftStressTest": {
+    "profile": "shifted",
+    "seeds": [
+      7,
+      43,
+      99,
+      2026,
+      7777
+    ],
+    "samplesPerSeed": 1040,
+    "perSeed": [
+      {
+        "seed": 7,
+        "falsePositiveRateAtAlert": 0.11875,
+        "falsePositiveRateAtCritical": 0.00125,
+        "recallAtAlert": 0.9791666666666666,
+        "recallAtCritical": 0.8833333333333333,
+        "f1AtCritical": 0.8346456692913385,
+        "alertOnlyEscalationRateAtCritical": 0.225,
+        "rocAuc": 0.9900442708333332
+      },
+      {
+        "seed": 43,
+        "falsePositiveRateAtAlert": 0.145,
+        "falsePositiveRateAtCritical": 0.0075,
+        "recallAtAlert": 0.9833333333333333,
+        "recallAtCritical": 0.8833333333333333,
+        "f1AtCritical": 0.8724279835390947,
+        "alertOnlyEscalationRateAtCritical": 0.09166666666666666,
+        "rocAuc": 0.9820989583333334
+      },
+      {
+        "seed": 99,
+        "falsePositiveRateAtAlert": 0.13625,
+        "falsePositiveRateAtCritical": 0.0075,
+        "recallAtAlert": 0.9791666666666666,
+        "recallAtCritical": 0.8416666666666667,
+        "f1AtCritical": 0.8211382113821138,
+        "alertOnlyEscalationRateAtCritical": 0.15833333333333333,
+        "rocAuc": 0.9844869791666667
+      },
+      {
+        "seed": 2026,
+        "falsePositiveRateAtAlert": 0.145,
+        "falsePositiveRateAtCritical": 0.01125,
+        "recallAtAlert": 0.9958333333333333,
+        "recallAtCritical": 0.9083333333333333,
+        "f1AtCritical": 0.8352490421455939,
+        "alertOnlyEscalationRateAtCritical": 0.19166666666666668,
+        "rocAuc": 0.9795572916666667
+      },
+      {
+        "seed": 7777,
+        "falsePositiveRateAtAlert": 0.1675,
+        "falsePositiveRateAtCritical": 0.0225,
+        "recallAtAlert": 0.9916666666666667,
+        "recallAtCritical": 0.8416666666666667,
+        "f1AtCritical": 0.7593984962406015,
+        "alertOnlyEscalationRateAtCritical": 0.225,
+        "rocAuc": 0.9712968750000001
+      }
+    ],
+    "aggregate": {
+      "falsePositiveRateAtAlert": {
+        "mean": 0.14250000000000002,
+        "standardDeviation": 0.015751984002023368,
+        "minimum": 0.11875,
+        "maximum": 0.1675
+      },
+      "falsePositiveRateAtCritical": {
+        "mean": 0.01,
+        "standardDeviation": 0.007026734661277598,
+        "minimum": 0.00125,
+        "maximum": 0.0225
+      },
+      "recallAtAlert": {
+        "mean": 0.9858333333333335,
+        "standardDeviation": 0.0067700320038633285,
+        "minimum": 0.9791666666666666,
+        "maximum": 0.9958333333333333
+      },
+      "recallAtCritical": {
+        "mean": 0.8716666666666667,
+        "standardDeviation": 0.02614064523559686,
+        "minimum": 0.8416666666666667,
+        "maximum": 0.9083333333333333
+      },
+      "f1AtCritical": {
+        "mean": 0.8245718805197484,
+        "standardDeviation": 0.036783283428594084,
+        "minimum": 0.7593984962406015,
+        "maximum": 0.8724279835390947
+      },
+      "alertOnlyEscalationRateAtCritical": {
+        "mean": 0.17833333333333332,
+        "standardDeviation": 0.04988876515698589,
+        "minimum": 0.09166666666666666,
+        "maximum": 0.225
+      },
+      "rocAuc": {
+        "mean": 0.981496875,
+        "standardDeviation": 0.006167060666256186,
+        "minimum": 0.9712968750000001,
+        "maximum": 0.9900442708333332
+      }
+    },
+    "normalScenarioWorstCase": {
+      "END_OF_DAY_INCREASE": {
+        "maxFalsePositiveRateAtAlert": 0.21875,
+        "maxFalsePositiveRateAtCritical": 0.04375
+      },
+      "HIGH_VALUE_CASE_EXTRA_READS": {
+        "maxFalsePositiveRateAtAlert": 0.1375,
+        "maxFalsePositiveRateAtCritical": 0.01875
+      },
+      "LEGITIMATE_OVERTIME": {
+        "maxFalsePositiveRateAtAlert": 0.18125,
+        "maxFalsePositiveRateAtCritical": 0.03125
+      },
+      "MOMENTARY_SPIKE": {
+        "maxFalsePositiveRateAtAlert": 0.21875,
+        "maxFalsePositiveRateAtCritical": 0.00625
+      },
+      "STANDARD_BUSINESS_HOURS": {
+        "maxFalsePositiveRateAtAlert": 0.21875,
+        "maxFalsePositiveRateAtCritical": 0.04375
+      }
+    },
+    "anomalyScenarioWorstCase": {
+      "AFTER_HOURS_ACCUMULATION": {
+        "expectedMinimumLevel": "CRITICAL",
+        "minRecallAtAlert": 1.0,
+        "minRecallAtCritical": 0.8416666666666667,
+        "maxRecallAtCritical": 0.9083333333333333,
+        "minRecallAtExpectedLevel": 0.8416666666666667
+      },
+      "RAPID_REPETITION": {
+        "expectedMinimumLevel": "ALERT",
+        "minRecallAtAlert": 0.9583333333333334,
+        "minRecallAtCritical": 0.09166666666666666,
+        "maxRecallAtCritical": 0.225,
+        "minRecallAtExpectedLevel": 0.9583333333333334
+      }
+    }
+  }
+}
