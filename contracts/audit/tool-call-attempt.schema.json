@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finguard.io/contracts/audit/tool-call-attempt.schema.json",
+  "title": "ToolCallAttempt",
+  "description": "실행 결과가 아직 존재하지 않는 현재 Tool 호출 시도",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requestId",
+    "agentId",
+    "agentRunId",
+    "caseId",
+    "tool",
+    "targetConsumerId",
+    "requestedData",
+    "requestedAt"
+  ],
+  "properties": {
+    "requestId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "agentId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "agentRunId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "caseId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "targetConsumerId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "requestedData": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/dataType" }
+    },
+    "requestedAt": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "nonEmptyIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "tool": {
+      "type": "string",
+      "enum": ["CREDIT_SCORE_READ", "INCOME_READ", "DEBT_READ"]
+    },
+    "dataType": {
+      "type": "string",
+      "enum": ["CREDIT_SCORE", "INCOME", "DEBT"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

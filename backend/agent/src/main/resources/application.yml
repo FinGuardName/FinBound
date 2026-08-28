@@ -2,5 +2,9 @@ spring:
   application:
     name: finguard-agent
 
+finguard:
+  core-api:
+    base-url: ${CORE_API_BASE_URL:http://localhost:8080}
+
 server:
   port: ${AGENT_PORT:8082}

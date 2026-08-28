@@ -14,10 +14,46 @@
 10. 인증 실패는 별도 SecurityAuthEvent로 최소 기록한다.
 11. Prompt Injection은 새로운 입력 유입 시 검사하고 동일 입력은 Snapshot을 재사용한다.
 12. `PolicyDecision`과 시스템 `ERROR Outcome`을 구분한다.
+13. Core `/api/v1/**`는 호출자를 인증하고 역할을 확인한 뒤에만 업무 처리를 시작한다.
+14. AgentRun의 `employeeId`는 Request Body만으로 신뢰하지 않고 인증된 Operator Identity와 대조한다.
 
 ---
 
 ## 2. 공통 Header
+
+### Vue → Core API (P0)
+
+```http
+Authorization: Bearer <viewer-or-operator-credential>
+X-Request-Id: <uuid>              # 없으면 Core 생성
+Traceparent: <w3c-trace-context>
+```
+
+P0에서는 Core가 관리하는 opaque Bearer Credential을 사용한다. Credential 자체에서 Claim을
+읽지 않으며, Core 설정의 Credential·Role·Employee 매핑을 기준으로 인증한다.
+
+| Credential | 허용 범위 | Employee 결합 |
+|---|---|---|
+| `VIEWER_CREDENTIAL` | §15 Dashboard 조회 Endpoint | 없음 |
+| `OPERATOR_CREDENTIAL` | AgentRun 생성 `POST /api/v1/agent-runs`와 Dashboard 조회 | Core 설정의 단일 Employee ID |
+
+- `/api/v1/**`에는 인증 없는 기본 경로를 두지 않는다.
+- `VIEWER_CREDENTIAL`로 AgentRun을 생성할 수 없다.
+- 두 Credential은 필수이며 비어 있거나 서로 같으면 Core 기동에 실패한다.
+- `OPERATOR_EMPLOYEE_ID`가 비어 있으면 Core 기동에 실패한다.
+- Credential은 Vue 소스·빌드 산출물·Web Storage에 넣지 않고 P0 실행 시 메모리에만 전달한다.
+- Credential 원문은 Request Body, 로그, Audit에 남기지 않는다.
+- Loopback 기반 로컬 Compose 외 환경에서는 TLS 없이 Bearer Credential을 전송하지 않는다.
+- P1에서 OIDC Access Token으로 교체하더라도 `Authorization: Bearer` 전송 계약과 역할 경계는 유지한다.
+
+Credential 누락·불일치는 `401 CORE_API_CREDENTIAL_INVALID`, 권한 부족은
+`403 CORE_API_ROLE_FORBIDDEN`으로 fail-closed 처리한다. 인증 실패는 업무 Audit이나
+업무 데이터를 만들지 않고 `credentialType=CORE_API_BEARER`인 최소 `SecurityAuthEvent`만
+기록하며 Credential 원문은 저장하지 않는다. Role·Employee 검증 실패도 같은 경계를 적용한다.
+
+구현 테스트는 Viewer 조회 ALLOW, Operator 생성 ALLOW와 함께 Credential 누락·불일치,
+Viewer의 AgentRun 생성, Operator Employee 불일치를 각각 검증한다. 거부된 요청은
+Controller의 업무 처리와 Persistence·Prompt Risk 등 후속 호출에 도달하지 않아야 한다.
 
 ### LoanAgent → Gateway
 
@@ -67,6 +103,13 @@ POST /api/v1/agent-runs
   "inputText": "CUST-1001의 대출심사를 진행해줘."
 }
 ```
+
+이 Endpoint는 `OPERATOR_CREDENTIAL`만 호출할 수 있다. Core는 Credential에 연결된 Employee ID와
+Request의 `employeeId`가 같은지 확인하며, 다르면 `403 EMPLOYEE_IDENTITY_MISMATCH`로 거부한다.
+Request의 `employeeId`는 조회할 업무 대상을 표시하는 값이지 단독 인증수단이 아니다.
+
+Credential·Role·Employee 검증은 Financial Case 생성, Task Passport 발급, 입력 저장,
+Prompt Risk 호출보다 먼저 수행한다. 검증 실패 요청은 어떤 업무 상태도 변경하지 않는다.
 
 ### 처리
 
@@ -686,12 +729,12 @@ Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 �
 
 ## 15. Dashboard API
 
-```http
-GET /api/v1/audit-events
-GET /api/v1/audit-events/{auditEventId}
-GET /api/v1/dashboard/summary
-GET /api/v1/agent-runs/{agentRunId}/permission-comparison
-```
+| Endpoint | 허용 Credential |
+|---|---|
+| `GET /api/v1/audit-events` | Viewer 또는 Operator |
+| `GET /api/v1/audit-events/{auditEventId}` | Viewer 또는 Operator |
+| `GET /api/v1/dashboard/summary` | Viewer 또는 Operator |
+| `GET /api/v1/agent-runs/{agentRunId}/permission-comparison` | Viewer 또는 Operator |
 
 Vue는 PostgreSQL을 직접 조회하지 않는다.
 
@@ -701,6 +744,9 @@ Vue는 PostgreSQL을 직접 조회하지 않는다.
 
 | 상황 | 처리 |
 |---|---|
+| Core API Credential 누락/불일치 | `401 CORE_API_CREDENTIAL_INVALID` + 업무 처리 미시작 |
+| Core API Role 부족 | `403 CORE_API_ROLE_FORBIDDEN` + 업무 처리 미시작 |
+| Operator Employee와 요청 Employee 불일치 | `403 EMPLOYEE_IDENTITY_MISMATCH` + 업무 처리 미시작 |
 | Core Context unavailable | `CONTEXT_SERVICE_UNAVAILABLE` + BLOCK |
 | Business Audit 선저장 실패 | `AUDIT_WRITE_FAILED` + Downstream 미호출 |
 | Prompt Risk Snapshot 필요하나 없음/실패 | `PROMPT_RISK_UNAVAILABLE` + BLOCK |

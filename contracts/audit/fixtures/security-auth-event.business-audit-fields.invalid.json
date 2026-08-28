@@ -1,0 +1,11 @@
+{
+  "securityEventId": "SEC-002",
+  "requestId": "REQ-X02",
+  "eventType": "AUTH_FAILURE",
+  "reasonCode": "AGENT_AUTHENTICATION_FAILED",
+  "credentialType": "AGENT_SERVICE",
+  "agentId": "UNVERIFIED-AGENT",
+  "tool": "CREDIT_SCORE_READ",
+  "targetConsumerId": "CUST-1001",
+  "occurredAt": "2026-08-17T21:34:00+09:00"
+}
