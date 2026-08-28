@@ -1,0 +1,13 @@
+# core-api를 호스트에 노출한다. 프론트엔드 작업이나 수동 확인이 필요할 때만 쓴다.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.expose.yml up
+#
+# 기본 `docker compose up`은 core-api를 열지 않는다. 같은 포트에 `/api/v1/**`(사내 화면)과
+# `/internal/**`(서비스 간)이 함께 있어서, 포트를 열면 그 PC에 닿는 누구나 Internal API에
+# 요청을 보낼 수 있고 남는 방어는 공유 자격 증명 문자열 하나뿐이다.
+#
+# 그래서 여기서도 127.0.0.1에만 묶는다. 같은 네트워크의 다른 기기에서는 보이지 않는다.
+services:
+  core-api:
+    ports:
+      - "127.0.0.1:${CORE_API_PORT:-8080}:8080"

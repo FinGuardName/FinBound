@@ -1,0 +1,14 @@
+# 데모 시드(EMP-101 / CUST-1001 / CUST-9999 / LOAN-2026-001 …)를 DB에 넣는다.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+#
+# 기본 실행에 넣지 않은 이유: PostgreSQL 볼륨(finguard-postgres)이 영속이라
+# 한 번 적용된 시드는 나중에 이 파일을 빼도 사라지지 않는다. 지우려면 볼륨을 날려야 한다.
+#
+#   docker compose down -v
+#
+# 되돌릴 수 없는 동작은 기본값으로 두지 않는다.
+services:
+  core-api:
+    environment:
+      SPRING_PROFILES_ACTIVE: local
