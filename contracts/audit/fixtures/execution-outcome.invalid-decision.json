@@ -1,0 +1,11 @@
+{
+  "requestId": "REQ-003",
+  "decision": "ERROR",
+  "systemOutcome": "ERROR",
+  "reasonCodes": ["DOWNSTREAM_ERROR"],
+  "downstreamReached": true,
+  "responseReleased": false,
+  "success": false,
+  "errorLocation": "DOWNSTREAM",
+  "completedAt": "2026-08-17T21:34:11+09:00"
+}

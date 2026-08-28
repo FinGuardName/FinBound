@@ -1,0 +1,10 @@
+{
+  "securityEventId": "SEC-001",
+  "requestId": "REQ-X01",
+  "traceId": "4bf92f0000000005",
+  "eventType": "AUTH_FAILURE",
+  "reasonCode": "AGENT_AUTHENTICATION_FAILED",
+  "credentialType": "AGENT_SERVICE",
+  "sourceFingerprint": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "occurredAt": "2026-08-17T21:33:00+09:00"
+}
