@@ -3,6 +3,7 @@ package io.finguard.agent.agentrun.adapter;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,8 @@ public class CoreAgentRunHttpClient implements CoreAgentRunClient {
 
     private final WebClient webClient;
 
+    /** 생성자가 둘이므로 컨테이너가 고를 쪽을 명시합니다. 지우면 Spring이 없는 기본 생성자를 찾다 실패합니다. */
+    @Autowired
     public CoreAgentRunHttpClient(
             WebClient.Builder webClientBuilder,
             @Value("${finguard.core-api.base-url:http://localhost:8080}") String coreApiBaseUrl
@@ -29,6 +32,7 @@ public class CoreAgentRunHttpClient implements CoreAgentRunClient {
         this(webClientBuilder.baseUrl(coreApiBaseUrl).build());
     }
 
+    /** {@link WebClient}를 직접 넣는 테스트 전용 생성자입니다. */
     CoreAgentRunHttpClient(WebClient webClient) {
         this.webClient = webClient;
     }
