@@ -1,29 +1,43 @@
 package io.finguard.core.audit;
 
-import org.springframework.http.ProblemDetail;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
-import io.finguard.core.api.NotImplementedResponse;
+import jakarta.validation.Valid;
 
 /**
- * Business Audit — docs/04-api-contract.md §11.
- *
- * <p>인증 성공 이후에만 생성한다. 구현은 이슈 #21.
+ * Business Audit 영속화 API. {@code docs/04-api-contract.md} §11.
  */
 @RestController
 public class AuditController {
 
+    private static final String VERIFIED_AGENT_HEADER = "X-Verified-Agent-Id";
+
+    private final AuditService service;
+
+    public AuditController(AuditService service) {
+        this.service = service;
+    }
+
     @PostMapping("/internal/v1/audits")
-    public ResponseEntity<ProblemDetail> create() {
-        return NotImplementedResponse.forEndpoint("POST /internal/v1/audits");
+    public ResponseEntity<AuditResponse> create(
+            @RequestHeader(VERIFIED_AGENT_HEADER) String verifiedAgentId,
+            @Valid @RequestBody AuditCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.create(request, verifiedAgentId));
     }
 
     @PatchMapping("/internal/v1/audits/{requestId}/outcome")
-    public ResponseEntity<ProblemDetail> updateOutcome(@PathVariable String requestId) {
-        return NotImplementedResponse.forEndpoint("PATCH /internal/v1/audits/" + requestId + "/outcome");
+    public ResponseEntity<AuditResponse> updateOutcome(
+            @PathVariable String requestId,
+            @RequestHeader(VERIFIED_AGENT_HEADER) String verifiedAgentId,
+            @Valid @RequestBody AuditOutcomeRequest request) {
+        return ResponseEntity.ok(service.updateOutcome(requestId, request, verifiedAgentId));
     }
 }

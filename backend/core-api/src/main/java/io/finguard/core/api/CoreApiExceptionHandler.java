@@ -10,7 +10,14 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import io.finguard.core.audit.AuditOperationException;
+import io.finguard.core.context.ContextLookupException;
+import io.finguard.core.history.InvalidBehaviorHistoryWindowException;
 import io.finguard.core.permission.PermissionNotIssuableException;
+import io.finguard.core.security.CoreApiAccessDeniedException;
+import io.finguard.core.security.CoreApiCredentialFilter;
+import io.finguard.core.securityevent.SecurityEventWriteException;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Core API의 오류 응답. 본문은 {@code application/problem+json}이고 {@code reasonCode}를 싣는다.
@@ -21,6 +28,39 @@ import io.finguard.core.permission.PermissionNotIssuableException;
  */
 @RestControllerAdvice
 public class CoreApiExceptionHandler {
+
+    @ExceptionHandler(AuditOperationException.class)
+    ResponseEntity<ProblemDetail> handleAuditOperation(AuditOperationException exception) {
+        HttpStatus status = switch (exception.getKind()) {
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case DUPLICATE -> HttpStatus.CONFLICT;
+            case INVALID_OUTCOME -> HttpStatus.BAD_REQUEST;
+            case WRITE_FAILED -> HttpStatus.SERVICE_UNAVAILABLE;
+        };
+        return problem(status, exception.getReasonCode(), "Business Audit 요청을 처리할 수 없습니다.");
+    }
+
+    @ExceptionHandler(SecurityEventWriteException.class)
+    ResponseEntity<ProblemDetail> handleSecurityEventWrite(SecurityEventWriteException exception) {
+        return problem(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "SECURITY_EVENT_WRITE_FAILED",
+                "Security Event를 저장할 수 없습니다.");
+    }
+
+    @ExceptionHandler(ContextLookupException.class)
+    ResponseEntity<ProblemDetail> handleContextLookup(ContextLookupException exception) {
+        return problem(
+                HttpStatus.NOT_FOUND,
+                exception.getReasonCode(),
+                "요청한 Runtime Context를 찾을 수 없습니다.");
+    }
+
+    @ExceptionHandler(InvalidBehaviorHistoryWindowException.class)
+    ResponseEntity<ProblemDetail> handleInvalidHistoryWindow(
+            InvalidBehaviorHistoryWindowException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_TOOL_REQUEST", "조회 시간 범위가 올바르지 않습니다.");
+    }
 
     /**
      * 요청 형식은 멀쩡한데 현재 권한 상태로는 만들 수 없는 경우.
@@ -34,6 +74,20 @@ public class CoreApiExceptionHandler {
                 HttpStatus.UNPROCESSABLE_ENTITY,
                 exception.getReasonCode(),
                 "Task Passport를 발급할 수 없는 상태입니다.");
+    }
+
+    /**
+     * 인증은 됐지만 자격이 없다. 어느 Role이 필요한지, 어떤 Employee가 묶여 있는지는 알려주지 않는다 —
+     * 거부 사유를 좁혀 주면 그것 자체가 탐색의 실마리가 된다({@code docs/06} §26).
+     */
+    @ExceptionHandler(CoreApiAccessDeniedException.class)
+    ResponseEntity<ProblemDetail> handleAccessDenied(
+            CoreApiAccessDeniedException exception, HttpServletRequest request) {
+        // 사유를 필터가 집어갈 수 있게 남긴다. 기록은 거기 한 곳에서 한다 — CoreApiCredentialFilter.
+        request.setAttribute(
+                CoreApiCredentialFilter.DENIED_REASON_ATTRIBUTE, exception.getReasonCode());
+        return problem(
+                HttpStatus.FORBIDDEN, exception.getReasonCode().name(), "이 요청을 수행할 자격이 없습니다.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

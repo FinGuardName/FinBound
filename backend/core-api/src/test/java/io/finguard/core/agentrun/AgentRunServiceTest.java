@@ -30,7 +30,13 @@ import jakarta.persistence.EntityManager;
  * PromptRiskSnapshot은 {@code inputHash}로 공유되므로 <strong>다른 테스트가 만든 행을 찾아
  * 통과하는</strong> 일이 생긴다. 그러면 이 파일의 단언들이 무엇도 증명하지 못한다.
  */
-@SpringBootTest(properties = "finguard.internal.credential=test-internal-credential")
+@SpringBootTest(
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @ActiveProfiles("local")
 @Testcontainers
 @Transactional

@@ -30,7 +30,13 @@ import jakarta.persistence.EntityManager;
  * "컬럼이 있다"까지는 기동 자체가 보증한다. 여기서 보는 것은 그 다음이다 — 값이 왕복하는가,
  * 제약이 실제로 거부하는가, 시각이 보존되는가.
  */
-@SpringBootTest(properties = "finguard.internal.credential=test-internal-credential")
+@SpringBootTest(
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @Testcontainers
 @Transactional
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -378,9 +384,10 @@ class EntityMappingTest {
         assertThat(found.getPromptRisk()).isNull();
         assertThat(found.getBehaviorRisk()).isNull();
         assertThat(found.getPolicyVersion()).isNull();
-        assertThat(found.getCaseId()).isNull();
-        assertThat(found.getTargetConsumerId()).isNull();
-        assertThat(found.getRequestedTool()).isNull();
+        // Case·Tool은 판정 결과가 아니라 요청 시점에 이미 아는 값이라 PROCESSING에서도 채워져 있다.
+        assertThat(found.getCaseId()).isEqualTo("LOAN-2026-900");
+        assertThat(found.getTargetConsumerId()).isEqualTo("CUST-900");
+        assertThat(found.getRequestedTool()).isEqualTo(Tool.CREDIT_SCORE_READ);
         assertThat(found.getTraceId()).isEqualTo("trace-900");
         assertThat(found.getAgentId()).isEqualTo("LOAN-AGENT-01");
         assertThat(found.getAgentRunId()).isEqualTo("RUN-900");
@@ -483,7 +490,15 @@ class EntityMappingTest {
 
     private AuditEvent auditEvent(String auditEventId, String requestId) {
         return new AuditEvent(
-                auditEventId, requestId, "trace-900", "LOAN-AGENT-01", "RUN-900", ISSUED);
+                auditEventId,
+                requestId,
+                "trace-900",
+                "LOAN-AGENT-01",
+                "RUN-900",
+                "LOAN-2026-900",
+                "CUST-900",
+                Tool.CREDIT_SCORE_READ,
+                ISSUED);
     }
 
     private SecurityAuthEvent securityAuthEvent(String securityEventId) {

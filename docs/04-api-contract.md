@@ -545,12 +545,28 @@ POST /internal/v1/audits
   "traceId": "4bf92f...",
   "agentRunId": "RUN-001",
   "verifiedAgentId": "LOAN-AGENT-01",
+  "caseId": "LOAN-2026-001",
+  "targetConsumerId": "CUST-1001",
+  "requestedTool": "CREDIT_SCORE_READ",
   "status": "PROCESSING",
   "requestedAt": "2026-08-17T21:32:10+09:00"
 }
 ```
 
 Business Audit 생성 실패 시 Gateway는 Downstream을 호출하지 않는다.
+
+`caseId`·`targetConsumerId`·`requestedTool`은 §14 AuditEvent와
+`contracts/audit/audit-event.schema.json`이 정의한 필드이고, §9 Behavior History가 그대로 돌려준다.
+BLOCK이나 ERROR로 끝나도 남아야 하므로 Outcome이 아니라 선저장 때 받는다.
+
+**이 셋은 "Agent가 시도한 값"이지 Core가 보증한 값이 아니다.** §1.4에 따라 Body의 식별자는
+인증수단이 아니며, 같은 요청의 `verifiedAgentId`가 무시되고 `X-FinGuard-Service-Credential`로
+검증된 신원이 쓰이는 것과 같은 이유다. 이 값으로 권한을 판단하지 않는다 — Scope 비교는
+Financial Context Resolver가, 정책 조합은 OPA가 한다.
+
+> **미결:** 이 셋을 `agentRunId`가 가리키는 AgentRun·Task Passport와 대조해 저장할지는 정하지 않았다.
+> 대조하면 이력 오염을 막지만 선저장 경로에 조회가 하나 늘고, Audit 선저장 실패는 Downstream
+> 미호출로 이어지므로 실패 지점이 하나 늘어난다. 별도 티켓에서 정한다.
 
 ### Outcome 갱신
 
@@ -567,6 +583,52 @@ PATCH /internal/v1/audits/{requestId}/outcome
   "responseReleased": false,
   "behaviorRisk": 0.21,
   "policyVersion": "loan-review-policy-1",
+  "completedAt": "2026-08-17T21:32:11+09:00"
+}
+```
+
+ALLOW로 Downstream까지 간 경우에는 실행 측정값을 함께 보낸다.
+
+```json
+{
+  "decision": "ALLOW",
+  "systemOutcome": "COMPLETED",
+  "reasonCodes": [],
+  "downstreamReached": true,
+  "responseReleased": true,
+  "success": true,
+  "recordsRead": 1,
+  "latencyMs": 120,
+  "behaviorRisk": 0.08,
+  "policyVersion": "loan-review-policy-1",
+  "completedAt": "2026-08-17T21:32:11+09:00"
+}
+```
+
+`success`·`recordsRead`·`latencyMs`는 §13 ExecutionOutcome과
+`contracts/audit/execution-outcome.schema.json`이 정의한 필드이고, §9 Behavior History가
+`success`·`latencyMs`를 그대로 싣는다. BLOCK처럼 Downstream에 도달하지 않은 경우에는 측정값이 없다.
+
+`systemOutcome`이 `ERROR`이면 어느 단계에서 실패했는지를 `errorLocation`으로 함께 보낸다.
+같은 스키마가 ERROR에 다음을 요구하며, Core는 어긋난 요청을 저장하지 않고 `400`으로 거부한다.
+
+| 조건 | 요구 |
+|---|---|
+| `systemOutcome = ERROR` | `errorLocation` 필수, `success = false`, `reasonCodes` 비어 있지 않음 |
+| `decision = ALLOW` + `systemOutcome = COMPLETED` | `success = true` |
+| `decision = BLOCK` | `downstreamReached = false`, `responseReleased = false` |
+
+`errorLocation`은 `^[A-Z][A-Z0-9_]*$` 형식이다.
+
+```json
+{
+  "decision": "ALLOW",
+  "systemOutcome": "ERROR",
+  "reasonCodes": ["DOWNSTREAM_TIMEOUT"],
+  "downstreamReached": true,
+  "responseReleased": false,
+  "success": false,
+  "errorLocation": "MOCK_FINANCE",
   "completedAt": "2026-08-17T21:32:11+09:00"
 }
 ```

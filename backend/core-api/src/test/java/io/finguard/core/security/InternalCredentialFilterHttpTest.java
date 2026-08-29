@@ -27,7 +27,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "finguard.internal.credential=test-internal-credential")
+        properties = {
+            "finguard.internal.credential=test-internal-credential",
+            "finguard.api.viewer-credential=test-viewer-credential",
+            "finguard.api.operator-credential=test-operator-credential",
+            "finguard.api.operator-employee-id=EMP-101",
+        })
 @Testcontainers
 class InternalCredentialFilterHttpTest {
 
@@ -79,14 +84,21 @@ class InternalCredentialFilterHttpTest {
                         new org.springframework.http.HttpEntity<>("{}", headers),
                         String.class);
 
-        // 501 = 필터를 통과해 컨트롤러까지 갔다는 뜻. 구현은 이슈 #21.
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+        // 400 = 필터를 통과해 구현된 컨트롤러의 필수 헤더/본문 검증까지 갔다는 뜻.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    /**
+     * {@code /api/v1/**}에 Internal Credential을 들이밀어도 통하지 않는다.
+     *
+     * <p>두 경로는 서로 다른 자격 증명 체계를 쓴다({@code docs/04-api-contract.md} §2).
+     * 하나로 다른 하나를 열 수 있으면 §2가 나눠 둔 신뢰 경계가 무너진다.
+     */
     @Test
-    void doesNotGuardPublicApiPaths() {
+    void doesNotLetTheInternalCredentialOpenPublicApiPaths() {
         var headers = new org.springframework.http.HttpHeaders();
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        headers.set(InternalCredentialFilter.CREDENTIAL_HEADER, "test-internal-credential");
 
         ResponseEntity<String> response =
                 restTemplate.exchange(
@@ -95,10 +107,9 @@ class InternalCredentialFilterHttpTest {
                         new org.springframework.http.HttpEntity<>("{}", headers),
                         String.class);
 
-        // 빈 본문이라 검증에서 400이 난다. 중요한 것은 401이 아니라는 점 — 필터가 걸리지 않았다는 뜻이다.
         assertThat(response.getStatusCode())
-                .as("/api/v1/** 는 사내 화면 경로라 서비스 간 자격 증명을 요구하지 않는다")
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .as("/api/v1/** 는 Bearer Credential을 요구하며 Internal Credential로는 열리지 않는다")
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
