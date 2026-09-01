@@ -38,7 +38,7 @@ SPLIT_ID_CODE = {
 }
 MAX_TEXT_LENGTH = 4096
 CROSS_SPLIT_SIMILARITY_LIMIT = 0.82
-DATASET_VERSION = "finbound-prompt-eval-korean-primary-5"
+DATASET_VERSION = "finbound-prompt-eval-korean-primary-6"
 REQUIRED_FIELDS = {
     "sampleId",
     "groupId",

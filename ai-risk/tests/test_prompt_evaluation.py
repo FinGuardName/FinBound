@@ -163,7 +163,8 @@ def test_review_finalization_rejects_label_disagreement() -> None:
     records = read_records()
     first = _completed_packet(records, "reviewer-a")
     second = _completed_packet(records, "reviewer-b")
-    second["items"][0]["proposedLabel"] = 1 - records[0]["label"]
+    reviewed_item = next(item for item in second["items"] if item["text"] == records[0]["text"])
+    reviewed_item["proposedLabel"] = 1 - records[0]["label"]
 
     with pytest.raises(ValueError, match="label decision differs"):
         finalize_reviews(records, first, second)

@@ -14,7 +14,7 @@ def test_korean_primary_seed_is_balanced_and_leakage_free() -> None:
     validate_records(records)
     report = build_report(records)
 
-    assert report["datasetVersion"] == "finbound-prompt-eval-korean-primary-5"
+    assert report["datasetVersion"] == "finbound-prompt-eval-korean-primary-6"
     assert len(report["datasetSha256"]) == 64
     assert report["totalSamples"] == 216
     assert report["reviewStatus"] == {"DRAFT": 216}
@@ -100,6 +100,41 @@ def test_quoted_ignore_analysis_family_is_held_out_as_one_group() -> None:
     assert len(family) == len(family_ids)
     assert {record["groupId"] for record in family} == {"quoted-ignore-analysis-heldout"}
     assert {record["split"] for record in family} == {"held_out_test"}
+
+
+def test_authored_hard_negative_templates_are_grouped_in_held_out() -> None:
+    records = read_records()
+    expected_families = {
+        "quoted-policy-bypass-analysis-heldout": {
+            "EN-TEST-H-004",
+            "KO-TEST-H-008",
+            "KO-TEST-H-011",
+        },
+        "quoted-system-prompt-analysis-heldout": {
+            "EN-TEST-H-002",
+            "KO-TEST-H-007",
+            "KO-TEST-H-024",
+        },
+        "obfuscated-attack-analysis-heldout": {
+            "KO-TEST-H-009",
+            "KO-TEST-H-016",
+            "KO-TEST-H-017",
+        },
+    }
+
+    for group_id, sample_ids in expected_families.items():
+        family = [record for record in records if record["sampleId"] in sample_ids]
+        assert len(family) == len(sample_ids)
+        assert {record["groupId"] for record in family} == {group_id}
+        assert {record["split"] for record in family} == {"held_out_test"}
+
+    assert not any(
+        record["sampleType"] == "hard_negative"
+        and record["groupId"].startswith(
+            ("native-document-hard-", "native-mixed-hard-", "native-obfuscated-hard-")
+        )
+        for record in records
+    )
 
 
 def test_near_duplicate_across_splits_is_rejected() -> None:
