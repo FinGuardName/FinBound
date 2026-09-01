@@ -1,0 +1,16 @@
+{
+  "auditEventId": "AUD-005",
+  "requestId": "REQ-005",
+  "traceId": "4bf92f0000000005",
+  "agentId": "LOAN-AGENT-01",
+  "agentRunId": "RUN-005",
+  "decision": "BLOCK",
+  "reasonCodes": ["CASE_SCOPE_VIOLATION"],
+  "systemOutcome": "COMPLETED",
+  "downstreamReached": false,
+  "responseReleased": false,
+  "success": false,
+  "status": "COMPLETED",
+  "requestedAt": "2026-08-17T21:36:10+09:00",
+  "completedAt": "2026-08-17T21:36:11+09:00"
+}

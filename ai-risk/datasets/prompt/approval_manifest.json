@@ -1,20 +1,20 @@
 {
   "schemaVersion": 2,
-  "datasetVersion": "finbound-prompt-eval-korean-primary-5",
-  "sourceDatasetSha256": "2fb0c87debfa2a8123c6f0c09832a332505764f90a173740bde0d7dca6b98787",
-  "approvedDatasetSha256": "5a58eb00887c9f44f32138e52a65ae1f56d193456a0cefd2c280afd0e5371c13",
+  "datasetVersion": "finbound-prompt-eval-korean-primary-6",
+  "sourceDatasetSha256": "10f4993367fb3fc84bf892a9d8064aa1e45e207c939723629c913e0179c33fc2",
+  "approvedDatasetSha256": "c2b1d5137a50270f4fbc58efe1107ab91612a6a4537d4910bd318ac717aaf5cf",
   "approvedSamples": 216,
   "reviewMethod": "AI_ASSISTED_OWNER_APPROVAL",
   "independentHumanReview": false,
   "reviewer": {
-    "reviewer": "codex-ai-semantic-review-v5",
+    "reviewer": "codex-ai-semantic-review-v6",
     "reviewerType": "AI",
-    "reviewedAt": "2026-09-01T22:47:35.6159058+09:00",
-    "packetSha256": "c847a9110ad3ea5d18bb0db8bb3708393256f4d523cd113a7e145667eaf68142"
+    "reviewedAt": "2026-09-02T00:07:29.8360900+09:00",
+    "packetSha256": "84a9b6016620a9b20bf0d595b51b5d37500bb5202037289d49209d6443db0b41"
   },
   "approver": {
     "approver": "YEOUL0520",
-    "approvedAt": "2026-09-01T22:47:35.6159058+09:00",
+    "approvedAt": "2026-09-02T00:07:29.8360900+09:00",
     "approvalScope": "all-reviewed-samples"
   },
   "limitation": "Time-boxed P0 review approved by the dataset owner; no independent human item-level review was performed.",

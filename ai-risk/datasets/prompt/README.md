@@ -100,7 +100,7 @@ python -m datasets.prompt.review finalize-ai-assisted \
   --manifest datasets/prompt/approval_manifest.json
 ```
 
-현재 승인 Snapshot은 Dataset Owner의 명시적 팀 합의에 따라 `codex-ai-review` 전수 검수와
+현재 승인 Snapshot은 Dataset Owner의 명시적 팀 합의에 따라 `codex-ai-semantic-review-v6` 전수 검수와
 `YEOUL0520` 전체 승인으로 생성했습니다. `approval_manifest.json`은 독립 사람 검수가 없었다는
 한계를 명시하며, 승인 Set 216건의 SHA-256과 검수 Packet SHA-256을 고정합니다. Source Seed는
 재검수 출발점으로 계속 `DRAFT`를 유지하고 최종 평가는 `finbound_eval_approved.jsonl`만 사용합니다.
