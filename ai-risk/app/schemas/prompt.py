@@ -26,7 +26,9 @@ class PromptRiskRequest(ContractModel):
     input_ref: str = Field(min_length=1, max_length=128)
     input_text: str = Field(min_length=1, max_length=4096)
     input_hash: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
-    content_language: InputLanguage
+    # Core may not have classified the language yet. The detector is language-agnostic,
+    # so preserve that distinction instead of inventing a `mixed` classification.
+    content_language: InputLanguage | None = None
 
 
 class PromptRiskResponse(ContractModel):
