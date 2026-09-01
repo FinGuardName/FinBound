@@ -1,6 +1,7 @@
 package io.finguard.core.domain;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -45,6 +46,31 @@ public record ResolvedAuditContext(
             throw new IllegalArgumentException("Prompt risk must be between zero and one");
         }
         requestedData = Set.copyOf(requestedData);
+    }
+
+    /**
+     * 같은 결론인가. 이미 근거가 적힌 감사행에 다시 쓰려 할 때 재시도와 변조를 가른다.
+     *
+     * <p>{@code record}가 만들어 주는 {@code equals}를 쓰지 않는다. {@code promptRisk}가
+     * {@link BigDecimal}이라 {@code 0.05}와 {@code 0.0500}을 다른 값으로 보는데, 둘은 같은 값이고
+     * 어느 쪽이 오는지는 저장 자릿수에 달렸다. 그걸로 정상 재시도를 거부하면 안 된다.
+     */
+    public boolean matches(ResolvedAuditContext other) {
+        return other != null
+                && employeeId.equals(other.employeeId)
+                && passportId.equals(other.passportId)
+                && requestedData.equals(other.requestedData)
+                && scopeStatus.equals(other.scopeStatus)
+                && promptRiskEvaluationStatus == other.promptRiskEvaluationStatus
+                && Objects.equals(promptModelVersion, other.promptModelVersion)
+                && sameAmount(promptRisk, other.promptRisk);
+    }
+
+    private static boolean sameAmount(BigDecimal left, BigDecimal right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.compareTo(right) == 0;
     }
 
     private static void requireText(String value, String name) {

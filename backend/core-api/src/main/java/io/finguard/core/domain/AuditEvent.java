@@ -194,10 +194,16 @@ public class AuditEvent {
         if (status != AuditStatus.PROCESSING) {
             throw new IllegalStateException("AuditEvent is already finalized");
         }
-        // 같은 요청을 다시 해석해 같은 결론이 나온 재시도는 통과시킨다. 그러나 판정이 달라졌다면
-        // 덮어쓰지 않는다 — 나중에 적힌 근거로 앞선 판정을 설명하게 되고, 그건 증거가 아니다.
-        if (scopeStatus != null && !scopeStatus.equals(context.scopeStatus())) {
-            throw new IllegalStateException("AuditEvent already carries a different scope status");
+        // 이미 근거가 적혀 있다면 set-once다. 같은 요청을 다시 해석해 근거가 통째로 같으면 재시도이므로
+        // 아무것도 바꾸지 않고 통과시키고, 한 자리라도 다르면 거부한다.
+        //
+        // Scope 판정만 대조하면 부족하다. 판정이 OK로 같아도 대상 Passport나 Employee가 다르면
+        // 그건 다른 사건이고, 덮어쓰는 순간 앞선 판정의 근거가 조용히 바뀐다.
+        if (isEvidenceRecorded()) {
+            if (!currentEvidence().matches(context)) {
+                throw new IllegalStateException("AuditEvent already carries different evidence");
+            }
+            return;
         }
         this.employeeId = context.employeeId();
         this.passportId = context.passportId();
@@ -207,6 +213,25 @@ public class AuditEvent {
         this.promptRisk = context.promptRisk();
         this.promptRiskEvaluationStatus = context.promptRiskEvaluationStatus();
         this.promptModelVersion = context.promptModelVersion();
+    }
+
+    /**
+     * 근거가 이미 적혔는가. {@code scopeStatus}로 판단한다 — 9개 컬럼이 전부 차거나 전부 비거나
+     * 둘 중 하나이고({@code V3}의 all-or-none check), 근거를 적을 때 함께 채워지는 값이다.
+     */
+    private boolean isEvidenceRecorded() {
+        return scopeStatus != null;
+    }
+
+    private ResolvedAuditContext currentEvidence() {
+        return new ResolvedAuditContext(
+                employeeId,
+                passportId,
+                requestedData,
+                scopeStatus,
+                promptRisk,
+                promptRiskEvaluationStatus,
+                promptModelVersion);
     }
 
     public String getAuditEventId() {
