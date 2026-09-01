@@ -6,3 +6,5 @@
 !app/**
 !models/
 !models/**
+# Always source the downloaded Prompt Detector from the verified build stage.
+models/prompt_guard_onnx/
