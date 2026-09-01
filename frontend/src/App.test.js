@@ -84,6 +84,43 @@ describe('FinBound P0 application', () => {
     executeAgentTask.mockRestore()
   })
 
+  it('does not present an allowed policy decision with a system error as a successful check', async () => {
+    const executeAgentTask = vi.spyOn(finboundApi, 'executeAgentTask').mockResolvedValueOnce({
+      status: 'COMPLETED',
+      title: 'AI 업무 처리 중 오류가 발생했습니다',
+      message: '정상 완료로 처리하지 않았습니다.',
+      resultHeading: 'Agent 실행 결과',
+      resultItems: ['처리 오류 1건'],
+      nextAction: '업무 기록을 확인해 주세요.',
+      attempts: [{
+        requestId: 'REQ-ERROR-1',
+        decision: 'ALLOW',
+        systemOutcome: 'ERROR',
+        label: '신용정보 확인',
+        description: '업무 시스템 처리 중 오류가 발생했습니다.',
+        targetConsumerId: 'CUST-1001',
+        scopeStatus: { customerScope: 'OK' },
+        reasonCodes: ['DOWNSTREAM_ERROR'],
+        downstreamReached: null,
+        responseReleased: false,
+        tool: 'CREDIT_SCORE_READ',
+        requestedData: ['CREDIT_SCORE'],
+      }],
+    })
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('업무 오류')
+    expect(wrapper.text()).toContain('0건 확인 · 0건 차단 · 1건 오류')
+    expect(wrapper.text()).toContain('처리 오류')
+    expect(wrapper.text()).toContain('금융시스템 조회확인 불가')
+    expect(wrapper.text()).not.toContain('1건 확인 · 0건 차단')
+    executeAgentTask.mockRestore()
+  })
+
   it.each([
     ['NEW_LOAN', 3, 0, null],
     ['LIMIT_REVIEW', 2, 1, 'CASE_SCOPE_VIOLATION'],

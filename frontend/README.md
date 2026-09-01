@@ -20,7 +20,7 @@ AgentRun 생성 Command API를 사용하고, 권한 비교와 Dashboard는 Sprin
 
 현재 P0 Mock에서는 `src/services/finboundApi.js` 뒤에 가상 데이터를 둡니다. 목록의 검색 조건과
 페이지 정보도 이 API 경계로 전달해 브라우저가 전체 감사 기록을 무제한으로 적재하지 않도록 합니다.
-Spring API가 준비되면 이 Adapter가 AgentRun 생성, Permission Comparison, AgentRun별 AuditEvent를
+실제 모드에서는 이 Adapter가 AgentRun 생성, Permission Comparison, Public 실행 조회 응답을
 조합해 현재 View Model로 변환합니다. 화면이나 Fixture에는 원본 Prompt와 금융 응답 Payload를
 포함하지 않습니다.
 
@@ -51,14 +51,21 @@ Storage에 넣지 않는다. `real` 모드에서는 화면의 업무 세션 입�
 | `behaviorFeatureVersion` | `featureVersion` |
 
 현재 Core Dashboard 계약은 `severity`와 `riskOnly` 서버 필터를 제공하지 않는다. 실제 모드에서는
-두 필터를 비활성화하여 적용되지 않는 조건을 적용된 것처럼 표시하지 않는다. AgentRun 생성 후
-실제 Agent 실행을 시작하는 공개 Core Endpoint도 아직 없으므로 Vue는 내부 Agent Simulator를
-직접 호출하지 않고 생성된 AgentRun과 권한 비교까지만 표시한다.
+두 필터를 비활성화하여 적용되지 않은 조건을 적용된 것처럼 표시하지 않는다. AgentRun 생성 후
+Core가 Agent를 호출하며, Vue는 내부 Agent Simulator를 직접 호출하지 않고 아래 Public API를
+짧게 Polling하여 실행 상태와 결과를 조회한다.
 
 | Frontend 작업 | Spring Contract |
 |---|---|
 | 업무 실행 시작 | `POST /api/v1/agent-runs` |
 | 현재 업무 권한 축소 근거 | `GET /api/v1/agent-runs/{agentRunId}/permission-comparison` |
-| Tool Call 처리 결과 | AgentRun의 `ToolCallAttempt` + `ExecutionOutcome` |
+| Tool Call 처리 결과 | `GET /api/v1/agent-runs/{agentRunId}/execution` |
 | 안전 현황 목록·상세 | `GET /api/v1/audit-events`, `GET /api/v1/audit-events/{auditEventId}` |
 | 현황 요약 | `GET /api/v1/dashboard/summary` |
+
+실행 조회 응답은 `agentRunId`, `status(RUNNING/COMPLETED/FAILED)`, `attempts`를 제공해야 한다.
+각 Attempt는 `decision(ALLOW/BLOCK)`과 `systemOutcome(COMPLETED/ERROR)`을 분리하고,
+`requestId`, `requestedTool`, `targetConsumerId`, `requestedData`, `reasonCodes`,
+`downstreamReached`, `responseReleased`, `scopeStatus`만 전달한다. 금융 Payload나 원본 Prompt는
+Public 응답에 포함하지 않는다. 완료 응답에 Attempt가 없거나 두 결과 축이 누락되면 Frontend는
+정상으로 추정하지 않고 계약 오류로 처리한다.

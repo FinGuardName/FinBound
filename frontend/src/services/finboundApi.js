@@ -4,6 +4,14 @@ const clone = (value) => structuredClone(value)
 const eventOutcome = (event) => event.auditStatus === 'ERROR' ? 'ERROR' : event.decision
 const uniqueValues = (events, key) => [...new Set(events.map((event) => event[key]).filter(Boolean))]
 const DEFAULT_TIMEOUT_MS = 8_000
+const DEFAULT_EXECUTION_POLL_INTERVAL_MS = 250
+const DEFAULT_EXECUTION_POLL_ATTEMPTS = 20
+const EXECUTION_STATUSES = new Set(['RUNNING', 'COMPLETED', 'FAILED'])
+const EXECUTION_TOOL_LABELS = {
+  CREDIT_SCORE_READ: '신용정보 확인',
+  INCOME_READ: '소득자료 확인',
+  DEBT_READ: '부채자료 확인',
+}
 
 const initialMode = import.meta.env.VITE_FINBOUND_API_MODE === 'real' ? 'real' : 'mock'
 const runtime = {
@@ -12,6 +20,9 @@ const runtime = {
   credential: null,
   fetchImpl: (...args) => globalThis.fetch(...args),
   timeoutMs: DEFAULT_TIMEOUT_MS,
+  executionPollIntervalMs: DEFAULT_EXECUTION_POLL_INTERVAL_MS,
+  executionPollAttempts: DEFAULT_EXECUTION_POLL_ATTEMPTS,
+  sleepImpl: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
 }
 
 export class FinboundApiError extends Error {
@@ -88,10 +99,22 @@ async function coreRequest(path, { method = 'GET', body } = {}) {
       signal: controller.signal,
     })
     const text = await response.text()
-    const payload = text ? JSON.parse(text) : null
+    let payload = null
+    if (text) {
+      try {
+        payload = JSON.parse(text)
+      } catch {
+        if (response.ok) {
+          throw new FinboundApiError('Core API returned an invalid JSON response', {
+            code: 'CORE_API_INVALID_RESPONSE',
+            status: response.status,
+          })
+        }
+      }
+    }
     if (!response.ok) {
-      throw new FinboundApiError(payload?.message ?? 'Core API request failed', {
-        code: payload?.errorCode ?? `CORE_API_HTTP_${response.status}`,
+      throw new FinboundApiError(payload?.detail ?? `Core API request failed (${response.status})`, {
+        code: payload?.reasonCode ?? `CORE_API_HTTP_${response.status}`,
         status: response.status,
       })
     }
@@ -158,6 +181,125 @@ function mapPermissionSummary(permission) {
   ]
 }
 
+function executionDescription(attempt) {
+  if (attempt.systemOutcome === 'ERROR') return '업무 시스템 처리 중 오류가 발생해 결과를 제공하지 못했습니다.'
+  if (attempt.decision === 'BLOCK') return '현재 업무 범위를 벗어난 요청으로 금융시스템 조회 전에 차단했습니다.'
+  if (attempt.decision === 'ALLOW' && attempt.systemOutcome === 'COMPLETED') return '현재 업무 범위 안에서 자료 확인을 완료했습니다.'
+  return '실행 결과의 상세 설명이 제공되지 않았습니다.'
+}
+
+function mapExecutionAttempt(raw = {}) {
+  const tool = raw.requestedTool ?? raw.tool ?? 'UNKNOWN'
+  const attempt = {
+    requestId: raw.requestId ?? '미제공',
+    decision: raw.decision,
+    systemOutcome: raw.systemOutcome,
+    targetConsumerId: raw.targetConsumerId ?? '미제공',
+    requestedData: Array.isArray(raw.requestedData) ? raw.requestedData : [],
+    reasonCodes: Array.isArray(raw.reasonCodes) ? raw.reasonCodes : [],
+    downstreamReached: typeof raw.downstreamReached === 'boolean' ? raw.downstreamReached : null,
+    responseReleased: typeof raw.responseReleased === 'boolean' ? raw.responseReleased : null,
+    scopeStatus: mapScopeStatus(raw.scopeStatus),
+    tool,
+    label: EXECUTION_TOOL_LABELS[tool] ?? tool,
+  }
+  return { ...attempt, description: executionDescription(attempt) }
+}
+
+function validateExecution(execution, agentRunId) {
+  if (!execution || execution.agentRunId !== agentRunId || !EXECUTION_STATUSES.has(execution.status)) {
+    throw new FinboundApiError('Core API returned an invalid Agent execution response', {
+      code: 'CORE_API_INVALID_RESPONSE',
+    })
+  }
+  if (execution.attempts !== undefined && !Array.isArray(execution.attempts)) {
+    throw new FinboundApiError('Core API returned invalid Agent execution attempts', {
+      code: 'CORE_API_INVALID_RESPONSE',
+    })
+  }
+  if (execution.status === 'COMPLETED' && (!execution.attempts || execution.attempts.length === 0)) {
+    throw new FinboundApiError('Completed Agent execution did not include an execution attempt', {
+      code: 'CORE_API_INVALID_RESPONSE',
+    })
+  }
+  if ((execution.attempts ?? []).some((attempt) => (
+    !['ALLOW', 'BLOCK'].includes(attempt?.decision)
+    || !['COMPLETED', 'ERROR'].includes(attempt?.systemOutcome)
+  ))) {
+    throw new FinboundApiError('Agent execution attempt did not preserve decision and system outcome', {
+      code: 'CORE_API_INVALID_RESPONSE',
+    })
+  }
+  return execution
+}
+
+async function getAgentExecution(agentRunId) {
+  const pathId = encodeURIComponent(agentRunId)
+  return validateExecution(
+    await coreRequest(`/api/v1/agent-runs/${pathId}/execution`),
+    agentRunId,
+  )
+}
+
+async function waitForAgentExecution(agentRunId) {
+  let execution
+  for (let attempt = 0; attempt < runtime.executionPollAttempts; attempt += 1) {
+    execution = await getAgentExecution(agentRunId)
+    if (execution.status !== 'RUNNING') return execution
+    if (attempt + 1 < runtime.executionPollAttempts) {
+      await runtime.sleepImpl(runtime.executionPollIntervalMs)
+    }
+  }
+  return execution
+}
+
+function mapAgentExecution(agentRun, permission, execution) {
+  const attempts = (execution.attempts ?? []).map(mapExecutionAttempt)
+  const allowedCount = attempts.filter((attempt) => attempt.decision === 'ALLOW' && attempt.systemOutcome !== 'ERROR').length
+  const blockedCount = attempts.filter((attempt) => attempt.decision === 'BLOCK').length
+  const status = execution.status === 'FAILED' ? 'ERROR' : execution.status
+  const errorCount = Math.max(
+    attempts.filter((attempt) => attempt.systemOutcome === 'ERROR').length,
+    status === 'ERROR' ? 1 : 0,
+  )
+  const executionReasonCodes = Array.isArray(execution.reasonCodes) ? execution.reasonCodes : []
+
+  if (status === 'RUNNING') {
+    return {
+      status,
+      title: 'AI 업무를 실행하고 있습니다',
+      message: 'Core가 Agent를 호출했으며 실행 결과를 기다리고 있습니다.',
+      resultHeading: '현재 업무 권한이 준비되었습니다',
+      resultItems: mapPermissionSummary(permission),
+      nextAction: '잠시 후 업무 기록에서 최신 실행 상태를 확인해 주세요.',
+      attempts,
+      agentRun,
+      permission,
+    }
+  }
+
+  return {
+    status,
+    title: status === 'ERROR' || errorCount ? 'AI 업무 처리 중 오류가 발생했습니다' : 'AI 업무 처리가 완료되었습니다',
+    message: status === 'ERROR' || errorCount
+      ? '정상 완료로 처리하지 않았습니다. 아래 실행 사유와 업무 기록을 확인해 주세요.'
+      : 'Core Public API에서 확인한 Agent 실행 결과입니다.',
+    resultHeading: 'Agent 실행 결과',
+    resultItems: [
+      `정상 확인 ${allowedCount}건`,
+      `안전 차단 ${blockedCount}건`,
+      `처리 오류 ${errorCount}건`,
+      ...(executionReasonCodes.length ? [`오류 사유 ${executionReasonCodes.join(' · ')}`] : []),
+    ],
+    nextAction: status === 'ERROR' || errorCount
+      ? '업무 기록에서 오류 사유를 확인한 뒤 재처리해 주세요.'
+      : '실행 결과를 검토하고 다음 심사 업무를 진행해 주세요.',
+    attempts,
+    agentRun,
+    permission,
+  }
+}
+
 const mockApi = {
   async getBankWorkCatalog() { return clone(bankWorkCatalogFixture) },
   async executeAgentTask({ workId }) {
@@ -215,18 +357,9 @@ const realApi = {
       },
     })
     const permission = await coreRequest(`/api/v1/agent-runs/${encodeURIComponent(agentRun.agentRunId)}/permission-comparison`)
+    const execution = await waitForAgentExecution(agentRun.agentRunId)
 
-    return {
-      status: agentRun.status,
-      title: 'AI 업무 실행이 등록되었습니다',
-      message: 'Core가 현재 업무의 AgentRun과 최소 권한을 발급했습니다.',
-      resultHeading: '현재 업무 권한이 준비되었습니다',
-      resultItems: mapPermissionSummary(permission),
-      nextAction: 'Agent 실행 결과는 감사 현황에서 확인해 주세요.',
-      attempts: [],
-      agentRun,
-      permission,
-    }
+    return mapAgentExecution(agentRun, permission, execution)
   },
   async getAuditEvents(options = {}) {
     const page = await coreRequest(`/api/v1/audit-events?${queryString(options)}`)
@@ -249,12 +382,24 @@ function activeApi() {
   return runtime.mode === 'real' ? realApi : mockApi
 }
 
-export function configureFinboundApi({ mode, baseUrl, credential, fetchImpl, timeoutMs } = {}) {
+export function configureFinboundApi({
+  mode,
+  baseUrl,
+  credential,
+  fetchImpl,
+  timeoutMs,
+  executionPollIntervalMs,
+  executionPollAttempts,
+  sleepImpl,
+} = {}) {
   if (mode !== undefined) runtime.mode = mode === 'real' ? 'real' : 'mock'
   if (baseUrl !== undefined) runtime.baseUrl = baseUrl.replace(/\/$/, '')
   if (credential !== undefined) runtime.credential = credential || null
   if (fetchImpl !== undefined) runtime.fetchImpl = fetchImpl
   if (timeoutMs !== undefined) runtime.timeoutMs = timeoutMs
+  if (executionPollIntervalMs !== undefined) runtime.executionPollIntervalMs = Math.max(0, executionPollIntervalMs)
+  if (executionPollAttempts !== undefined) runtime.executionPollAttempts = Math.max(1, executionPollAttempts)
+  if (sleepImpl !== undefined) runtime.sleepImpl = sleepImpl
 }
 
 export function resetFinboundApi() {
@@ -263,6 +408,9 @@ export function resetFinboundApi() {
   runtime.credential = null
   runtime.fetchImpl = (...args) => globalThis.fetch(...args)
   runtime.timeoutMs = DEFAULT_TIMEOUT_MS
+  runtime.executionPollIntervalMs = DEFAULT_EXECUTION_POLL_INTERVAL_MS
+  runtime.executionPollAttempts = DEFAULT_EXECUTION_POLL_ATTEMPTS
+  runtime.sleepImpl = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 export const finboundApi = {

@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('real Core API adapter', () => {
-  it('creates an AgentRun with an in-memory credential and reads permission comparison', async () => {
+  it('creates an AgentRun and reads its result only through the Core Public execution API', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse({
         agentRunId: 'RUN-REAL-1',
@@ -42,6 +42,22 @@ describe('real Core API adapter', () => {
         },
         withheldTools: ['INCOME_READ'],
       }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-REAL-1',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: 'REQ-REAL-1',
+          requestedTool: 'CREDIT_SCORE_READ',
+          targetConsumerId: 'CUST-1001',
+          requestedData: ['CREDIT_SCORE'],
+          decision: 'ALLOW',
+          systemOutcome: 'COMPLETED',
+          reasonCodes: [],
+          downstreamReached: true,
+          responseReleased: true,
+          scopeStatus: { customerScope: 'OK' },
+        }],
+      }))
 
     configureFinboundApi({
       mode: 'real',
@@ -52,7 +68,7 @@ describe('real Core API adapter', () => {
 
     const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
 
-    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
     expect(fetchImpl.mock.calls[0][0]).toBe('http://localhost:8080/api/v1/agent-runs')
     expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer operator-test-credential')
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
@@ -62,9 +78,62 @@ describe('real Core API adapter', () => {
       inputText: '현재 고객의 신규 대출 심사자료 확인',
     })
     expect(fetchImpl.mock.calls[1][0]).toContain('/api/v1/agent-runs/RUN-REAL-1/permission-comparison')
-    expect(result.status).toBe('RUNNING')
-    expect(result.attempts).toEqual([])
-    expect(result.resultItems).toContain('허용 업무 1개')
+    expect(fetchImpl.mock.calls[2][0]).toBe('http://localhost:8080/api/v1/agent-runs/RUN-REAL-1/execution')
+    expect(fetchImpl.mock.calls.every(([url]) => !url.includes('/internal/'))).toBe(true)
+    expect(result.status).toBe('COMPLETED')
+    expect(result.attempts[0]).toMatchObject({
+      tool: 'CREDIT_SCORE_READ',
+      decision: 'ALLOW',
+      systemOutcome: 'COMPLETED',
+      downstreamReached: true,
+      responseReleased: true,
+    })
+    expect(result.resultItems).toContain('정상 확인 1건')
+  })
+
+  it('polls a running Agent execution without calling an internal endpoint', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-POLL-1', status: 'RUNNING' }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: { allowedTools: [], allowedData: [] },
+        withheldTools: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-POLL-1', status: 'RUNNING', attempts: [] }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-POLL-1',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: 'REQ-POLL-1',
+          tool: 'CREDIT_SCORE_READ',
+          targetConsumerId: 'CUST-1001',
+          requestedData: ['CREDIT_SCORE'],
+          decision: 'BLOCK',
+          systemOutcome: 'COMPLETED',
+          reasonCodes: ['CASE_SCOPE_VIOLATION'],
+          downstreamReached: false,
+          responseReleased: false,
+        }],
+      }))
+    const sleepImpl = vi.fn().mockResolvedValue(undefined)
+    configureFinboundApi({
+      mode: 'real',
+      credential: 'operator',
+      fetchImpl,
+      executionPollAttempts: 2,
+      sleepImpl,
+    })
+
+    const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
+
+    expect(sleepImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl.mock.calls.filter(([url]) => url.endsWith('/execution'))).toHaveLength(2)
+    expect(fetchImpl.mock.calls.every(([url]) => !url.includes('/internal/'))).toBe(true)
+    expect(result.attempts[0]).toMatchObject({
+      decision: 'BLOCK',
+      systemOutcome: 'COMPLETED',
+      downstreamReached: false,
+      responseReleased: false,
+    })
   })
 
   it('maps official audit fields and sends only supported server filters', async () => {
@@ -119,10 +188,13 @@ describe('real Core API adapter', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  it('preserves fail-closed HTTP error codes', async () => {
+  it('preserves application/problem+json reasonCode and detail', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
-      errorCode: 'CORE_API_ROLE_FORBIDDEN',
-      message: 'Viewer cannot create AgentRun',
+      type: 'about:blank',
+      title: 'Forbidden',
+      status: 403,
+      detail: 'Viewer cannot create AgentRun',
+      reasonCode: 'CORE_API_ROLE_FORBIDDEN',
     }, 403))
     configureFinboundApi({ mode: 'real', credential: 'viewer', fetchImpl })
 
@@ -131,8 +203,90 @@ describe('real Core API adapter', () => {
         name: 'FinboundApiError',
         code: 'CORE_API_ROLE_FORBIDDEN',
         status: 403,
+        message: 'Viewer cannot create AgentRun',
       }),
     )
+  })
+
+  it('preserves a credential-filter reasonCode even when detail is absent', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
+      reasonCode: 'CORE_API_CREDENTIAL_INVALID',
+    }, 401))
+    configureFinboundApi({ mode: 'real', credential: 'invalid', fetchImpl })
+
+    await expect(finboundApi.getDashboardSummary()).rejects.toMatchObject({
+      code: 'CORE_API_CREDENTIAL_INVALID',
+      status: 401,
+    })
+  })
+
+  it('preserves a validation problem reasonCode and detail', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
+      status: 422,
+      detail: 'The request contains invalid fields',
+      reasonCode: 'CORE_API_VALIDATION_FAILED',
+      invalidFields: ['employeeId'],
+    }, 422))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
+      code: 'CORE_API_VALIDATION_FAILED',
+      status: 422,
+      message: 'The request contains invalid fields',
+    })
+  })
+
+  it('does not convert a non-JSON Core error into an unavailable-network error', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      text: async () => '<html>bad gateway</html>',
+    })
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    await expect(finboundApi.getDashboardSummary()).rejects.toMatchObject({
+      code: 'CORE_API_HTTP_502',
+      status: 502,
+    })
+  })
+
+  it('fails closed when a completed execution omits its result attempts', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-BROKEN', status: 'RUNNING' }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: { allowedTools: [], allowedData: [] },
+        withheldTools: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-BROKEN', status: 'COMPLETED', attempts: [] }))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
+      code: 'CORE_API_INVALID_RESPONSE',
+    })
+  })
+
+  it('keeps unavailable reachability facts unknown', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-UNKNOWN', status: 'RUNNING' }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: { allowedTools: [], allowedData: [] },
+        withheldTools: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-UNKNOWN',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: 'REQ-UNKNOWN',
+          decision: 'ALLOW',
+          systemOutcome: 'COMPLETED',
+        }],
+      }))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
+
+    expect(result.attempts[0].downstreamReached).toBeNull()
+    expect(result.attempts[0].responseReleased).toBeNull()
   })
 
   it('never derives unavailable backend risk fields as safe values', () => {
