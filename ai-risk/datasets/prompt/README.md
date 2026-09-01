@@ -25,11 +25,13 @@ Source Revision, Parquet Revision, SHA-256, License를 통해 재현합니다. H
 - 서로 다른 Split의 문자 3-gram 유사도가 `0.82` 이상이면 단순 변형 누수로 보고 실패
 - 공개 영어 데이터의 번역본을 Native Korean이라고 부르지 않음
 
-`reviewStatus=DRAFT`인 자체 작성 문장은 팀원 2명이 서로의 판단을 보지 않고 Label, 자연스러움,
-Group을 검토해야 합니다. 두 Packet이 모두 작성되고 원본 Dataset SHA-256과 일치할 때만
-`review.py finalize`가 `APPROVED` 최종 Set을 만듭니다. 현재 Source Seed는 의도적으로 모두
-`DRAFT`이며, 승인 Set 생성 전에는 최종 성능 수치에 포함할 수 없습니다. 자세한 절차는
-[`LABELING_GUIDE.md`](LABELING_GUIDE.md)를 따릅니다.
+`reviewStatus=DRAFT`인 자체 작성 문장은 Label, 자연스러움, Group을 항목별로 검토해야 합니다.
+기본 절차는 독립 Reviewer 2명의 Blind Review입니다. P0 일정상 팀이 명시적으로 합의한 경우에는
+AI 항목별 검수와 Dataset Owner의 전체 승인으로 대체할 수 있으며, 이때 Manifest에
+`reviewMethod=AI_ASSISTED_OWNER_APPROVAL`, `independentHumanReview=false`와 한계를 기록합니다.
+어느 방식이든 원본 Dataset SHA-256과 Packet이 일치할 때만 `APPROVED` Set을 만들며, 승인 전에는
+최종 성능 수치에 포함할 수 없습니다. 자세한 절차는 [`LABELING_GUIDE.md`](LABELING_GUIDE.md)를
+따릅니다.
 
 현재 Seed는 216건입니다. Development와 Validation은 각각 48건이며 정상 12, Hard Negative 12,
 공격 24, Label 0/1 각 24건, 한국어 32, 혼합어 4, 영어 12건입니다. Held-out Test는 최종 지표의
@@ -81,6 +83,26 @@ python -m datasets.prompt.prepare \
   --source datasets/prompt/finbound_eval_approved.jsonl \
   --report evaluate/prompt_dataset_report.json
 ```
+
+## AI 검수 + Dataset Owner 승인
+
+P0 일정상 팀 합의로 독립 2인 검수를 대체할 때만 사용합니다. AI Reviewer가 모든 항목의 Label,
+Sample Type, Attack Type, 자연스러움과 Grouping을 기록한 Packet을 만든 뒤 Dataset Owner가 전체
+범위를 승인합니다. 사람 2인의 독립 검수로 표시하지 않으며 Manifest에 검수 방식과 한계를 남깁니다.
+
+```bash
+python -m datasets.prompt.review finalize-ai-assisted \
+  --review datasets/cache/prompt/reviews/codex-ai-review.json \
+  --approver YEOUL0520 \
+  --approved-at 2026-09-01T12:00:00+09:00 \
+  --output datasets/prompt/finbound_eval_approved.jsonl \
+  --manifest datasets/prompt/approval_manifest.json
+```
+
+현재 승인 Snapshot은 Dataset Owner의 명시적 팀 합의에 따라 `codex-ai-review` 전수 검수와
+`YEOUL0520` 전체 승인으로 생성했습니다. `approval_manifest.json`은 독립 사람 검수가 없었다는
+한계를 명시하며, 승인 Set 216건의 SHA-256과 검수 Packet SHA-256을 고정합니다. Source Seed는
+재검수 출발점으로 계속 `DRAFT`를 유지하고 최종 평가는 `finbound_eval_approved.jsonl`만 사용합니다.
 
 ## 최종 성능 평가
 

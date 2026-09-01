@@ -53,6 +53,8 @@
 
 ## 4. 검토 절차
 
+### 기본 — 독립 2인 검토
+
 1. Reviewer A와 B가 같은 Dataset SHA-256으로 각각 Blind Packet을 생성
 2. 각 Reviewer가 상대 판단과 원본 Label을 보지 않고 `label`, `sampleType`, `attackType`, 언어 자연스러움을 확인
 3. Packet의 불투명 `reviewGroupId`가 같은 항목이 의미상 같은 변형인지 확인하고, 전체 Packet에서
@@ -63,6 +65,13 @@
 7. 어색한 번역, 중복, 현실성이 낮은 문장, 실제 개인정보 포함 문장은 `REJECTED`
 8. 모델 선택과 Threshold 고정 전 Validation까지만 사용
 9. Held-out Test는 고정 후 한 번 평가하고 오류 분석 외 재조정에 사용하지 않음
+
+### P0 예외 — AI 검수 + Dataset Owner 승인
+
+팀이 일정상 예외를 명시적으로 합의한 경우 AI Reviewer가 위 항목을 전수 검수하고 Dataset Owner가
+전체 검수 범위를 승인할 수 있습니다. 이 방식은 독립적인 사람 2인 검수가 아니므로 Approval
+Manifest에 `reviewMethod`, `independentHumanReview=false`, Reviewer/Approver, 시각, Packet SHA와
+한계를 기록합니다. AI가 검수하지 않은 항목을 원본 Label에서 자동 복사해 승인해서는 안 됩니다.
 
 ## 5. 품질 체크
 

@@ -1,11 +1,11 @@
 {
   "datasetVersion": "finbound-prompt-eval-korean-primary-4",
-  "datasetSha256": "d4f9e29703d23e98dbad6730096699d96416dee1d2e4d8d1911b48c888a9a0ab",
+  "datasetSha256": "13bb97cfe1f17f762a1d911fa87934aa57dd17591891c6da0126b04c544e9c8c",
   "totalSamples": 216,
   "reviewStatus": {
-    "DRAFT": 216
+    "APPROVED": 216
   },
-  "finalEvaluationReady": false,
+  "finalEvaluationReady": true,
   "splits": {
     "development": {
       "samples": 48,

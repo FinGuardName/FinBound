@@ -1,14 +1,20 @@
+import json
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
-from datasets.prompt.prepare import read_records
+from datasets.prompt.prepare import build_report, dataset_digest, read_records, validate_records
 from datasets.prompt.review import (
+    build_ai_assisted_approval_manifest,
     build_approval_manifest,
     build_blind_packet,
+    finalize_ai_assisted_review,
     finalize_reviews,
 )
 from evaluate.prompt_metrics import evaluate_predictions
+
+AI_RISK_ROOT = Path(__file__).parents[1]
 
 
 def _completed_packet(records: list[dict], reviewer: str) -> dict:
@@ -76,6 +82,72 @@ def test_two_independent_matching_reviews_create_approved_set() -> None:
     assert manifest["approvedSamples"] == 216
     assert len({reviewer["reviewer"] for reviewer in manifest["reviewers"]}) == 2
     assert "text" not in str(manifest)
+
+
+def test_ai_assisted_review_records_owner_approval_and_limitation() -> None:
+    records = read_records()
+    packet = _completed_packet(records, "codex-ai-review")
+
+    approved = finalize_ai_assisted_review(
+        records,
+        packet,
+        approver="YEOUL0520",
+        approved_at="2026-09-01T12:00:00+09:00",
+    )
+    manifest = build_ai_assisted_approval_manifest(
+        records,
+        packet,
+        approver="YEOUL0520",
+        approved_at="2026-09-01T12:00:00+09:00",
+    )
+
+    assert len(approved) == 216
+    assert {record["reviewStatus"] for record in approved} == {"APPROVED"}
+    assert manifest["reviewMethod"] == "AI_ASSISTED_OWNER_APPROVAL"
+    assert manifest["independentHumanReview"] is False
+    assert manifest["reviewer"]["reviewerType"] == "AI"
+    assert manifest["approver"]["approver"] == "YEOUL0520"
+    assert manifest["limitation"]
+    assert "text" not in str(manifest)
+
+
+def test_ai_assisted_review_requires_distinct_owner() -> None:
+    records = read_records()
+    packet = _completed_packet(records, "YEOUL0520")
+
+    with pytest.raises(ValueError, match="must be distinct"):
+        finalize_ai_assisted_review(
+            records,
+            packet,
+            approver="YEOUL0520",
+            approved_at="2026-09-01T12:00:00+09:00",
+        )
+
+
+def test_committed_approved_dataset_matches_manifest_and_report() -> None:
+    seed = read_records()
+    approved = read_records(AI_RISK_ROOT / "datasets" / "prompt" / "finbound_eval_approved.jsonl")
+    manifest = json.loads(
+        (AI_RISK_ROOT / "datasets" / "prompt" / "approval_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    committed_report = json.loads(
+        (AI_RISK_ROOT / "evaluate" / "prompt_dataset_report.json").read_text(encoding="utf-8")
+    )
+
+    validate_records(approved)
+    generated_report = build_report(approved)
+
+    assert len(approved) == 216
+    assert {record["reviewStatus"] for record in approved} == {"APPROVED"}
+    assert manifest["sourceDatasetSha256"] == dataset_digest(seed)
+    assert manifest["approvedDatasetSha256"] == dataset_digest(approved)
+    assert manifest["reviewMethod"] == "AI_ASSISTED_OWNER_APPROVAL"
+    assert manifest["independentHumanReview"] is False
+    assert manifest["approver"]["approver"] == "YEOUL0520"
+    assert generated_report["finalEvaluationReady"] is True
+    assert committed_report == generated_report
 
 
 def test_review_finalization_rejects_same_reviewer() -> None:

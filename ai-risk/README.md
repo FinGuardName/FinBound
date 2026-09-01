@@ -96,5 +96,6 @@ Prompt Detector는 새 Prompt, Document 또는 외부 비신뢰 입력이 생성
 
 Prompt 평가 데이터의 공개 Source Revision, License, 한국어·영어·혼합어 자체 Seed와 Held-out
 정책은 [`datasets/prompt/README.md`](datasets/prompt/README.md)에서 관리합니다.
-`reviewStatus=DRAFT`인 문장은 최종 성능 수치에 사용하지 않으며, 서로 다른 팀원 2명의 Blind
-Review가 일치한 `APPROVED` Set만 최종 평가에 사용합니다.
+`reviewStatus=DRAFT`인 문장은 최종 성능 수치에 사용하지 않습니다. 기본은 서로 다른 팀원 2명의
+Blind Review이며, 팀이 명시적으로 합의한 P0 예외에서는 AI 전수 검수와 Dataset Owner 승인을
+Manifest에 투명하게 기록한 `APPROVED` Set만 최종 평가에 사용합니다.
