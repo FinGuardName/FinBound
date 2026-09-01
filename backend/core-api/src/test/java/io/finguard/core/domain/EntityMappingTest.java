@@ -21,6 +21,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import io.finguard.core.context.ScopeState;
 import jakarta.persistence.EntityManager;
 
 /**
@@ -394,6 +395,53 @@ class EntityMappingTest {
         assertThat(found.getRequestId()).isEqualTo("REQ-900");
         assertThat(found.getAuditEventId()).isEqualTo("AUD-900");
         assertThat(found.getRequestedAt()).isEqualTo(ISSUED);
+    }
+
+    @Test
+    void auditEventRoundTripsTheResolvedContextTheSchemaRequires() {
+        // contracts/audit/audit-event.schema.json 이 정의하지만 V1·V2 에는 칸이 없던 항목들이다.
+        // Scope 는 9개 중 하나만 VIOLATION 으로 둬서 자리가 섞이지 않았는지 함께 본다.
+        AuditEvent event = auditEvent("AUD-900", "REQ-900");
+        event.recordResolvedContext(
+                new ResolvedAuditContext(
+                        "EMP-900",
+                        "PASS-900",
+                        EnumSet.of(DataType.CREDIT_SCORE),
+                        new AuditScopeStatus(
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.VIOLATION),
+                        new BigDecimal("0.0500"),
+                        PromptRiskEvaluationStatus.EVALUATED,
+                        "prompt-guard-1"));
+        em.persist(event);
+        em.flush();
+        em.clear();
+
+        AuditEvent found = em.find(AuditEvent.class, "AUD-900");
+
+        assertThat(found.getEmployeeId()).isEqualTo("EMP-900");
+        assertThat(found.getPassportId()).isEqualTo("PASS-900");
+        assertThat(found.getRequestedData()).containsExactly(DataType.CREDIT_SCORE);
+        assertThat(found.getPromptRisk()).isEqualByComparingTo("0.0500");
+        assertThat(found.getPromptRiskEvaluationStatus())
+                .isEqualTo(PromptRiskEvaluationStatus.EVALUATED);
+        assertThat(found.getPromptModelVersion()).isEqualTo("prompt-guard-1");
+        assertThat(found.getScopeStatus().dataScope()).isEqualTo(ScopeState.VIOLATION);
+        assertThat(found.getScopeStatus().employeeAuthority()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().permissionTemplate()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().caseStatus()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().mandate()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().passportStatus()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().agentBinding()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().customerScope()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().toolScope()).isEqualTo(ScopeState.OK);
     }
 
     @Test

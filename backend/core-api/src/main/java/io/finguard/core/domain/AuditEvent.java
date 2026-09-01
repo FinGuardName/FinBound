@@ -9,12 +9,14 @@ import java.util.Set;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 /**
  * Business AuditEvent. {@code docs/04-api-contract.md} §11 · §14.
@@ -62,8 +64,39 @@ public class AuditEvent {
     @Column(name = "requested_tool", length = 64)
     private Tool requestedTool;
 
+    /** 요청 시점이 아니라 Resolver가 Passport를 해석한 뒤에 확정된다. */
+    @Column(name = "employee_id", length = 64)
+    private String employeeId;
+
+    @Column(name = "passport_id", length = 64)
+    private String passportId;
+
+    /**
+     * Agent가 읽으려 시도한 Data. <strong>인가되었다는 증거가 아니다</strong> — 무엇을 시도했는지의
+     * 기록이고, 허용 여부는 {@link #scopeStatus}의 {@code dataScope}가 말한다.
+     */
+    @ElementCollection
+    @CollectionTable(
+            name = "audit_event_requested_data",
+            joinColumns = @JoinColumn(name = "audit_event_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "data_type", nullable = false, length = 64)
+    private Set<DataType> requestedData = new LinkedHashSet<>();
+
+    /** Resolver를 거치기 전에는 null이다. 9개가 전부 차거나 전부 비거나 둘 중 하나다. */
+    @Embedded
+    private AuditScopeStatus scopeStatus;
+
     @Column(name = "prompt_risk", precision = 5, scale = 4)
     private BigDecimal promptRisk;
+
+    /** 점수가 없는 것과 검사하지 않은 것은 다른 사실이다(docs/04 §7). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "prompt_risk_evaluation_status", length = 32)
+    private PromptRiskEvaluationStatus promptRiskEvaluationStatus;
+
+    @Column(name = "prompt_model_version", length = 64)
+    private String promptModelVersion;
 
     @Column(name = "behavior_risk", precision = 5, scale = 4)
     private BigDecimal behaviorRisk;
@@ -115,6 +148,14 @@ public class AuditEvent {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    /**
+     * 낙관적 락. 한 감사 기록에 쓰는 주체가 선저장·증거 기록·최종 결과로 늘어나므로, 겹쳐 쓸 때
+     * Hibernate의 전체 엔티티 UPDATE가 다른 쪽이 방금 쓴 칸을 옛 값으로 되돌리는 것을 막는다.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
     protected AuditEvent() {
         // JPA
     }
@@ -144,8 +185,51 @@ public class AuditEvent {
         this.requestedAt = requestedAt;
     }
 
+    /**
+     * Resolver가 계산한 증거를 감사 기록에 남긴다. 선저장 때는 알 수 없던 값들이다.
+     *
+     * <p>확정된 기록에는 쓰지 않는다 — 판정이 끝난 뒤 근거가 바뀌면 그 기록은 더 이상 증거가 아니다.
+     */
+    public void recordResolvedContext(ResolvedAuditContext context) {
+        if (status != AuditStatus.PROCESSING) {
+            throw new IllegalStateException("AuditEvent is already finalized");
+        }
+        this.employeeId = context.employeeId();
+        this.passportId = context.passportId();
+        this.requestedData.clear();
+        this.requestedData.addAll(context.requestedData());
+        this.scopeStatus = context.scopeStatus();
+        this.promptRisk = context.promptRisk();
+        this.promptRiskEvaluationStatus = context.promptRiskEvaluationStatus();
+        this.promptModelVersion = context.promptModelVersion();
+    }
+
     public String getAuditEventId() {
         return auditEventId;
+    }
+
+    public String getEmployeeId() {
+        return employeeId;
+    }
+
+    public String getPassportId() {
+        return passportId;
+    }
+
+    public Set<DataType> getRequestedData() {
+        return Collections.unmodifiableSet(requestedData);
+    }
+
+    public AuditScopeStatus getScopeStatus() {
+        return scopeStatus;
+    }
+
+    public PromptRiskEvaluationStatus getPromptRiskEvaluationStatus() {
+        return promptRiskEvaluationStatus;
+    }
+
+    public String getPromptModelVersion() {
+        return promptModelVersion;
     }
 
     public String getRequestId() {
