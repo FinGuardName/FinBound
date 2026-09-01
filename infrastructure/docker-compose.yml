@@ -1,6 +1,15 @@
 name: finguard
 
+networks:
+  public-zone:
+    driver: bridge
+  internal-zone:
+    driver: bridge
+  data-zone:
+    driver: bridge
+
 services:
+  # data-zone
   postgres:
     image: postgres:17.10-alpine
     environment:
@@ -8,7 +17,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-finguard}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"   # dev용
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -16,27 +25,89 @@ services:
       retries: 10
     volumes:
       - finguard-postgres:/var/lib/postgresql/data
-    networks: [finguard]
+    networks: [data-zone]
+
+  # internal-zone
+  core-api:
+    build:
+      context: ..
+      dockerfile: backend/core-api/Dockerfile
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finguard}
+      POSTGRES_USER: ${POSTGRES_USER:-finguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      # 값이 없으면 compose가 여기서 멈춘다. 인증이 사실상 꺼진 Internal API를 띄우지 않는다.
+      FINGUARD_INTERNAL_CREDENTIAL: ${FINGUARD_INTERNAL_CREDENTIAL:?set FINGUARD_INTERNAL_CREDENTIAL in .env}
+      # 기본은 프로파일 없음 = 데모 시드를 넣지 않는다.
+      # PostgreSQL 볼륨이 영속이라 한 번 들어간 시드는 프로파일을 나중에 꺼도 남는다.
+      # 되돌릴 수 없는 쪽을 기본값으로 두지 않는다. 시드가 필요하면 docker-compose.demo.yml.
+      SPRING_PROFILES_ACTIVE: ${CORE_API_PROFILES:-}
+    # ports가 아니라 expose다. 호스트에 열지 않는다 — /internal/** 의 방어가 공유 자격 증명 하나뿐이라
+    # 1차 방어선인 네트워크 격리를 포기하지 않는다. 브라우저에서 접근이 필요하면
+    # docker-compose.expose.yml 을 함께 지정한다. README 참조.
+    expose:
+      - "8080"
+    # ENTRYPOINT의 -XX:MaxRAMPercentage=75 는 "컨테이너에 허용된 메모리의 75%"다.
+    # 상한이 없으면 호스트 전체 RAM 기준이 되어 힙이 과도하게 커진다.
+    mem_limit: ${CORE_API_MEM_LIMIT:-1g}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    # data-zone은 postgres에, internal-zone은 gateway가 닿기 위해서다. public-zone에는 두지 않는다.
+    networks: [internal-zone, data-zone]
 
   opa:
     image: openpolicyagent/opa:1.17.0-static
-    command:
-      - run
-      - --server
-      - --addr=0.0.0.0:8181
-      - /policy
-    ports:
-      - "${OPA_PORT:-8181}:8181"
+    command: [run, --server, --addr=0.0.0.0:8181, /policy]
     volumes:
       - ../policy:/policy:ro
     read_only: true
     security_opt:
       - no-new-privileges:true
-    networks: [finguard]
+    networks: [internal-zone]
 
-networks:
-  finguard:
-    driver: bridge
+  gateway:
+    build:
+      context: ..
+      dockerfile: backend/gateway/Dockerfile
+    environment:
+      CORE_URL: http://core-api:8080
+      AI_URL: http://ai-risk:8000
+      OPA_URL: http://opa:8181
+      MOCK_FINANCE_URL: http://mock-finance:8082
+    depends_on:
+      - opa
+    ports:
+      - "127.0.0.1:${GATEWAY_HOST_PORT:-8091}:8081"
+    networks: [public-zone, internal-zone]
+    security_opt: [no-new-privileges:true]
+
+  # agent:
+  #   build:
+  #     context: ../backend/agent
+  #   environment:
+  #     CORE_URL: http://core-api:8080
+  #     GATEWAY_URL: http://gateway:8081
+  #   depends_on:
+  #     - core-api
+  #     - gateway
+  #   networks: [internal-zone]
+
+  # mock-finance:
+  #   build:
+  #     context: ../backend/mock-finance
+  #   networks: [internal-zone]
+
+  # ai-risk:
+  #   build:
+  #     context: ../ai-risk
+  #   networks: [internal-zone]
 
 volumes:
   finguard-postgres:

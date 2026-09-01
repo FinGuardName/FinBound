@@ -1,0 +1,10 @@
+# 로컬 개발 전용. 데모 시드를 Flyway location에 추가한다.
+#
+# 시드를 db/migration 안에 두지 않는 이유: Flyway는 지정한 location의 하위 디렉터리를 재귀 스캔하므로
+# 안에 두면 모든 환경에 딸려 들어간다. 별도 경로로 두고 이 프로파일에서만 더한다.
+# docs/adr/0002-flyway-owns-core-api-schema.md
+spring:
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/local

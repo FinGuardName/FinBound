@@ -1,0 +1,15 @@
+{
+  "auditEventId": "AUD-003",
+  "requestId": "REQ-003",
+  "traceId": "4bf92f0000000003",
+  "agentId": "LOAN-AGENT-01",
+  "agentRunId": "RUN-003",
+  "reasonCodes": ["CONTEXT_SERVICE_UNAVAILABLE"],
+  "systemOutcome": "ERROR",
+  "downstreamReached": false,
+  "responseReleased": false,
+  "errorLocation": "CONTEXT_RESOLVER",
+  "status": "ERROR",
+  "requestedAt": "2026-08-17T21:34:10+09:00",
+  "completedAt": "2026-08-17T21:34:11+09:00"
+}

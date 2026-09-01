@@ -1,0 +1,12 @@
+{
+  "requestId": "REQ-001",
+  "decision": "ALLOW",
+  "systemOutcome": "COMPLETED",
+  "reasonCodes": [],
+  "downstreamReached": true,
+  "responseReleased": true,
+  "success": true,
+  "recordsRead": 1,
+  "latencyMs": 120,
+  "completedAt": "2026-08-17T21:32:11+09:00"
+}
