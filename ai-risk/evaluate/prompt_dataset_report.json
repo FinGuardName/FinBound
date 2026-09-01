@@ -1,0 +1,89 @@
+{
+  "datasetVersion": "finbound-prompt-eval-korean-primary-6",
+  "datasetSha256": "c2b1d5137a50270f4fbc58efe1107ab91612a6a4537d4910bd318ac717aaf5cf",
+  "totalSamples": 216,
+  "reviewStatus": {
+    "APPROVED": 216
+  },
+  "finalEvaluationReady": true,
+  "splits": {
+    "development": {
+      "samples": 48,
+      "groups": 35,
+      "labels": {
+        "0": 24,
+        "1": 24
+      },
+      "sampleTypes": {
+        "normal": 12,
+        "hard_negative": 12,
+        "attack": 24
+      },
+      "inputLanguages": {
+        "ko": 32,
+        "mixed": 4,
+        "en": 12
+      },
+      "attackTypes": {
+        "IGNORE_PREVIOUS_INSTRUCTION": 4,
+        "POLICY_BYPASS": 4,
+        "SYSTEM_PROMPT_EXTRACTION": 4,
+        "CROSS_CUSTOMER_ACCESS": 4,
+        "UNAUTHORIZED_TOOL_REQUEST": 4,
+        "UNKNOWN_PROMPT_ATTACK": 4
+      }
+    },
+    "held_out_test": {
+      "samples": 120,
+      "groups": 95,
+      "labels": {
+        "0": 60,
+        "1": 60
+      },
+      "sampleTypes": {
+        "normal": 30,
+        "hard_negative": 30,
+        "attack": 60
+      },
+      "inputLanguages": {
+        "ko": 80,
+        "mixed": 20,
+        "en": 20
+      },
+      "attackTypes": {
+        "IGNORE_PREVIOUS_INSTRUCTION": 10,
+        "POLICY_BYPASS": 10,
+        "SYSTEM_PROMPT_EXTRACTION": 10,
+        "CROSS_CUSTOMER_ACCESS": 10,
+        "UNAUTHORIZED_TOOL_REQUEST": 10,
+        "UNKNOWN_PROMPT_ATTACK": 10
+      }
+    },
+    "validation": {
+      "samples": 48,
+      "groups": 35,
+      "labels": {
+        "0": 24,
+        "1": 24
+      },
+      "sampleTypes": {
+        "normal": 12,
+        "hard_negative": 12,
+        "attack": 24
+      },
+      "inputLanguages": {
+        "ko": 32,
+        "mixed": 4,
+        "en": 12
+      },
+      "attackTypes": {
+        "IGNORE_PREVIOUS_INSTRUCTION": 4,
+        "POLICY_BYPASS": 4,
+        "SYSTEM_PROMPT_EXTRACTION": 4,
+        "CROSS_CUSTOMER_ACCESS": 4,
+        "UNAUTHORIZED_TOOL_REQUEST": 4,
+        "UNKNOWN_PROMPT_ATTACK": 4
+      }
+    }
+  }
+}

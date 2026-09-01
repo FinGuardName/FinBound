@@ -1,0 +1,19 @@
+{
+  "modelVersion": "prompt-guard-4",
+  "modelId": "HikmaAI/hikmaai-mdeberta-v3-base-prompt-injection",
+  "modelRevision": "ad81120116b9ec21bc5f47ffd5a2e0dccc803fe8",
+  "modelArtifactPath": "onnx/int8/model_quantized.onnx",
+  "modelArtifactSha256": "151fa3a17cc4c11a5fa86173c9d5cf63846c74389e528ed420f28cc203cd9aaa",
+  "tokenizerPath": "onnx/int8",
+  "injectionLabelId": 1,
+  "maxTokens": 512,
+  "ruleRisk": 0.98,
+  "pretrainedScoreThreshold": 0.9995304836023597,
+  "domainAdapterArtifactPath": "prompt_domain_adapter.joblib",
+  "domainAdapterArtifactSha256": "e233b167811cee0aa99cd419723288dea10e2af6ebb6e32cf30e8acbce56d25d",
+  "domainAdapterScoreThreshold": 0.5086391125189315,
+  "hybridEvidenceThreshold": 1.0,
+  "promptBlockThreshold": 0.9,
+  "datasetVersion": "finbound-prompt-eval-korean-primary-6",
+  "approvedDatasetSha256": "c2b1d5137a50270f4fbc58efe1107ab91612a6a4537d4910bd318ac717aaf5cf"
+}

@@ -3,8 +3,14 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException
 
 from app.behavior.service import BehaviorModelError, BehaviorRiskService
+from app.prompt.service import PromptInputError, PromptModelError, PromptRiskService
 from app.schemas.behavior import BehaviorRiskRequest, BehaviorRiskResponse
-from app.security import internal_credential_is_configured, verify_internal_credential
+from app.schemas.prompt import PromptRiskRequest, PromptRiskResponse
+from app.security import (
+    internal_credential_is_configured,
+    verify_internal_credential,
+    verify_prompt_internal_credential,
+)
 
 app = FastAPI(
     title="FinBound AI Risk Engine",
@@ -12,6 +18,7 @@ app = FastAPI(
     description="Returns risk signals only; authorization decisions belong to OPA.",
 )
 behavior_service = BehaviorRiskService()
+prompt_service = PromptRiskService()
 
 
 @app.get("/health", tags=["operations"])
@@ -25,8 +32,11 @@ def ready() -> dict[str, str]:
         if not internal_credential_is_configured():
             raise BehaviorModelError("Internal credential is not configured")
         behavior_service.check_ready()
+        prompt_service.check_ready()
     except BehaviorModelError as error:
         raise HTTPException(status_code=503, detail="BEHAVIOR_RISK_UNAVAILABLE") from error
+    except PromptModelError as error:
+        raise HTTPException(status_code=503, detail="PROMPT_RISK_UNAVAILABLE") from error
     return {"status": "READY"}
 
 
@@ -44,3 +54,21 @@ def evaluate_behavior(
         return behavior_service.evaluate(request)
     except BehaviorModelError as error:
         raise HTTPException(status_code=503, detail="BEHAVIOR_RISK_UNAVAILABLE") from error
+
+
+@app.post(
+    "/internal/v1/risk/prompt",
+    response_model=PromptRiskResponse,
+    response_model_by_alias=True,
+    tags=["risk"],
+)
+def evaluate_prompt(
+    request: PromptRiskRequest,
+    _internal_credential: Annotated[None, Depends(verify_prompt_internal_credential)],
+) -> PromptRiskResponse:
+    try:
+        return prompt_service.evaluate(request)
+    except PromptInputError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except PromptModelError as error:
+        raise HTTPException(status_code=503, detail="PROMPT_RISK_UNAVAILABLE") from error

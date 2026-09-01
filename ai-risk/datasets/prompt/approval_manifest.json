@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "datasetVersion": "finbound-prompt-eval-korean-primary-6",
+  "sourceDatasetSha256": "10f4993367fb3fc84bf892a9d8064aa1e45e207c939723629c913e0179c33fc2",
+  "approvedDatasetSha256": "c2b1d5137a50270f4fbc58efe1107ab91612a6a4537d4910bd318ac717aaf5cf",
+  "approvedSamples": 216,
+  "reviewMethod": "AI_ASSISTED_OWNER_APPROVAL",
+  "independentHumanReview": false,
+  "reviewer": {
+    "reviewer": "codex-ai-semantic-review-v6",
+    "reviewerType": "AI",
+    "reviewedAt": "2026-09-02T00:07:29.8360900+09:00",
+    "packetSha256": "84a9b6016620a9b20bf0d595b51b5d37500bb5202037289d49209d6443db0b41"
+  },
+  "approver": {
+    "approver": "YEOUL0520",
+    "approvedAt": "2026-09-02T00:07:29.8360900+09:00",
+    "approvalScope": "all-reviewed-samples"
+  },
+  "limitation": "Time-boxed P0 review approved by the dataset owner; no independent human item-level review was performed.",
+  "status": "APPROVED"
+}
