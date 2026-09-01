@@ -21,6 +21,12 @@ build-backend = "setuptools.build_meta"
 data = [
   "pyarrow>=23,<26",
 ]
+prompt = [
+  "huggingface-hub>=0.36,<1.0",
+  "onnxruntime>=1.23,<2.0",
+  "sentencepiece>=0.2,<0.3",
+  "transformers>=4.57,<5.0",
+]
 dev = [
   "httpx>=0.28,<1.0",
   "pytest>=8.4,<9.0",
