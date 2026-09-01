@@ -1,0 +1,61 @@
+name: finbound-frontend-ai-e2e
+
+networks:
+  public-zone:
+    driver: bridge
+  internal-zone:
+    driver: bridge
+
+services:
+  stub-core:
+    build:
+      context: ./stub-core
+    environment:
+      E2E_OPERATOR_CREDENTIAL: e2e-operator-credential
+    expose:
+      - "8080"
+    networks: [internal-zone]
+    security_opt: [no-new-privileges:true]
+
+  ai-risk:
+    build:
+      context: ../ai-risk
+    environment:
+      FINGUARD_INTERNAL_CREDENTIAL: e2e-ai-service-credential
+    expose:
+      - "8000"
+    networks: [internal-zone]
+    security_opt: [no-new-privileges:true]
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_FINBOUND_API_MODE: real
+        VITE_FINBOUND_API_BASE_URL: /core-api
+    environment:
+      CORE_API_UPSTREAM: http://stub-core:8080
+    depends_on:
+      stub-core:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${E2E_FRONTEND_HOST_PORT:-18088}:8080"
+    networks: [public-zone, internal-zone]
+    security_opt: [no-new-privileges:true]
+
+  e2e:
+    build:
+      context: ./playwright
+    environment:
+      CI: "1"
+      FRONTEND_BASE_URL: http://frontend:8080
+      AI_RISK_BASE_URL: http://ai-risk:8000
+      E2E_OPERATOR_CREDENTIAL: e2e-operator-credential
+      E2E_AI_CREDENTIAL: e2e-ai-service-credential
+    depends_on:
+      frontend:
+        condition: service_healthy
+      ai-risk:
+        condition: service_healthy
+    ipc: host
+    networks: [internal-zone]
