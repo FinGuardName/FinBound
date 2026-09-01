@@ -19,6 +19,34 @@ uv run uvicorn app.main:app --reload --port 8000
 uv run pytest
 ```
 
+## 컨테이너 실행
+
+이미지는 저장소 루트가 아니라 `ai-risk` 디렉터리를 Build Context로 사용합니다. 잠금 파일에
+고정된 Python 의존성과 모델 Artifact만 이미지에 포함하며 Credential은 Runtime 환경변수로만
+주입합니다.
+
+```bash
+docker build -t finbound-ai-risk:local ai-risk
+docker run --rm \
+  -p 127.0.0.1:8000:8000 \
+  -e FINGUARD_INTERNAL_CREDENTIAL="$(openssl rand -base64 32)" \
+  finbound-ai-risk:local
+```
+
+컨테이너는 UID/GID `10001`의 non-root 사용자로 실행합니다. Docker Healthcheck는 `/ready`를
+사용하므로 Credential이나 Behavior 모델 Artifact가 없으면 `unhealthy`가 됩니다. 프로세스 생존만
+확인하려면 `/health`를 사용합니다.
+
+Compose에서는 다음과 같이 `ai-risk`를 Build Context로 지정합니다.
+
+```yaml
+ai-risk:
+  build:
+    context: ../ai-risk
+  environment:
+    FINGUARD_INTERNAL_CREDENTIAL: ${FINGUARD_INTERNAL_CREDENTIAL:?required}
+```
+
 Behavior Independent Mock artifact는 고정 Seed의 합성 데이터로 재현할 수 있습니다.
 
 ```bash

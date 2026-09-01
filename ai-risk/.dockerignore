@@ -1,0 +1,8 @@
+**
+!Dockerfile
+!requirements.lock
+!pyproject.toml
+!app/
+!app/**
+!models/
+!models/**
