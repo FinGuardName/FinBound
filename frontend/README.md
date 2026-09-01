@@ -24,6 +24,37 @@ Spring API가 준비되면 이 Adapter가 AgentRun 생성, Permission Comparison
 조합해 현재 View Model로 변환합니다. 화면이나 Fixture에는 원본 Prompt와 금융 응답 Payload를
 포함하지 않습니다.
 
+## Mock / Core API 모드
+
+기본값은 기존 화면 회귀 검증을 위한 `mock`이다. 실제 Core API에 연결할 때는 공개 주소만
+환경변수로 지정한다.
+
+```bash
+VITE_FINBOUND_API_MODE=real
+VITE_FINBOUND_API_BASE_URL=/core-api
+VITE_FINBOUND_DEV_PROXY_TARGET=http://localhost:8080
+```
+
+개발 서버는 `/core-api`를 로컬 Core로 Proxy하여 브라우저 CORS 우회를 만들지 않는다. Production
+Frontend도 같은 경로를 Core API로 Reverse Proxy해야 한다.
+
+`VIEWER_CREDENTIAL`과 `OPERATOR_CREDENTIAL`은 `.env`, Vue 소스, 빌드 산출물 또는 Web
+Storage에 넣지 않는다. `real` 모드에서는 화면의 업무 세션 입력란으로 전달하며 새로고침하거나
+연결을 종료하면 메모리에서 사라진다.
+
+`src/services/finboundApi.js`는 공식 REST 필드를 현재 View Model로 명시적으로 변환한다.
+
+| Core REST Field | Front View Model |
+|---|---|
+| `status` | `auditStatus` |
+| `promptRiskEvaluationStatus` | `promptEvaluationStatus` |
+| `behaviorFeatureVersion` | `featureVersion` |
+
+현재 Core Dashboard 계약은 `severity`와 `riskOnly` 서버 필터를 제공하지 않는다. 실제 모드에서는
+두 필터를 비활성화하여 적용되지 않는 조건을 적용된 것처럼 표시하지 않는다. AgentRun 생성 후
+실제 Agent 실행을 시작하는 공개 Core Endpoint도 아직 없으므로 Vue는 내부 Agent Simulator를
+직접 호출하지 않고 생성된 AgentRun과 권한 비교까지만 표시한다.
+
 | Frontend 작업 | Spring Contract |
 |---|---|
 | 업무 실행 시작 | `POST /api/v1/agent-runs` |

@@ -1,8 +1,10 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App.vue'
-import { finboundApi } from './services/finboundApi'
+import { configureFinboundApi, finboundApi, resetFinboundApi } from './services/finboundApi'
+
+afterEach(() => resetFinboundApi())
 
 const getAllAuditEvents = async () => {
   const result = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, pageSize: 100 })
@@ -10,6 +12,24 @@ const getAllAuditEvents = async () => {
 }
 
 describe('FinBound P0 application', () => {
+  it('keeps the real Core credential in memory instead of Web Storage', async () => {
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem')
+    configureFinboundApi({ mode: 'real' })
+    const wrapper = mount(App)
+
+    expect(wrapper.text()).toContain('업무 세션 Credential을 입력해 주세요')
+    expect(wrapper.findAll('.work-card')).toHaveLength(0)
+
+    await wrapper.get('#core-credential').setValue('operator-runtime-only')
+    await wrapper.get('.credential-panel form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.findAll('.work-card')).toHaveLength(3)
+    expect(finboundApi.hasCredential()).toBe(true)
+    expect(storageWrite).not.toHaveBeenCalled()
+    expect(wrapper.html()).not.toContain('operator-runtime-only')
+  })
+
   it('shows bank work instead of asking an employee to configure security', async () => {
     const wrapper = mount(App)
     await flushPromises()

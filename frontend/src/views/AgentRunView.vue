@@ -18,6 +18,11 @@ onMounted(async () => {
 const workContext = computed(() => workCatalog.value.find((work) => work.id === selectedWorkId.value))
 const allowedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'ALLOW') ?? [])
 const blockedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'BLOCK') ?? [])
+const executionStateLabel = computed(() => {
+  if (execution.value?.status === 'RUNNING') return '업무 실행 중'
+  if (execution.value?.status === 'ERROR') return '업무 오류'
+  return blockedAttempts.value.length ? `업무 완료 · 보호 ${blockedAttempts.value.length}건` : '업무 완료'
+})
 
 watch(selectedWorkId, () => {
   execution.value = null
@@ -162,12 +167,13 @@ async function runAgentTask() {
         <div class="decision-banner protected">
           <div class="decision-icon" aria-hidden="true">✓</div>
           <div><p class="section-kicker">AI 업무 처리 결과</p><h2>{{ execution.title }}</h2><p>{{ execution.message }}</p></div>
-          <span class="plain-decision">{{ blockedAttempts.length ? `업무 완료 · 보호 ${blockedAttempts.length}건` : '업무 완료' }}</span>
+          <span class="plain-decision">{{ executionStateLabel }}</span>
         </div>
 
         <div class="execution-content">
           <div class="work-progress">
-            <div class="attempt-heading"><div><p class="section-kicker">AI가 시도한 작업</p><h3>자료별 접근 결과</h3></div><span>{{ allowedAttempts.length }}건 확인 · {{ blockedAttempts.length }}건 차단</span></div>
+            <div class="attempt-heading"><div><p class="section-kicker">AI가 시도한 작업</p><h3>자료별 접근 결과</h3></div><span>{{ execution.status === 'RUNNING' ? '실행 결과 대기 중' : `${allowedAttempts.length}건 확인 · ${blockedAttempts.length}건 차단` }}</span></div>
+            <p v-if="execution.status === 'RUNNING'" class="no-results">AgentRun이 생성되었습니다. Tool Call 결과는 감사 현황에서 확인할 수 있습니다.</p>
             <ol class="attempt-list" aria-label="AI 자료 접근 결과">
               <li v-for="attempt in execution.attempts" :key="attempt.requestId" :class="attempt.decision.toLowerCase()">
                 <span class="timeline-marker">{{ attempt.decision === 'ALLOW' ? '✓' : '!' }}</span>
