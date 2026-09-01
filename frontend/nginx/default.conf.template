@@ -1,0 +1,33 @@
+server {
+    listen 8080;
+    listen [::]:8080;
+    server_name _;
+    server_tokens off;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Docker DNS로 Runtime upstream을 지연 해석한다. Core가 아직 시작되지 않았거나 Mock Mode로
+    # Frontend만 띄울 때도 Nginx 자체는 정상 기동하고, 실제 API 요청만 502로 실패해야 한다.
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $core_api_upstream ${CORE_API_UPSTREAM};
+
+    location = /health {
+        access_log off;
+        default_type application/json;
+        return 200 '{"status":"UP"}';
+    }
+
+    location /core-api/ {
+        rewrite ^/core-api/(.*)$ /$1 break;
+        proxy_pass $core_api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
