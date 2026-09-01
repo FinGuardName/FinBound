@@ -47,6 +47,9 @@ public record AuditEventView(
         AuditStatus systemOutcome,
         Boolean downstreamReached,
         Boolean responseReleased,
+        Boolean success,
+        Integer recordsRead,
+        Long latencyMs,
         String errorLocation,
         AuditStatus status,
         Instant requestedAt,
@@ -81,10 +84,26 @@ public record AuditEventView(
                 systemOutcomeOf(event),
                 event.getDownstreamReached(),
                 event.getResponseReleased(),
+                blocked(event) ? null : event.getSuccess(),
+                blocked(event) ? null : event.getRecordsRead(),
+                blocked(event) ? null : event.getLatencyMs(),
                 event.getErrorLocation(),
                 event.getStatus(),
                 event.getRequestedAt(),
                 event.getCompletedAt());
+    }
+
+    /**
+     * BLOCK 기록은 실행 측정값을 내보내지 않는다.
+     *
+     * <p>{@code contracts/audit/audit-event.schema.json}이 BLOCK에서 {@code success}·
+     * {@code recordsRead}·{@code latencyMs}를 금지한다. downstream에 닿지 않았으니 측정할 것이 없었다.
+     *
+     * <p>저장 쪽에서도 막지만({@code AuditOutcomeRequest}) 여기서 한 번 더 거른다 — 계약이 생기기 전에
+     * 쌓인 기록에는 값이 남아 있을 수 있고, 화면에 나가는 순간 그것도 계약 위반이다.
+     */
+    private static boolean blocked(AuditEvent event) {
+        return event.getDecision() == PolicyDecision.BLOCK;
     }
 
     /**

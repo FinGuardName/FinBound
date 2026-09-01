@@ -133,6 +133,42 @@ class AuditPersistenceApiTest {
     }
 
     @Test
+    void rejectsExecutionMeasurementsOnABlockedOutcome() {
+        String requestId = requestId();
+        createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        // BLOCK은 downstream에 닿지 않았으므로 실행 측정값이 존재할 수 없다.
+        // contracts/audit/execution-outcome.schema.json과 audit-event.schema.json이
+        // 둘 다 이 셋을 BLOCK에서 금지한다. 받아서 저장하면 스키마 위반 기록이 남는다.
+        ResponseEntity<JsonNode> response =
+                updateOutcome(
+                        requestId,
+                        "LOAN-AGENT-01",
+                        """
+                        {
+                          "decision": "BLOCK",
+                          "systemOutcome": "COMPLETED",
+                          "reasonCodes": ["CASE_SCOPE_VIOLATION"],
+                          "downstreamReached": false,
+                          "responseReleased": false,
+                          "success": false,
+                          "recordsRead": 0,
+                          "latencyMs": 18,
+                          "completedAt": "%s"
+                        }
+                        """
+                                .formatted(COMPLETED_AT));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "select status from audit_events where request_id = ?",
+                                String.class,
+                                requestId))
+                .isEqualTo("PROCESSING");
+    }
+
+    @Test
     void completesBlockedOutcomeWithoutDownstreamReachability() {
         String requestId = requestId();
         createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);

@@ -117,6 +117,33 @@ class DashboardApiTest {
     }
 
     @Test
+    void allowedEventExposesTheExecutionMeasurements() {
+        insertCompletedAudit("AUD-200", "REQ-200", "ALLOW", true, 3, 120L);
+
+        JsonNode body = getAsViewer("/api/v1/audit-events/AUD-200").getBody();
+
+        assertThat(body).isNotNull();
+        assertThat(body.get("success").asBoolean()).isTrue();
+        assertThat(body.get("recordsRead").asInt()).isEqualTo(3);
+        assertThat(body.get("latencyMs").asLong()).isEqualTo(120L);
+    }
+
+    @Test
+    void blockedEventHidesTheExecutionMeasurements() {
+        // BLOCK은 downstream에 닿지 않았다. 스키마가 이 셋을 금지하므로 내보내면 안 된다.
+        // 옛 기록에 값이 남아 있어도 마찬가지다 — 계약이 우선이다.
+        insertCompletedAudit("AUD-201", "REQ-201", "BLOCK", false, 0, 18L);
+
+        JsonNode body = getAsViewer("/api/v1/audit-events/AUD-201").getBody();
+
+        assertThat(body).isNotNull();
+        assertThat(body.get("decision").asText()).isEqualTo("BLOCK");
+        assertThat(body.hasNonNull("success")).isFalse();
+        assertThat(body.hasNonNull("recordsRead")).isFalse();
+        assertThat(body.hasNonNull("latencyMs")).isFalse();
+    }
+
+    @Test
     void processingEventReportsNoSystemOutcome() {
         // audit-event.schema.json은 systemOutcome을 COMPLETED|ERROR로만 정의한다.
         // status는 PROCESSING을 허용한다 — 둘은 다른 속성이고 진행 중인 요청에는 결과가 없다.
@@ -162,6 +189,32 @@ class DashboardApiTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth("test-viewer-credential");
         return restTemplate.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+    }
+
+    private void insertCompletedAudit(
+            String auditEventId,
+            String requestId,
+            String decision,
+            Boolean success,
+            Integer recordsRead,
+            Long latencyMs) {
+        jdbcTemplate.update(
+                """
+                insert into audit_events (
+                    audit_event_id, request_id, trace_id, agent_id, agent_run_id,
+                    case_id, target_consumer_id, requested_tool, decision, status,
+                    success, records_read, latency_ms, requested_at, version)
+                values (?, ?, 'trace-1', 'LOAN-AGENT-01', 'RUN-001',
+                    'LOAN-2026-001', 'CUST-1001', 'CREDIT_SCORE_READ', ?, 'COMPLETED',
+                    ?, ?, ?, ?, 0)
+                """,
+                auditEventId,
+                requestId,
+                decision,
+                success,
+                recordsRead,
+                latencyMs,
+                java.sql.Timestamp.from(Instant.parse("2026-08-25T10:00:00Z")));
     }
 
     private void insertProcessingAudit(String auditEventId, String requestId, String requestedAt) {

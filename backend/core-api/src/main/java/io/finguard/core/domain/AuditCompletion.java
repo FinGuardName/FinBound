@@ -29,6 +29,12 @@ public record AuditCompletion(
         if (decision == PolicyDecision.BLOCK && downstreamReached) {
             throw new IllegalArgumentException("Blocked audit cannot reach downstream");
         }
+        // downstream에 닿지 않았으므로 실행 측정값이 존재할 수 없다. 두 스키마가 함께 금지한다.
+        // false나 0도 값이다 — "측정하지 않았음"과 "측정했더니 0"은 다른 사실이다.
+        if (decision == PolicyDecision.BLOCK
+                && (success != null || recordsRead != null || latencyMs != null)) {
+            throw new IllegalArgumentException("Blocked audit cannot carry execution measurements");
+        }
         // contracts/audit/execution-outcome.schema.json의 조건부 불변식.
         // 이걸 걸지 않으면 스키마가 금지한 상태가 감사 기록으로 남는다.
         if (systemOutcome == AuditStatus.ERROR) {
