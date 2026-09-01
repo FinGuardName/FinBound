@@ -1,0 +1,35 @@
+name: Frontend + AI E2E
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/frontend-ai-e2e.yml
+      - ai-risk/**
+      - e2e/**
+      - frontend/**
+      - infrastructure/docker-compose.frontend-ai.yml
+  push:
+    branches: [main, develop]
+    paths:
+      - .github/workflows/frontend-ai-e2e.yml
+      - ai-risk/**
+      - e2e/**
+      - frontend/**
+      - infrastructure/docker-compose.frontend-ai.yml
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-ai-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build containers and run browser scenarios
+        run: >-
+          docker compose -f e2e/docker-compose.frontend-ai.yml
+          up --build --abort-on-container-exit --exit-code-from e2e
+      - name: Remove E2E containers and networks
+        if: always()
+        run: docker compose -f e2e/docker-compose.frontend-ai.yml down --remove-orphans
