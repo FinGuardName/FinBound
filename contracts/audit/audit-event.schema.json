@@ -57,6 +57,15 @@
     },
     "downstreamReached": { "type": "boolean" },
     "responseReleased": { "type": "boolean" },
+    "success": { "type": "boolean" },
+    "recordsRead": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "latencyMs": {
+      "type": "integer",
+      "minimum": 0
+    },
     "errorLocation": { "$ref": "#/$defs/upperSnakeCase" },
     "status": {
       "type": "string",
@@ -94,13 +103,15 @@
           "reasonCodes",
           "downstreamReached",
           "responseReleased",
+          "success",
           "errorLocation",
           "completedAt"
         ],
         "properties": {
           "systemOutcome": { "const": "ERROR" },
           "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
-          "responseReleased": { "const": false }
+          "responseReleased": { "const": false },
+          "success": { "const": false }
         }
       }
     },
@@ -114,7 +125,10 @@
           "status": { "const": "COMPLETED" },
           "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
           "downstreamReached": { "const": false },
-          "responseReleased": { "const": false }
+          "responseReleased": { "const": false },
+          "success": false,
+          "recordsRead": false,
+          "latencyMs": false
         }
       }
     },
@@ -132,9 +146,11 @@
         ]
       },
       "then": {
+        "required": ["success"],
         "properties": {
           "downstreamReached": { "const": true },
-          "responseReleased": { "const": true }
+          "responseReleased": { "const": true },
+          "success": { "const": true }
         }
       }
     }

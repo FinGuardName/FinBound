@@ -118,6 +118,11 @@ class AuditRuntimeContractTest {
                 "audit-event.sensitive-data.invalid.json"
             ),
             Arguments.of(
+                "BLOCK Business Audit의 실행 측정값 차단",
+                "audit-event.schema.json",
+                "audit-event.block-execution-values.invalid.json"
+            ),
+            Arguments.of(
                 "인증 실패 Event의 Business Audit 필드 차단",
                 "security-auth-event.schema.json",
                 "security-auth-event.business-audit-fields.invalid.json"
