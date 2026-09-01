@@ -194,6 +194,11 @@ public class AuditEvent {
         if (status != AuditStatus.PROCESSING) {
             throw new IllegalStateException("AuditEvent is already finalized");
         }
+        // 같은 요청을 다시 해석해 같은 결론이 나온 재시도는 통과시킨다. 그러나 판정이 달라졌다면
+        // 덮어쓰지 않는다 — 나중에 적힌 근거로 앞선 판정을 설명하게 되고, 그건 증거가 아니다.
+        if (scopeStatus != null && !scopeStatus.equals(context.scopeStatus())) {
+            throw new IllegalStateException("AuditEvent already carries a different scope status");
+        }
         this.employeeId = context.employeeId();
         this.passportId = context.passportId();
         this.requestedData.clear();

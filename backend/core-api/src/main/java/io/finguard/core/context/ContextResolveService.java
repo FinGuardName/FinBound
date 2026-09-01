@@ -10,16 +10,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.finguard.core.audit.AuditEvidenceRecorder;
 import io.finguard.core.context.ContextResolveResponse.PromptRiskView;
 import io.finguard.core.context.ContextResolveResponse.References;
 import io.finguard.core.domain.AgentRun;
 import io.finguard.core.domain.AgentRunStatus;
+import io.finguard.core.domain.AuditScopeStatus;
 import io.finguard.core.domain.ConsumerMandate;
 import io.finguard.core.domain.EmployeeAuthority;
 import io.finguard.core.domain.FinancialCase;
 import io.finguard.core.domain.PermissionTemplate;
 import io.finguard.core.domain.PromptRiskEvaluationStatus;
 import io.finguard.core.domain.PromptRiskSnapshot;
+import io.finguard.core.domain.ResolvedAuditContext;
 import io.finguard.core.domain.SourceVersions;
 import io.finguard.core.domain.TaskPassport;
 import io.finguard.core.repository.AgentRunRepository;
@@ -63,6 +66,7 @@ public class ContextResolveService {
     private final SecuredAgentInputRepository securedInputs;
     private final PromptRiskSnapshotRepository promptRiskSnapshots;
     private final FinancialContextResolver resolver;
+    private final AuditEvidenceRecorder auditEvidence;
     private final Clock clock;
 
     public ContextResolveService(
@@ -75,6 +79,7 @@ public class ContextResolveService {
             SecuredAgentInputRepository securedInputs,
             PromptRiskSnapshotRepository promptRiskSnapshots,
             FinancialContextResolver resolver,
+            AuditEvidenceRecorder auditEvidence,
             Clock clock) {
         this.taskPassports = taskPassports;
         this.agentRuns = agentRuns;
@@ -85,10 +90,12 @@ public class ContextResolveService {
         this.securedInputs = securedInputs;
         this.promptRiskSnapshots = promptRiskSnapshots;
         this.resolver = resolver;
+        this.auditEvidence = auditEvidence;
         this.clock = clock;
     }
 
-    @Transactional(readOnly = true)
+    // readOnly가 아니다. 계산이 끝나면 그 근거를 선저장된 감사행에 적는다(아래 recordEvidence).
+    @Transactional
     public ContextResolveResponse resolve(
             ContextResolveRequest request, String trustedVerifiedAgentId) {
         // 본문의 verifiedAgentId 는 계약이 요구하는 필드지만 권한 근거가 아니다(docs/04 §1.4).
@@ -143,6 +150,19 @@ public class ContextResolveService {
                         request.requestedData(),
                         clock.instant());
 
+        // 판정 근거를 감사 기록에 남긴 뒤에 응답한다. 순서가 반대면 근거 없이 인가 근거가 먼저 나간다.
+        // 식별자는 요청 본문이 아니라 해석된 Passport에서 가져온다 — 본문 값은 인증수단이 아니다(docs/04 §1.4).
+        auditEvidence.record(
+                request.requestId().toString(),
+                new ResolvedAuditContext(
+                        passport.getEmployeeId(),
+                        passport.getPassportId(),
+                        request.requestedData(),
+                        toAuditScopeStatus(scopeStatus),
+                        promptRisk.getPromptRisk(),
+                        promptRisk.getEvaluationStatus(),
+                        promptRisk.getModelVersion()));
+
         return new ContextResolveResponse(
                 request.requestId(),
                 new References(
@@ -154,6 +174,25 @@ public class ContextResolveService {
                         promptRisk.isDetected(),
                         promptRisk.getInputHash(),
                         promptRisk.getModelVersion()));
+    }
+
+    /**
+     * 응답용 {@link ScopeStatus}를 영속용 {@link AuditScopeStatus}로 옮긴다.
+     *
+     * <p>값이 같은데 타입을 나눠 둔 이유는 방향이 다르기 때문이다 — 이쪽은 지금 계산해 내보내는 값이고,
+     * 저쪽은 나중에 읽을 증거다. 한 타입으로 합치면 {@code context} 패키지가 JPA에 묶인다.
+     */
+    private static AuditScopeStatus toAuditScopeStatus(ScopeStatus scopeStatus) {
+        return new AuditScopeStatus(
+                scopeStatus.employeeAuthority(),
+                scopeStatus.permissionTemplate(),
+                scopeStatus.caseStatus(),
+                scopeStatus.mandate(),
+                scopeStatus.passportStatus(),
+                scopeStatus.agentBinding(),
+                scopeStatus.customerScope(),
+                scopeStatus.toolScope(),
+                scopeStatus.dataScope());
     }
 
     /**

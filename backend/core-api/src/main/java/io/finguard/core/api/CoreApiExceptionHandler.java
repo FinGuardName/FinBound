@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import io.finguard.core.audit.AuditEvidenceRejectedException;
 import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
 import io.finguard.core.dashboard.AuditEventNotFoundException;
@@ -121,6 +122,21 @@ public class CoreApiExceptionHandler {
         ProblemDetail body = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
         body.setDetail("요청한 기록을 찾을 수 없습니다.");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    /**
+     * 근거를 적을 감사행이 없거나, 이미 다른 근거가 적혀 있다. 호출 순서 위반이라 409다.
+     *
+     * <p>{@code reasonCode}를 붙이지 않는다. {@code docs/06} §20의 목록은 Runtime 집행의 거부 사유를
+     * 정의하며 "호출 순서 위반"에 해당하는 값이 없다. 전용 Code는 별도 계약 결정으로 분리했다 —
+     * PR #56 리뷰에서 합의한 범위다.
+     */
+    @ExceptionHandler(AuditEvidenceRejectedException.class)
+    ResponseEntity<ProblemDetail> handleAuditEvidenceRejected(
+            AuditEvidenceRejectedException exception) {
+        ProblemDetail body = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        body.setDetail("이 요청의 감사 기록이 근거를 받을 수 있는 상태가 아닙니다.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
     /** 조회 조건이 정의되지 않은 값이다. 위와 같은 이유로 {@code reasonCode}를 붙이지 않는다. */

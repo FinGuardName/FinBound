@@ -3,7 +3,9 @@ package io.finguard.core.context;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
+import java.util.Map;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -55,9 +57,18 @@ class ContextResolveApiTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /** REQUEST_ID를 테스트끼리 공유하므로 앞 테스트가 남긴 감사행을 지운다. */
+    @BeforeEach
+    void clearAuditEvents() {
+        jdbcTemplate.update("delete from audit_event_requested_data");
+        jdbcTemplate.update("delete from audit_event_reason_codes");
+        jdbcTemplate.update("delete from audit_events");
+    }
+
     @Test
     void returnsAllNineStatusesAndTheNotEvaluatedPromptSnapshot() {
         RunReferences run = startAgentRun();
+        createAudit(run);
 
         ResponseEntity<JsonNode> response =
                 resolve(
@@ -94,6 +105,7 @@ class ContextResolveApiTest {
     @Test
     void usesTheVerifiedHeaderInsteadOfTheBodyForAgentBinding() {
         RunReferences run = startAgentRun();
+        createAudit(run);
 
         ResponseEntity<JsonNode> response =
                 resolve(
@@ -110,8 +122,57 @@ class ContextResolveApiTest {
     }
 
     @Test
+    void writesTheResolvedEvidenceOntoTheAuditRow() {
+        RunReferences run = startAgentRun();
+        createAudit(run);
+
+        assertThat(resolve(run, "LOAN-AGENT-01", "CUST-9999", "CREDIT_SCORE_READ", "CREDIT_SCORE")
+                        .getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        // Resolver가 계산한 근거가 감사 기록에 남아야 한다. 남지 않으면 나중에 "무엇을 보고
+        // 그렇게 판단했는가"에 답할 수 없다 — contracts/audit/audit-event.schema.json.
+        Map<String, Object> row =
+                jdbcTemplate.queryForMap(
+                        "select employee_id, passport_id, scope_customer_scope, scope_tool_scope,"
+                                + " prompt_risk_evaluation_status, prompt_model_version"
+                                + " from audit_events where request_id = ?",
+                        REQUEST_ID);
+
+        assertThat(row.get("employee_id")).isEqualTo("EMP-101");
+        assertThat(row.get("passport_id")).isEqualTo(run.passportId());
+        // 요청이 CUST-9999를 노렸으므로 고객 범위는 위반이다. 이 값이 OK로 남으면 증거가 거짓이 된다.
+        assertThat(row.get("scope_customer_scope")).isEqualTo("VIOLATION");
+        assertThat(row.get("scope_tool_scope")).isEqualTo("OK");
+        assertThat(row.get("prompt_risk_evaluation_status")).isEqualTo("NOT_EVALUATED");
+        assertThat(row.get("prompt_model_version")).isEqualTo("prompt-guard-1");
+
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "select data_type from audit_event_requested_data d"
+                                        + " join audit_events a on a.audit_event_id = d.audit_event_id"
+                                        + " where a.request_id = ?",
+                                String.class,
+                                REQUEST_ID))
+                .isEqualTo("CREDIT_SCORE");
+    }
+
+    @Test
+    void refusesToResolveWhenNoAuditRowIsWaitingForTheEvidence() {
+        RunReferences run = startAgentRun();
+        // 감사행을 만들지 않는다. docs/02:143-149 순서를 어긴 호출이다.
+
+        ResponseEntity<JsonNode> response =
+                resolve(run, "LOAN-AGENT-01", "CUST-1001", "CREDIT_SCORE_READ", "CREDIT_SCORE");
+
+        // 통과시키면 Core가 인가 근거를 반환하는데 그 근거를 받을 행이 없다.
+        // 남는 흔적은 만료되는 로그뿐이므로 fail-closed로 막는다.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
     void reportsAMissingPassportAsTaskPassportNotFound() {
-        RunReferences missing = new RunReferences("RUN-MISSING", "PASS-MISSING");
+        RunReferences missing = new RunReferences("RUN-MISSING", "PASS-MISSING", "LOAN-2026-001");
 
         ResponseEntity<JsonNode> response =
                 resolve(
@@ -131,7 +192,7 @@ class ContextResolveApiTest {
     @Test
     void reportsAnIncompleteContextWithoutInventingViolationStatuses() {
         RunReferences run = startAgentRun();
-        RunReferences missingRun = new RunReferences("RUN-MISSING", run.passportId());
+        RunReferences missingRun = new RunReferences("RUN-MISSING", run.passportId(), run.caseId());
 
         ResponseEntity<JsonNode> response =
                 resolve(
@@ -150,6 +211,7 @@ class ContextResolveApiTest {
     @Test
     void rejectsARequestThatOmitsTheToolsRequiredData() {
         RunReferences run = startAgentRun();
+        createAudit(run);
 
         ResponseEntity<JsonNode> response =
                 resolve(
@@ -184,6 +246,7 @@ class ContextResolveApiTest {
     @Test
     void reportsTheWorstPromptRiskAcrossEveryInputNotJustTheLatest() {
         RunReferences run = startAgentRun();
+        createAudit(run);
 
         // 나중에 들어온 입력은 검사를 마쳤고 음성이다. 마지막 것만 보면 EVALUATED로 보고된다.
         // 그러나 앞선 입력이 아직 미검사이므로 "검사했고 음성"이라고 말할 수 없다 — docs/04 §7.
@@ -241,7 +304,8 @@ class ContextResolveApiTest {
         assertThat(response.getBody()).isNotNull();
         return new RunReferences(
                 response.getBody().get("agentRunId").asText(),
-                response.getBody().get("passportId").asText());
+                response.getBody().get("passportId").asText(),
+                response.getBody().get("caseId").asText());
     }
 
     private ResponseEntity<JsonNode> resolve(
@@ -284,6 +348,39 @@ class ContextResolveApiTest {
         return "http://localhost:" + port;
     }
 
-    private record RunReferences(String agentRunId, String passportId) {
+    private record RunReferences(String agentRunId, String passportId, String caseId) {
+    }
+
+    /**
+     * 선저장 Business Audit. {@code docs/02-architecture.md}:143-149의 순서상 감사행이 먼저 생기고
+     * resolve가 뒤에 온다. resolve가 근거를 그 행에 적으므로 성공 경로 테스트에는 이 행이 있어야 한다.
+     */
+    private void createAudit(RunReferences run) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(InternalCredentialFilter.CREDENTIAL_HEADER, "test-internal-credential");
+        headers.set("X-Verified-Agent-Id", "LOAN-AGENT-01");
+        ResponseEntity<JsonNode> response =
+                restTemplate.exchange(
+                        URI.create(base() + "/internal/v1/audits"),
+                        HttpMethod.POST,
+                        new HttpEntity<>(
+                                """
+                                {
+                                  "requestId": "%s",
+                                  "traceId": "4bf92f0000000001",
+                                  "agentRunId": "%s",
+                                  "verifiedAgentId": "LOAN-AGENT-01",
+                                  "caseId": "%s",
+                                  "targetConsumerId": "CUST-1001",
+                                  "requestedTool": "CREDIT_SCORE_READ",
+                                  "status": "PROCESSING",
+                                  "requestedAt": "2026-08-25T12:00:00Z"
+                                }
+                                """
+                                        .formatted(REQUEST_ID, run.agentRunId(), run.caseId()),
+                                headers),
+                        JsonNode.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 }
