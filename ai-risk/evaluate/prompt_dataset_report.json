@@ -1,71 +1,84 @@
 {
-  "datasetVersion": "finguard-prompt-eval-ko-1",
-  "totalSamples": 72,
+  "datasetVersion": "finbound-prompt-eval-ko-2",
+  "totalSamples": 108,
   "reviewStatus": {
-    "DRAFT": 72
+    "DRAFT": 108
   },
+  "finalEvaluationReady": false,
   "splits": {
     "development": {
-      "samples": 24,
-      "groups": 12,
+      "samples": 36,
+      "groups": 24,
       "labels": {
-        "0": 12,
-        "1": 12
+        "0": 18,
+        "1": 18
       },
       "sampleTypes": {
-        "normal": 6,
-        "hard_negative": 6,
-        "attack": 12
+        "normal": 9,
+        "hard_negative": 9,
+        "attack": 18
+      },
+      "inputLanguages": {
+        "ko": 32,
+        "mixed": 4
       },
       "attackTypes": {
-        "IGNORE_PREVIOUS_INSTRUCTION": 2,
-        "POLICY_BYPASS": 2,
-        "SYSTEM_PROMPT_EXTRACTION": 2,
-        "CROSS_CUSTOMER_ACCESS": 2,
-        "UNAUTHORIZED_TOOL_REQUEST": 2,
-        "UNKNOWN_PROMPT_ATTACK": 2
+        "IGNORE_PREVIOUS_INSTRUCTION": 3,
+        "POLICY_BYPASS": 3,
+        "SYSTEM_PROMPT_EXTRACTION": 3,
+        "CROSS_CUSTOMER_ACCESS": 3,
+        "UNAUTHORIZED_TOOL_REQUEST": 3,
+        "UNKNOWN_PROMPT_ATTACK": 3
       }
     },
     "held_out_test": {
-      "samples": 24,
-      "groups": 12,
+      "samples": 36,
+      "groups": 24,
       "labels": {
-        "0": 12,
-        "1": 12
+        "0": 18,
+        "1": 18
       },
       "sampleTypes": {
-        "normal": 6,
-        "hard_negative": 6,
-        "attack": 12
+        "normal": 9,
+        "hard_negative": 9,
+        "attack": 18
+      },
+      "inputLanguages": {
+        "ko": 32,
+        "mixed": 4
       },
       "attackTypes": {
-        "IGNORE_PREVIOUS_INSTRUCTION": 2,
-        "POLICY_BYPASS": 2,
-        "SYSTEM_PROMPT_EXTRACTION": 2,
-        "CROSS_CUSTOMER_ACCESS": 2,
-        "UNAUTHORIZED_TOOL_REQUEST": 2,
-        "UNKNOWN_PROMPT_ATTACK": 2
+        "IGNORE_PREVIOUS_INSTRUCTION": 3,
+        "POLICY_BYPASS": 3,
+        "SYSTEM_PROMPT_EXTRACTION": 3,
+        "CROSS_CUSTOMER_ACCESS": 3,
+        "UNAUTHORIZED_TOOL_REQUEST": 3,
+        "UNKNOWN_PROMPT_ATTACK": 3
       }
     },
     "validation": {
-      "samples": 24,
-      "groups": 12,
+      "samples": 36,
+      "groups": 24,
       "labels": {
-        "0": 12,
-        "1": 12
+        "0": 18,
+        "1": 18
       },
       "sampleTypes": {
-        "normal": 6,
-        "hard_negative": 6,
-        "attack": 12
+        "normal": 9,
+        "hard_negative": 9,
+        "attack": 18
+      },
+      "inputLanguages": {
+        "ko": 32,
+        "mixed": 4
       },
       "attackTypes": {
-        "IGNORE_PREVIOUS_INSTRUCTION": 2,
-        "POLICY_BYPASS": 2,
-        "SYSTEM_PROMPT_EXTRACTION": 2,
-        "CROSS_CUSTOMER_ACCESS": 2,
-        "UNAUTHORIZED_TOOL_REQUEST": 2,
-        "UNKNOWN_PROMPT_ATTACK": 2
+        "IGNORE_PREVIOUS_INSTRUCTION": 3,
+        "POLICY_BYPASS": 3,
+        "SYSTEM_PROMPT_EXTRACTION": 3,
+        "CROSS_CUSTOMER_ACCESS": 3,
+        "UNAUTHORIZED_TOOL_REQUEST": 3,
+        "UNKNOWN_PROMPT_ATTACK": 3
       }
     }
   }

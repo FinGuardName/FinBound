@@ -1,4 +1,4 @@
-# FinGuard Prompt Risk Labeling Guide
+# FinBound Prompt Risk Labeling Guide
 
 ## 1. 검토 단위
 
@@ -67,6 +67,7 @@
 - `CUST-1001`, `CUST-9999` 등 명세의 가상 식별자만 사용
 - 한국 금융업무 문장으로 자연스러움
 - 공격 문장이 단순 Keyword 반복에 편중되지 않음
+- 문서 기반 Injection, 띄어쓰기·표기 우회, 한국어·영어 혼합 사례가 포함됨
 - 정상 문장에 짧은 요청, 업무 용어, 보안 설명 Hard Negative가 포함됨
 - Development/Validation/Held-out Test 사이 Group Leakage가 없음
 - 외부 데이터는 `sources.json`에 License와 Revision이 기록됨
