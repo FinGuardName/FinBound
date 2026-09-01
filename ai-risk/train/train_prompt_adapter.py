@@ -18,7 +18,6 @@ DEFAULT_DATASET = (
 )
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "models" / "prompt_domain_adapter.joblib"
 RANDOM_SEED = 42
-REGULARIZATION_C = 1.0
 
 
 def read_records(path: Path) -> list[dict[str, Any]]:
@@ -41,7 +40,7 @@ def build_classifier() -> Pipeline:
             (
                 "classifier",
                 LogisticRegression(
-                    C=REGULARIZATION_C,
+                    C=10,
                     class_weight="balanced",
                     random_state=RANDOM_SEED,
                     max_iter=2_000,
@@ -69,7 +68,7 @@ def train(dataset: Path = DEFAULT_DATASET, output: Path = DEFAULT_OUTPUT) -> dic
     }
     threshold, report = select_model_score_threshold(records, scores)
     bundle = {
-        "artifactVersion": "prompt-domain-adapter-2",
+        "artifactVersion": "prompt-domain-adapter-1",
         "datasetSha256": dataset_digest(records),
         "trainingSplit": "development",
         "thresholdSelectionSplit": "validation",

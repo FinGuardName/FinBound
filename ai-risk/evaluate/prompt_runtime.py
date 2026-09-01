@@ -128,7 +128,6 @@ def build_report(
         "rawPromptIncluded": False,
         "authorizationDecisionProduced": False,
         "heldOutUsedForSelection": False,
-        "heldOutRepeatedForDiagnostic": True,
     }
     if mode == "select":
         validation_records = [record for record in records if record["split"] == "validation"]
