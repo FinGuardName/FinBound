@@ -117,6 +117,27 @@ class DashboardApiTest {
     }
 
     @Test
+    void processingEventReportsNoSystemOutcome() {
+        // audit-event.schema.json은 systemOutcome을 COMPLETED|ERROR로만 정의한다.
+        // status는 PROCESSING을 허용한다 — 둘은 다른 속성이고 진행 중인 요청에는 결과가 없다.
+        insertProcessingAudit("AUD-100", "REQ-100", "2026-08-25T10:00:00Z");
+
+        JsonNode body = getAsViewer("/api/v1/audit-events/AUD-100").getBody();
+
+        assertThat(body).isNotNull();
+        assertThat(body.get("status").asText()).isEqualTo("PROCESSING");
+        assertThat(body.hasNonNull("systemOutcome")).isFalse();
+    }
+
+    @Test
+    void unsupportedPeriodIsARequestErrorNotAServerError() {
+        // 서버가 고장난 게 아니라 호출자가 없는 값을 보낸 것이다.
+        ResponseEntity<JsonNode> response = getAsViewer("/api/v1/audit-events?period=7D");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void unknownAuditEventIsNotFoundRatherThanAServerError() {
         // 인증된 호출자가 없는 자원을 물었을 뿐이다. 500이면 프론트가 장애로 읽고,
         // 403이면 "있는데 못 본다"로 읽혀 존재 여부가 샌다.
@@ -141,6 +162,20 @@ class DashboardApiTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth("test-viewer-credential");
         return restTemplate.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+    }
+
+    private void insertProcessingAudit(String auditEventId, String requestId, String requestedAt) {
+        jdbcTemplate.update(
+                """
+                insert into audit_events (
+                    audit_event_id, request_id, trace_id, agent_id, agent_run_id,
+                    case_id, target_consumer_id, requested_tool, status, requested_at, version)
+                values (?, ?, 'trace-1', 'LOAN-AGENT-01', 'RUN-001',
+                    'LOAN-2026-001', 'CUST-1001', 'CREDIT_SCORE_READ', 'PROCESSING', ?, 0)
+                """,
+                auditEventId,
+                requestId,
+                java.sql.Timestamp.from(Instant.parse(requestedAt)));
     }
 
     private void insertAudit(

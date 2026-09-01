@@ -78,12 +78,24 @@ public record AuditEventView(
                 event.getDecision(),
                 Set.copyOf(event.getReasonCodes()),
                 event.getPolicyVersion(),
-                event.getStatus(),
+                systemOutcomeOf(event),
                 event.getDownstreamReached(),
                 event.getResponseReleased(),
                 event.getErrorLocation(),
                 event.getStatus(),
                 event.getRequestedAt(),
                 event.getCompletedAt());
+    }
+
+    /**
+     * 진행 중인 요청에는 시스템 결과가 없다.
+     *
+     * <p>엔티티는 {@code status} 한 컬럼에 둘을 접어 두었지만 계약은 두 속성으로 나눈다 —
+     * {@code status}는 {@code PROCESSING|COMPLETED|ERROR}이고 {@code systemOutcome}은
+     * {@code COMPLETED|ERROR}뿐이다({@code contracts/audit/audit-event.schema.json}).
+     * 접힌 값을 그대로 두 자리에 넣으면 PROCESSING 기록이 스키마를 위반한 채 나간다.
+     */
+    private static AuditStatus systemOutcomeOf(AuditEvent event) {
+        return event.getStatus() == AuditStatus.PROCESSING ? null : event.getStatus();
     }
 }

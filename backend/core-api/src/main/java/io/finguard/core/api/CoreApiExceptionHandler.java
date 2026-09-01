@@ -14,6 +14,7 @@ import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
 import io.finguard.core.dashboard.AuditEventNotFoundException;
 import io.finguard.core.dashboard.PermissionComparisonNotFoundException;
+import io.finguard.core.dashboard.UnsupportedPeriodException;
 import io.finguard.core.history.InvalidBehaviorHistoryWindowException;
 import io.finguard.core.permission.PermissionNotIssuableException;
 import io.finguard.core.security.CoreApiAccessDeniedException;
@@ -120,6 +121,14 @@ public class CoreApiExceptionHandler {
         ProblemDetail body = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
         body.setDetail("요청한 기록을 찾을 수 없습니다.");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    /** 조회 조건이 정의되지 않은 값이다. 위와 같은 이유로 {@code reasonCode}를 붙이지 않는다. */
+    @ExceptionHandler(UnsupportedPeriodException.class)
+    ResponseEntity<ProblemDetail> handleUnsupportedPeriod(UnsupportedPeriodException exception) {
+        ProblemDetail body = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        body.setDetail("조회 기간 값이 올바르지 않습니다.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     private ResponseEntity<ProblemDetail> problem(HttpStatus status, String reasonCode, String detail) {

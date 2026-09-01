@@ -86,7 +86,7 @@ public class DashboardController {
         return switch (period) {
             case "30M" -> Instant.now().minus(Duration.ofMinutes(30));
             case "24H" -> Instant.now().minus(Duration.ofHours(24));
-            default -> throw new IllegalArgumentException("Unsupported period " + period);
+            default -> throw new UnsupportedPeriodException();
         };
     }
 }
