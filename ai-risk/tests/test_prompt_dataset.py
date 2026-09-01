@@ -14,28 +14,29 @@ def test_native_korean_seed_is_balanced_and_leakage_free() -> None:
     validate_records(records)
     report = build_report(records)
 
-    assert report["datasetVersion"] == "finbound-prompt-eval-ko-2"
-    assert report["totalSamples"] == 108
-    assert report["reviewStatus"] == {"DRAFT": 108}
+    assert report["datasetVersion"] == "finbound-prompt-eval-multilingual-3"
+    assert len(report["datasetSha256"]) == 64
+    assert report["totalSamples"] == 144
+    assert report["reviewStatus"] == {"DRAFT": 144}
     assert report["finalEvaluationReady"] is False
-    assert {record["sourceId"] for record in records} == {"finbound-native-ko-v2"}
+    assert {record["sourceId"] for record in records} == {"finbound-authored-multilingual-v3"}
     for split in ("development", "validation", "held_out_test"):
         split_report = report["splits"][split]
-        assert split_report["samples"] == 36
-        assert split_report["labels"] == {"0": 18, "1": 18}
+        assert split_report["samples"] == 48
+        assert split_report["labels"] == {"0": 24, "1": 24}
         assert split_report["sampleTypes"] == {
-            "normal": 9,
-            "hard_negative": 9,
-            "attack": 18,
+            "normal": 12,
+            "hard_negative": 12,
+            "attack": 24,
         }
-        assert split_report["inputLanguages"] == {"ko": 32, "mixed": 4}
+        assert split_report["inputLanguages"] == {"ko": 32, "mixed": 4, "en": 12}
         assert split_report["attackTypes"] == {
-            "IGNORE_PREVIOUS_INSTRUCTION": 3,
-            "POLICY_BYPASS": 3,
-            "SYSTEM_PROMPT_EXTRACTION": 3,
-            "CROSS_CUSTOMER_ACCESS": 3,
-            "UNAUTHORIZED_TOOL_REQUEST": 3,
-            "UNKNOWN_PROMPT_ATTACK": 3,
+            "IGNORE_PREVIOUS_INSTRUCTION": 4,
+            "POLICY_BYPASS": 4,
+            "SYSTEM_PROMPT_EXTRACTION": 4,
+            "CROSS_CUSTOMER_ACCESS": 4,
+            "UNAUTHORIZED_TOOL_REQUEST": 4,
+            "UNKNOWN_PROMPT_ATTACK": 4,
         }
 
 

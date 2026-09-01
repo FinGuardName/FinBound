@@ -1,3 +1,5 @@
+import argparse
+import hashlib
 import json
 import re
 import unicodedata
@@ -6,7 +8,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
-SOURCE_PATH = Path(__file__).with_name("native_ko_seed.jsonl")
+SOURCE_PATH = Path(__file__).with_name("finbound_eval_seed.jsonl")
 DEFAULT_REPORT_PATH = (
     Path(__file__).resolve().parents[2] / "evaluate" / "prompt_dataset_report.json"
 )
@@ -28,9 +30,10 @@ SENSITIVE_PATTERNS = (
     re.compile(r"\b01[016789]-?\d{3,4}-?\d{4}\b"),
     re.compile(r"\b\d{10,14}\b"),
 )
-SAMPLE_ID_PATTERN = re.compile(r"^KO-(DEV|VAL|TEST)-(N|H|A)-\d{3}$")
+SAMPLE_ID_PATTERN = re.compile(r"^(KO|EN)-(DEV|VAL|TEST)-(N|H|A)-\d{3}$")
 MAX_TEXT_LENGTH = 4096
 CROSS_SPLIT_SIMILARITY_LIMIT = 0.82
+DATASET_VERSION = "finbound-prompt-eval-multilingual-3"
 REQUIRED_FIELDS = {
     "sampleId",
     "groupId",
@@ -48,6 +51,14 @@ REQUIRED_FIELDS = {
 
 def read_records(path: Path = SOURCE_PATH) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+
+
+def dataset_digest(records: list[dict[str, Any]]) -> str:
+    canonical = "\n".join(
+        json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        for record in records
+    )
+    return hashlib.sha256((canonical + "\n").encode()).hexdigest()
 
 
 def _normalize_text(text: str) -> str:
@@ -136,7 +147,8 @@ def validate_records(records: list[dict[str, Any]]) -> None:
 
 def build_report(records: list[dict[str, Any]]) -> dict[str, Any]:
     report: dict[str, Any] = {
-        "datasetVersion": "finbound-prompt-eval-ko-2",
+        "datasetVersion": DATASET_VERSION,
+        "datasetSha256": dataset_digest(records),
         "totalSamples": len(records),
         "reviewStatus": dict(Counter(record["reviewStatus"] for record in records)),
         "finalEvaluationReady": bool(records)
@@ -158,8 +170,8 @@ def build_report(records: list[dict[str, Any]]) -> dict[str, Any]:
     return report
 
 
-def main(report_path: Path = DEFAULT_REPORT_PATH) -> None:
-    records = read_records()
+def main(source_path: Path = SOURCE_PATH, report_path: Path = DEFAULT_REPORT_PATH) -> None:
+    records = read_records(source_path)
     validate_records(records)
     report = build_report(records)
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,4 +181,8 @@ def main(report_path: Path = DEFAULT_REPORT_PATH) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source", type=Path, default=SOURCE_PATH)
+    parser.add_argument("--report", type=Path, default=DEFAULT_REPORT_PATH)
+    arguments = parser.parse_args()
+    main(arguments.source, arguments.report)

@@ -1,84 +1,88 @@
 {
-  "datasetVersion": "finbound-prompt-eval-ko-2",
-  "totalSamples": 108,
+  "datasetVersion": "finbound-prompt-eval-multilingual-3",
+  "datasetSha256": "538f59d749ed9a33e8464f95ade08106ec3325bec0d04bf17c1af91965f6e108",
+  "totalSamples": 144,
   "reviewStatus": {
-    "DRAFT": 108
+    "DRAFT": 144
   },
   "finalEvaluationReady": false,
   "splits": {
     "development": {
-      "samples": 36,
-      "groups": 24,
+      "samples": 48,
+      "groups": 37,
       "labels": {
-        "0": 18,
-        "1": 18
+        "0": 24,
+        "1": 24
       },
       "sampleTypes": {
-        "normal": 9,
-        "hard_negative": 9,
-        "attack": 18
+        "normal": 12,
+        "hard_negative": 12,
+        "attack": 24
       },
       "inputLanguages": {
         "ko": 32,
-        "mixed": 4
+        "mixed": 4,
+        "en": 12
       },
       "attackTypes": {
-        "IGNORE_PREVIOUS_INSTRUCTION": 3,
-        "POLICY_BYPASS": 3,
-        "SYSTEM_PROMPT_EXTRACTION": 3,
-        "CROSS_CUSTOMER_ACCESS": 3,
-        "UNAUTHORIZED_TOOL_REQUEST": 3,
-        "UNKNOWN_PROMPT_ATTACK": 3
+        "IGNORE_PREVIOUS_INSTRUCTION": 4,
+        "POLICY_BYPASS": 4,
+        "SYSTEM_PROMPT_EXTRACTION": 4,
+        "CROSS_CUSTOMER_ACCESS": 4,
+        "UNAUTHORIZED_TOOL_REQUEST": 4,
+        "UNKNOWN_PROMPT_ATTACK": 4
       }
     },
     "held_out_test": {
-      "samples": 36,
-      "groups": 24,
+      "samples": 48,
+      "groups": 38,
       "labels": {
-        "0": 18,
-        "1": 18
+        "0": 24,
+        "1": 24
       },
       "sampleTypes": {
-        "normal": 9,
-        "hard_negative": 9,
-        "attack": 18
+        "normal": 12,
+        "hard_negative": 12,
+        "attack": 24
       },
       "inputLanguages": {
         "ko": 32,
-        "mixed": 4
+        "mixed": 4,
+        "en": 12
       },
       "attackTypes": {
-        "IGNORE_PREVIOUS_INSTRUCTION": 3,
-        "POLICY_BYPASS": 3,
-        "SYSTEM_PROMPT_EXTRACTION": 3,
-        "CROSS_CUSTOMER_ACCESS": 3,
-        "UNAUTHORIZED_TOOL_REQUEST": 3,
-        "UNKNOWN_PROMPT_ATTACK": 3
+        "IGNORE_PREVIOUS_INSTRUCTION": 4,
+        "POLICY_BYPASS": 4,
+        "SYSTEM_PROMPT_EXTRACTION": 4,
+        "CROSS_CUSTOMER_ACCESS": 4,
+        "UNAUTHORIZED_TOOL_REQUEST": 4,
+        "UNKNOWN_PROMPT_ATTACK": 4
       }
     },
     "validation": {
-      "samples": 36,
-      "groups": 24,
+      "samples": 48,
+      "groups": 37,
       "labels": {
-        "0": 18,
-        "1": 18
+        "0": 24,
+        "1": 24
       },
       "sampleTypes": {
-        "normal": 9,
-        "hard_negative": 9,
-        "attack": 18
+        "normal": 12,
+        "hard_negative": 12,
+        "attack": 24
       },
       "inputLanguages": {
         "ko": 32,
-        "mixed": 4
+        "mixed": 4,
+        "en": 12
       },
       "attackTypes": {
-        "IGNORE_PREVIOUS_INSTRUCTION": 3,
-        "POLICY_BYPASS": 3,
-        "SYSTEM_PROMPT_EXTRACTION": 3,
-        "CROSS_CUSTOMER_ACCESS": 3,
-        "UNAUTHORIZED_TOOL_REQUEST": 3,
-        "UNKNOWN_PROMPT_ATTACK": 3
+        "IGNORE_PREVIOUS_INSTRUCTION": 4,
+        "POLICY_BYPASS": 4,
+        "SYSTEM_PROMPT_EXTRACTION": 4,
+        "CROSS_CUSTOMER_ACCESS": 4,
+        "UNAUTHORIZED_TOOL_REQUEST": 4,
+        "UNKNOWN_PROMPT_ATTACK": 4
       }
     }
   }

@@ -53,13 +53,15 @@
 
 ## 4. 검토 절차
 
-1. Reviewer A가 `label`, `sampleType`, `attackType`, 한국어 자연스러움을 확인
-2. Reviewer B가 원 판단을 보지 않고 독립 검토
-3. 불일치는 두 Reviewer가 근거를 남기고 합의
-4. 합의된 문장만 `APPROVED`
-5. 어색한 번역, 중복, 현실성이 낮은 문장, 실제 개인정보 포함 문장은 `REJECTED`
-6. 모델 선택과 Threshold 고정 전 Validation까지만 사용
-7. Held-out Test는 고정 후 한 번 평가하고 오류 분석 외 재조정에 사용하지 않음
+1. Reviewer A와 B가 같은 Dataset SHA-256으로 각각 Blind Packet을 생성
+2. 각 Reviewer가 상대 판단과 원본 Label을 보지 않고 `label`, `sampleType`, `attackType`, 언어 자연스러움을 확인
+3. 각 문장의 `groupId`가 의미상 같은 변형만 묶고 다른 Split에 새 Group으로 중복되지 않았는지 확인
+4. Reviewer 이름, `reviewedAt`, 판정, 자연스러움, Group 검토와 근거를 Packet에 기록
+5. 불일치는 두 Reviewer가 근거를 남기고 합의한 뒤 Dataset 또는 Packet을 다시 검토
+6. 두 독립 판정이 모두 원본과 일치한 문장만 `review.py finalize`가 `APPROVED`로 생성
+7. 어색한 번역, 중복, 현실성이 낮은 문장, 실제 개인정보 포함 문장은 `REJECTED`
+8. 모델 선택과 Threshold 고정 전 Validation까지만 사용
+9. Held-out Test는 고정 후 한 번 평가하고 오류 분석 외 재조정에 사용하지 않음
 
 ## 5. 품질 체크
 
