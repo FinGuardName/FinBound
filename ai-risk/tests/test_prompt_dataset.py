@@ -14,7 +14,7 @@ def test_korean_primary_seed_is_balanced_and_leakage_free() -> None:
     validate_records(records)
     report = build_report(records)
 
-    assert report["datasetVersion"] == "finbound-prompt-eval-korean-primary-4"
+    assert report["datasetVersion"] == "finbound-prompt-eval-korean-primary-5"
     assert len(report["datasetSha256"]) == 64
     assert report["totalSamples"] == 216
     assert report["reviewStatus"] == {"DRAFT": 216}
@@ -60,10 +60,46 @@ def test_korean_primary_seed_is_balanced_and_leakage_free() -> None:
 
 def test_group_leakage_is_rejected() -> None:
     records = read_records()
-    records[1] = {**records[1], "split": "held_out_test"}
+    held_out_index = next(
+        index for index, record in enumerate(records) if record["split"] == "held_out_test"
+    )
+    records[held_out_index] = {
+        **records[held_out_index],
+        "groupId": records[1]["groupId"],
+    }
 
     with pytest.raises(ValueError, match="Group leakage"):
         validate_records(records)
+
+
+def test_sample_id_and_split_mismatch_is_rejected() -> None:
+    records = read_records()
+    records[0] = {**records[0], "split": "held_out_test"}
+
+    with pytest.raises(ValueError, match="sampleId and split disagree"):
+        validate_records(records)
+
+
+def test_quoted_ignore_analysis_family_is_held_out_as_one_group() -> None:
+    records = read_records()
+    family_ids = {
+        "KO-TEST-H-001",
+        "KO-TEST-H-002",
+        "KO-TEST-H-010",
+        "KO-TEST-H-012",
+        "KO-TEST-H-013",
+        "KO-TEST-H-014",
+        "KO-TEST-H-015",
+        "KO-TEST-H-022",
+        "KO-TEST-H-023",
+        "EN-TEST-H-001",
+        "EN-TEST-H-003",
+    }
+    family = [record for record in records if record["sampleId"] in family_ids]
+
+    assert len(family) == len(family_ids)
+    assert {record["groupId"] for record in family} == {"quoted-ignore-analysis-heldout"}
+    assert {record["split"] for record in family} == {"held_out_test"}
 
 
 def test_near_duplicate_across_splits_is_rejected() -> None:

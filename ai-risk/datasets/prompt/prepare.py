@@ -31,9 +31,14 @@ SENSITIVE_PATTERNS = (
     re.compile(r"\b\d{10,14}\b"),
 )
 SAMPLE_ID_PATTERN = re.compile(r"^(KO|EN)-(DEV|VAL|TEST)-(N|H|A)-\d{3}$")
+SPLIT_ID_CODE = {
+    "development": "DEV",
+    "validation": "VAL",
+    "held_out_test": "TEST",
+}
 MAX_TEXT_LENGTH = 4096
 CROSS_SPLIT_SIMILARITY_LIMIT = 0.82
-DATASET_VERSION = "finbound-prompt-eval-korean-primary-4"
+DATASET_VERSION = "finbound-prompt-eval-korean-primary-5"
 REQUIRED_FIELDS = {
     "sampleId",
     "groupId",
@@ -94,6 +99,9 @@ def validate_records(records: list[dict[str, Any]]) -> None:
                 raise ValueError(f"{record.get('sampleId', '<unknown>')} invalid {field}")
         if not SAMPLE_ID_PATTERN.fullmatch(record["sampleId"]):
             raise ValueError(f"Invalid sampleId: {record['sampleId']}")
+        sample_split_code = record["sampleId"].split("-")[1]
+        if sample_split_code != SPLIT_ID_CODE.get(record["split"]):
+            raise ValueError(f"sampleId and split disagree: {record['sampleId']}")
         if record["sampleId"] in sample_ids:
             raise ValueError(f"Duplicate sampleId: {record['sampleId']}")
         sample_ids.add(record["sampleId"])
