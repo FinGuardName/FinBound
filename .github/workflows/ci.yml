@@ -61,6 +61,36 @@ jobs:
           python -m ruff format --check .
       - name: Test AI Risk API
         run: python -m pytest -q
+      - name: Build and smoke-test AI Risk image
+        run: |
+          docker build --tag finguard-ai-risk:ci .
+          docker run --detach --name finguard-ai-risk-ci \
+            --publish 127.0.0.1:18000:8000 \
+            --env FINGUARD_INTERNAL_CREDENTIAL=ci-internal-credential \
+            finguard-ai-risk:ci
+          trap 'docker rm --force finguard-ai-risk-ci >/dev/null 2>&1 || true' EXIT
+
+          for attempt in $(seq 1 60); do
+            health="$(docker inspect --format '{{.State.Health.Status}}' finguard-ai-risk-ci)"
+            if [ "$health" = "healthy" ]; then
+              break
+            fi
+            if [ "$health" = "unhealthy" ]; then
+              docker logs finguard-ai-risk-ci
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$(docker inspect --format '{{.State.Health.Status}}' finguard-ai-risk-ci)" = "healthy"
+
+          input_text='Review the current customer credit score.'
+          input_hash="$(printf '%s' "$input_text" | sha256sum | cut -d ' ' -f 1)"
+          curl --fail --silent --show-error \
+            --header 'Content-Type: application/json' \
+            --header 'X-FinGuard-Service-Credential: ci-internal-credential' \
+            --data "{\"agentRunId\":\"RUN-CI\",\"inputRef\":\"INPUT-CI\",\"inputText\":\"$input_text\",\"inputHash\":\"sha256:$input_hash\",\"contentLanguage\":null}" \
+            http://127.0.0.1:18000/internal/v1/risk/prompt \
+            | jq --exit-status '.modelVersion == "prompt-guard-4" and (.detected | type == "boolean")'
 
   frontend:
     runs-on: ubuntu-latest
