@@ -80,7 +80,7 @@ services:
       CORE_URL: http://core-api:8080
       AI_URL: http://ai-risk:8000
       OPA_URL: http://opa:8181
-      MOCK_FINANCE_URL: http://mock-finance:8082
+      MOCK_FINANCE_URL: http://mock-finance:8083
     depends_on:
       - opa
     ports:

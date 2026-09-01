@@ -8,6 +8,7 @@
   "systemOutcome": "ERROR",
   "downstreamReached": false,
   "responseReleased": false,
+  "success": false,
   "errorLocation": "CONTEXT_RESOLVER",
   "status": "ERROR",
   "requestedAt": "2026-08-17T21:34:10+09:00",

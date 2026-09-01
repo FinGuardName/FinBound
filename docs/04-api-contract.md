@@ -128,11 +128,11 @@ Employee Authority / Permission Template / Mandate 조회
 
 ---
 
-## 3.1 Agent Simulator — Contract 제안
+## 3.1 Agent Simulator — P0 Runtime Contract
 
-> **팀 합의 전 제안이다.** Backend 3의 결정론적 Simulator 독립 구현을 위해 임시로
-> 사용한다. Core에서 Agent를 호출하는 정식 경로가 확정되면 Endpoint와 DTO, 테스트를
-> 같은 PR에서 함께 변경한다.
+P0의 결정론적 Simulator 계약이다. Agent는 `8082`에서 실행하며 Core와 같은 내부망에서만
+이 Endpoint를 노출한다. P1에서 실제 Agent Runtime으로 교체할 때는 Endpoint와 DTO, 테스트를
+같은 PR에서 변경한다.
 
 ### Endpoint
 
@@ -152,7 +152,7 @@ Content-Type: application/json
 }
 ```
 
-임시 Scenario:
+P0 Scenario:
 
 ```text
 NORMAL_CREDIT_SCORE → CREDIT_SCORE_READ(CUST-1001)
@@ -162,7 +162,7 @@ CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 Simulator는 Scenario를 §5의 Gateway Tool Call로 변환한다. Gateway 응답의 `ALLOW/BLOCK`은
 정책 결과로 그대로 반환하며, Timeout·5xx·본문 누락은 성공이나 `ALLOW`로 바꾸지 않는다.
 
-현재 임시 오류 Code:
+Agent Simulator 오류 Code:
 
 ```text
 INVALID_AGENT_SIMULATION_REQUEST
@@ -172,7 +172,8 @@ GATEWAY_TIMEOUT
 GATEWAY_UNAVAILABLE
 ```
 
-위 값은 Agent Simulator 내부 오류 Code 제안이며 공통 Reason Code로 확정된 값이 아니다.
+위 값은 Agent Simulator 호출자에게 반환하는 실행 오류 Code이며 Policy Decision이나
+Audit Reason Code가 아니다. Simulator는 이를 `ALLOW` 또는 `BLOCK`으로 변환하지 않는다.
 
 ---
 
@@ -727,11 +728,10 @@ Rego는 raw Case/Customer/Tool/Data 비교를 하지 않는다.
 
 ---
 
-## 13.1 Mock Financial API — Contract 제안
+## 13.1 Mock Financial API — P0 Runtime Contract
 
-> **팀 합의 전 제안이다.** Backend 3의 독립 Mock 구현을 위해 임시로 사용한다.
-> Gateway 연동 전에 Backend 2와 Endpoint, DTO, 오류 매핑을 Review하고 확정한다.
-> 합의 결과가 다르면 이 절과 구현, Contract Test를 같은 PR에서 함께 변경한다.
+Mock Financial API는 `8083`에서 실행하며 Gateway는 Compose 내부 주소
+`http://mock-finance:8083`을 사용한다. Agent는 이 API를 직접 호출하지 않는다.
 
 ### Endpoint
 
@@ -772,7 +772,7 @@ INCOME_READ       → annualIncome
 DEBT_READ         → totalDebt
 ```
 
-### 임시 오류 응답
+### 오류 응답
 
 ```json
 {
@@ -781,7 +781,7 @@ DEBT_READ         → totalDebt
 }
 ```
 
-현재 임시 오류 Code:
+Mock Finance 오류 Code:
 
 ```text
 INTERNAL_CREDENTIAL_INVALID
@@ -789,9 +789,20 @@ INVALID_TOOL_REQUEST
 FINANCIAL_DATA_NOT_FOUND
 ```
 
-`FINANCIAL_DATA_NOT_FOUND`는 Mock Finance 내부 오류 Code 제안이며 공통 Reason Code로
-확정된 값이 아니다. Gateway는 Mock Finance 처리 오류를 Audit의 `DOWNSTREAM_ERROR`로
-매핑한다.
+Mock Finance 오류와 전송 실패는 Gateway/Audit에서 다음과 같이 매핑한다. Mock Finance의
+`errorCode`는 Downstream 세부 오류이며 Audit Reason Code로 그대로 복사하지 않는다.
+
+| Mock Finance 결과 | HTTP | Gateway Reason Code | `systemOutcome` | `downstreamReached` | `errorLocation` |
+|---|---:|---|---|---:|---|
+| `INTERNAL_CREDENTIAL_INVALID` | 401 | `DOWNSTREAM_ERROR` | `ERROR` | `true` | `MOCK_FINANCE` |
+| `INVALID_TOOL_REQUEST` | 400 | `DOWNSTREAM_ERROR` | `ERROR` | `true` | `MOCK_FINANCE` |
+| `FINANCIAL_DATA_NOT_FOUND` | 404 | `DOWNSTREAM_ERROR` | `ERROR` | `true` | `MOCK_FINANCE` |
+| 기타 5xx 또는 유효하지 않은 응답 | 5xx/기타 | `DOWNSTREAM_ERROR` | `ERROR` | `true` | `MOCK_FINANCE` |
+| 연결 수립 실패 | - | `DOWNSTREAM_ERROR` | `ERROR` | `false` | `MOCK_FINANCE` |
+| 요청 전송 후 응답 Timeout | - | `DOWNSTREAM_TIMEOUT` | `ERROR` | `true` | `MOCK_FINANCE` |
+
+위 ERROR Outcome은 `responseReleased=false`, `success=false`로 기록한다. Credential 원문과
+Mock Finance 응답 Payload는 Gateway 응답, 로그 또는 Audit에 포함하지 않는다.
 
 Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 않는다. Gateway가
 인가를 완료한 요청의 Tool 실행만 담당한다.
@@ -816,6 +827,11 @@ Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 �
   "decision": "ALLOW",
   "reasonCodes": [],
   "downstreamReached": true,
+  "responseReleased": true,
+  "success": true,
+  "recordsRead": 1,
+  "latencyMs": 120,
+  "systemOutcome": "COMPLETED",
   "status": "COMPLETED"
 }
 ```
