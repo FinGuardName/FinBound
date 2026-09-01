@@ -33,7 +33,7 @@ SENSITIVE_PATTERNS = (
 SAMPLE_ID_PATTERN = re.compile(r"^(KO|EN)-(DEV|VAL|TEST)-(N|H|A)-\d{3}$")
 MAX_TEXT_LENGTH = 4096
 CROSS_SPLIT_SIMILARITY_LIMIT = 0.82
-DATASET_VERSION = "finbound-prompt-eval-multilingual-3"
+DATASET_VERSION = "finbound-prompt-eval-korean-primary-4"
 REQUIRED_FIELDS = {
     "sampleId",
     "groupId",

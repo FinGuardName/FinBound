@@ -6,8 +6,10 @@ from typing import Any
 
 from datasets.prompt.prepare import DATASET_VERSION, dataset_digest, read_records, validate_records
 
-REQUIRED_REVIEW_FIELDS = {
+REVIEW_PACKET_SCHEMA_VERSION = 2
+REVIEW_INPUT_FIELDS = {
     "reviewItemId",
+    "reviewGroupId",
     "proposedLabel",
     "proposedSampleType",
     "proposedAttackType",
@@ -16,6 +18,7 @@ REQUIRED_REVIEW_FIELDS = {
     "decision",
     "notes",
 }
+PACKET_ITEM_FIELDS = REVIEW_INPUT_FIELDS | {"text"}
 
 
 def _review_item_id(record: dict[str, Any], digest: str) -> str:
@@ -23,19 +26,29 @@ def _review_item_id(record: dict[str, Any], digest: str) -> str:
     return hashlib.sha256(value).hexdigest()[:16]
 
 
+def _review_group_id(record: dict[str, Any], digest: str) -> str:
+    value = f"{digest}:{record['groupId']}".encode()
+    return hashlib.sha256(value).hexdigest()[:12]
+
+
 def build_blind_packet(records: list[dict[str, Any]], reviewer: str) -> dict[str, Any]:
     if not reviewer.strip():
         raise ValueError("reviewer is required")
     validate_records(records)
     digest = dataset_digest(records)
-    shuffled = sorted(
+    grouped_and_shuffled = sorted(
         records,
-        key=lambda record: hashlib.sha256(
-            f"{reviewer.casefold()}:{digest}:{record['sampleId']}".encode()
-        ).hexdigest(),
+        key=lambda record: (
+            hashlib.sha256(
+                f"{reviewer.casefold()}:{digest}:{record['groupId']}".encode()
+            ).hexdigest(),
+            hashlib.sha256(
+                f"{reviewer.casefold()}:{digest}:{record['sampleId']}".encode()
+            ).hexdigest(),
+        ),
     )
     return {
-        "schemaVersion": 1,
+        "schemaVersion": REVIEW_PACKET_SCHEMA_VERSION,
         "datasetVersion": DATASET_VERSION,
         "datasetSha256": digest,
         "reviewer": reviewer,
@@ -43,6 +56,7 @@ def build_blind_packet(records: list[dict[str, Any]], reviewer: str) -> dict[str
         "items": [
             {
                 "reviewItemId": _review_item_id(record, digest),
+                "reviewGroupId": _review_group_id(record, digest),
                 "text": record["text"],
                 "proposedLabel": None,
                 "proposedSampleType": None,
@@ -52,7 +66,7 @@ def build_blind_packet(records: list[dict[str, Any]], reviewer: str) -> dict[str
                 "decision": None,
                 "notes": "",
             }
-            for record in shuffled
+            for record in grouped_and_shuffled
         ],
     }
 
@@ -60,6 +74,8 @@ def build_blind_packet(records: list[dict[str, Any]], reviewer: str) -> dict[str
 def _review_items(
     packet: dict[str, Any], records: list[dict[str, Any]]
 ) -> dict[str, dict[str, Any]]:
+    if packet.get("schemaVersion") != REVIEW_PACKET_SCHEMA_VERSION:
+        raise ValueError("Review packet schemaVersion mismatch")
     if packet.get("datasetVersion") != DATASET_VERSION:
         raise ValueError("Review packet datasetVersion mismatch")
     if packet.get("datasetSha256") != dataset_digest(records):
@@ -71,7 +87,7 @@ def _review_items(
 
     items: dict[str, dict[str, Any]] = {}
     for item in packet.get("items", []):
-        if set(item) - {"text"} != REQUIRED_REVIEW_FIELDS:
+        if set(item) != PACKET_ITEM_FIELDS:
             raise ValueError(f"Invalid review fields: {item.get('reviewItemId', '<unknown>')}")
         review_item_id = item["reviewItemId"]
         if review_item_id in items:
@@ -82,6 +98,12 @@ def _review_items(
     expected_ids = {_review_item_id(record, digest) for record in records}
     if set(items) != expected_ids:
         raise ValueError("Review packet sample set mismatch")
+    for record in records:
+        item = items[_review_item_id(record, digest)]
+        if item["text"] != record["text"]:
+            raise ValueError("Review packet text mismatch")
+        if item["reviewGroupId"] != _review_group_id(record, digest):
+            raise ValueError("Review packet group mapping mismatch")
     return items
 
 

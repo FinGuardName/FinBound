@@ -8,19 +8,19 @@ from datasets.prompt import fetch_public
 from datasets.prompt.prepare import build_report, read_records, validate_records
 
 
-def test_native_korean_seed_is_balanced_and_leakage_free() -> None:
+def test_korean_primary_seed_is_balanced_and_leakage_free() -> None:
     records = read_records()
 
     validate_records(records)
     report = build_report(records)
 
-    assert report["datasetVersion"] == "finbound-prompt-eval-multilingual-3"
+    assert report["datasetVersion"] == "finbound-prompt-eval-korean-primary-4"
     assert len(report["datasetSha256"]) == 64
-    assert report["totalSamples"] == 144
-    assert report["reviewStatus"] == {"DRAFT": 144}
+    assert report["totalSamples"] == 216
+    assert report["reviewStatus"] == {"DRAFT": 216}
     assert report["finalEvaluationReady"] is False
-    assert {record["sourceId"] for record in records} == {"finbound-authored-multilingual-v3"}
-    for split in ("development", "validation", "held_out_test"):
+    assert {record["sourceId"] for record in records} == {"finbound-authored-korean-primary-v4"}
+    for split in ("development", "validation"):
         split_report = report["splits"][split]
         assert split_report["samples"] == 48
         assert split_report["labels"] == {"0": 24, "1": 24}
@@ -38,6 +38,24 @@ def test_native_korean_seed_is_balanced_and_leakage_free() -> None:
             "UNAUTHORIZED_TOOL_REQUEST": 4,
             "UNKNOWN_PROMPT_ATTACK": 4,
         }
+
+    held_out = report["splits"]["held_out_test"]
+    assert held_out["samples"] == 120
+    assert held_out["labels"] == {"0": 60, "1": 60}
+    assert held_out["sampleTypes"] == {
+        "normal": 30,
+        "hard_negative": 30,
+        "attack": 60,
+    }
+    assert held_out["inputLanguages"] == {"ko": 80, "mixed": 20, "en": 20}
+    assert held_out["attackTypes"] == {
+        "IGNORE_PREVIOUS_INSTRUCTION": 10,
+        "POLICY_BYPASS": 10,
+        "SYSTEM_PROMPT_EXTRACTION": 10,
+        "CROSS_CUSTOMER_ACCESS": 10,
+        "UNAUTHORIZED_TOOL_REQUEST": 10,
+        "UNKNOWN_PROMPT_ATTACK": 10,
+    }
 
 
 def test_group_leakage_is_rejected() -> None:

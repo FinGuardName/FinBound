@@ -1,9 +1,9 @@
 {
-  "datasetVersion": "finbound-prompt-eval-multilingual-3",
-  "datasetSha256": "538f59d749ed9a33e8464f95ade08106ec3325bec0d04bf17c1af91965f6e108",
-  "totalSamples": 144,
+  "datasetVersion": "finbound-prompt-eval-korean-primary-4",
+  "datasetSha256": "d4f9e29703d23e98dbad6730096699d96416dee1d2e4d8d1911b48c888a9a0ab",
+  "totalSamples": 216,
   "reviewStatus": {
-    "DRAFT": 144
+    "DRAFT": 216
   },
   "finalEvaluationReady": false,
   "splits": {
@@ -34,29 +34,29 @@
       }
     },
     "held_out_test": {
-      "samples": 48,
-      "groups": 38,
+      "samples": 120,
+      "groups": 110,
       "labels": {
-        "0": 24,
-        "1": 24
+        "0": 60,
+        "1": 60
       },
       "sampleTypes": {
-        "normal": 12,
-        "hard_negative": 12,
-        "attack": 24
+        "normal": 30,
+        "hard_negative": 30,
+        "attack": 60
       },
       "inputLanguages": {
-        "ko": 32,
-        "mixed": 4,
-        "en": 12
+        "ko": 80,
+        "mixed": 20,
+        "en": 20
       },
       "attackTypes": {
-        "IGNORE_PREVIOUS_INSTRUCTION": 4,
-        "POLICY_BYPASS": 4,
-        "SYSTEM_PROMPT_EXTRACTION": 4,
-        "CROSS_CUSTOMER_ACCESS": 4,
-        "UNAUTHORIZED_TOOL_REQUEST": 4,
-        "UNKNOWN_PROMPT_ATTACK": 4
+        "IGNORE_PREVIOUS_INSTRUCTION": 10,
+        "POLICY_BYPASS": 10,
+        "SYSTEM_PROMPT_EXTRACTION": 10,
+        "CROSS_CUSTOMER_ACCESS": 10,
+        "UNAUTHORIZED_TOOL_REQUEST": 10,
+        "UNKNOWN_PROMPT_ATTACK": 10
       }
     },
     "validation": {

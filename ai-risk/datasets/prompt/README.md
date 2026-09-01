@@ -6,7 +6,7 @@
 ## 데이터 계층
 
 1. `sources.json`: 외부 후보의 License, Revision, Split, 채택 판단
-2. `finbound_eval_seed.jsonl`: FinBound 업무에 맞게 직접 작성한 한국어·영어·혼합어 평가 Seed
+2. `finbound_eval_seed.jsonl`: FinBound 업무에 맞게 직접 작성한 한국어 중심·영어·혼합어 평가 Seed
 3. `fetch_public.py`: 승인된 외부 소스의 고정 Parquet Artifact를 로컬 Cache로 수집
 4. `prepare.py`: Schema, 중복·유사도, 민감정보, Group Leakage 검증 및 평가 Report 생성
 5. `review.py`: 정답을 숨긴 2인 독립 검토 Packet 생성 및 최종 승인 Set 생성
@@ -31,9 +31,12 @@ Group을 검토해야 합니다. 두 Packet이 모두 작성되고 원본 Datase
 `DRAFT`이며, 승인 Set 생성 전에는 최종 성능 수치에 포함할 수 없습니다. 자세한 절차는
 [`LABELING_GUIDE.md`](LABELING_GUIDE.md)를 따릅니다.
 
-현재 Seed는 144건이며 각 Split에 48건을 둡니다. Split별 정상 12, Hard Negative 12, 공격 24,
-Label 0/1 각 24건이고, 한국어 32, 혼합어 4, 영어 12건입니다. 6개 공격 유형은 Split마다 각
-4건입니다. 문서 기반 Injection과 띄어쓰기·표기 우회도 포함합니다.
+현재 Seed는 216건입니다. Development와 Validation은 각각 48건이며 정상 12, Hard Negative 12,
+공격 24, Label 0/1 각 24건, 한국어 32, 혼합어 4, 영어 12건입니다. Held-out Test는 최종 지표의
+변동폭을 낮추기 위해 120건으로 분리하며 정상 30, Hard Negative 30, 공격 60, 한국어 80,
+혼합어 20, 영어 20건입니다. Held-out의 6개 공격 유형은 각 10건입니다. 한국어를 주 평가로,
+혼합어를 필수 방어 평가로, 순수 영어를 보조 평가로 해석합니다. 문서 기반 Injection과
+띄어쓰기·표기 우회도 포함합니다.
 
 공개 영어 데이터는 외부 Benchmark/공격 Supplement로만 사용하고 FinBound Held-out Test와
 합치지 않습니다. FinBound 최종 지표는 2인 승인된 자체 평가 Set에서 산출하며, 공개 Benchmark
@@ -54,7 +57,9 @@ License, Schema와 Sample을 다시 검토한 뒤에만 `sources.json`을 갱신
 ## 2인 독립 검토
 
 두 Reviewer는 같은 Dataset SHA-256에서 각자 Packet을 만들고, 상대방의 작성 결과를 보지 않은
-상태로 모든 항목을 채웁니다. Packet에는 기존 Label이 노출되지 않습니다.
+상태로 모든 항목을 채웁니다. Packet에는 기존 Label이 노출되지 않습니다. 원본 `groupId` 대신
+Dataset SHA에 결박된 불투명 `reviewGroupId`를 표시하고 같은 Group의 항목을 인접 배치하므로,
+Reviewer는 정답이나 Split을 보지 않고 Grouping의 타당성을 검토할 수 있습니다.
 
 ```bash
 python -m datasets.prompt.review create --reviewer reviewer-a --output datasets/cache/prompt/reviews/a.json
@@ -91,6 +96,7 @@ python -m evaluate.prompt_metrics \
   --output evaluate/prompt_metrics.json
 ```
 
-Report는 Precision, Recall, F1, False Positive Rate, 언어별 지표, 공격 유형별 Recall,
-False Positive/Negative Sample ID를 포함합니다. 특정 모델의 성능이나 실제 금융 환경 일반화
-성능은 측정 결과 없이 주장하지 않습니다.
+Report는 Precision, Recall, F1, False Positive Rate, Wilson 95% 신뢰구간, 언어별 지표,
+공격 유형별 Recall, 한국어 금융 정상/Hard Negative 전용 FPR, False Positive/Negative Sample ID를
+포함합니다. 균형 평가 Set의 Precision은 운영 환경의 실제 공격 비율을 반영한 값으로 해석하지
+않습니다. 특정 모델의 성능이나 실제 금융 환경 일반화 성능은 측정 결과 없이 주장하지 않습니다.

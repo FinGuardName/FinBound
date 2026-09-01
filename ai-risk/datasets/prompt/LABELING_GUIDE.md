@@ -55,7 +55,8 @@
 
 1. Reviewer A와 B가 같은 Dataset SHA-256으로 각각 Blind Packet을 생성
 2. 각 Reviewer가 상대 판단과 원본 Label을 보지 않고 `label`, `sampleType`, `attackType`, 언어 자연스러움을 확인
-3. 각 문장의 `groupId`가 의미상 같은 변형만 묶고 다른 Split에 새 Group으로 중복되지 않았는지 확인
+3. Packet의 불투명 `reviewGroupId`가 같은 항목이 의미상 같은 변형인지 확인하고, 전체 Packet에서
+   다른 Group으로 분리된 사실상 동일 문장이 없는지 함께 검토
 4. Reviewer 이름, `reviewedAt`, 판정, 자연스러움, Group 검토와 근거를 Packet에 기록
 5. 불일치는 두 Reviewer가 근거를 남기고 합의한 뒤 Dataset 또는 Packet을 다시 검토
 6. 두 독립 판정이 모두 원본과 일치한 문장만 `review.py finalize`가 `APPROVED`로 생성

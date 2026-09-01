@@ -1,6 +1,7 @@
 import argparse
 import json
 from collections import Counter
+from math import sqrt
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,23 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def _binary_metrics(labels: list[int], predictions: list[bool]) -> dict[str, int | float]:
+def _wilson_interval(successes: int, samples: int) -> dict[str, float] | None:
+    if samples == 0:
+        return None
+    z = 1.959963984540054
+    proportion = successes / samples
+    denominator = 1 + (z**2 / samples)
+    center = (proportion + z**2 / (2 * samples)) / denominator
+    margin = (
+        z * sqrt(proportion * (1 - proportion) / samples + z**2 / (4 * samples**2)) / denominator
+    )
+    return {
+        "lower": round(max(0.0, center - margin), 6),
+        "upper": round(min(1.0, center + margin), 6),
+    }
+
+
+def _binary_metrics(labels: list[int], predictions: list[bool]) -> dict[str, Any]:
     counts = Counter(
         ("tp" if label == 1 and prediction else "fn")
         if label == 1
@@ -33,6 +50,26 @@ def _binary_metrics(labels: list[int], predictions: list[bool]) -> dict[str, int
         "recall": round(recall, 6),
         "f1": round(f1, 6),
         "falsePositiveRate": round(false_positive_rate, 6),
+        "confidenceIntervals95": {
+            "precision": _wilson_interval(tp, tp + fp),
+            "recall": _wilson_interval(tp, tp + fn),
+            "falsePositiveRate": _wilson_interval(fp, fp + tn),
+        },
+    }
+
+
+def _benign_false_positive_metrics(
+    records: list[dict[str, Any]], predictions: list[bool]
+) -> dict[str, Any]:
+    if any(record["label"] != 0 for record in records):
+        raise ValueError("Benign false-positive metrics require only label 0 records")
+    false_positives = sum(predictions)
+    samples = len(records)
+    return {
+        "samples": samples,
+        "falsePositives": false_positives,
+        "falsePositiveRate": round(false_positives / samples, 6) if samples else 0.0,
+        "confidenceInterval95": _wilson_interval(false_positives, samples),
     }
 
 
@@ -73,6 +110,8 @@ def evaluate_predictions(
         "overall": _binary_metrics(labels, detected),
         "byLanguage": {},
         "byAttackType": {},
+        "benignFalsePositiveRateByLanguageAndType": {},
+        "koreanFinanceBenign": {},
         "falseNegativeSampleIds": [],
         "falsePositiveSampleIds": [],
     }
@@ -87,6 +126,33 @@ def evaluate_predictions(
             [labels[index] for index in selected],
             [detected[index] for index in selected],
         )
+        report["benignFalsePositiveRateByLanguageAndType"][language] = {}
+        for sample_type in ("normal", "hard_negative"):
+            benign_selected = [
+                index
+                for index, record in enumerate(selected_records)
+                if record["inputLanguage"] == language and record["sampleType"] == sample_type
+            ]
+            report["benignFalsePositiveRateByLanguageAndType"][language][sample_type] = (
+                _benign_false_positive_metrics(
+                    [selected_records[index] for index in benign_selected],
+                    [detected[index] for index in benign_selected],
+                )
+            )
+
+    korean_benign = [
+        index
+        for index, record in enumerate(selected_records)
+        if record["inputLanguage"] == "ko" and record["label"] == 0
+    ]
+    report["koreanFinanceBenign"] = {
+        "overall": _benign_false_positive_metrics(
+            [selected_records[index] for index in korean_benign],
+            [detected[index] for index in korean_benign],
+        ),
+        "normal": report["benignFalsePositiveRateByLanguageAndType"]["ko"]["normal"],
+        "hardNegative": report["benignFalsePositiveRateByLanguageAndType"]["ko"]["hard_negative"],
+    }
 
     for attack_type in sorted(
         {record["attackType"] for record in selected_records if record["attackType"]}
@@ -101,6 +167,7 @@ def evaluate_predictions(
             "samples": len(selected),
             "detected": detected_count,
             "recall": round(detected_count / len(selected), 6),
+            "recallConfidenceInterval95": _wilson_interval(detected_count, len(selected)),
         }
 
     report["falseNegativeSampleIds"] = [

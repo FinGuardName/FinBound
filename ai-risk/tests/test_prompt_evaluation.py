@@ -35,13 +35,31 @@ def test_blind_review_packet_does_not_expose_authored_labels() -> None:
 
     packet = build_blind_packet(records, "reviewer-a")
 
+    assert packet["schemaVersion"] == 2
     assert packet["datasetSha256"]
-    assert len(packet["items"]) == 144
+    assert len(packet["items"]) == 216
     assert "sampleId" not in packet["items"][0]
     assert "label" not in packet["items"][0]
     assert "sampleType" not in packet["items"][0]
     assert "attackType" not in packet["items"][0]
+    assert "groupId" not in packet["items"][0]
+    assert "split" not in packet["items"][0]
     assert packet["items"][0]["proposedLabel"] is None
+    assert packet["items"][0]["reviewGroupId"]
+
+
+def test_blind_review_packet_places_same_opaque_group_together() -> None:
+    records = read_records()
+
+    packet = build_blind_packet(records, "reviewer-a")
+    positions_by_group: dict[str, list[int]] = {}
+    for position, item in enumerate(packet["items"]):
+        positions_by_group.setdefault(item["reviewGroupId"], []).append(position)
+
+    assert all(
+        positions == list(range(positions[0], positions[-1] + 1))
+        for positions in positions_by_group.values()
+    )
 
 
 def test_two_independent_matching_reviews_create_approved_set() -> None:
@@ -52,10 +70,10 @@ def test_two_independent_matching_reviews_create_approved_set() -> None:
     approved = finalize_reviews(records, first, second)
     manifest = build_approval_manifest(records, first, second)
 
-    assert len(approved) == 144
+    assert len(approved) == 216
     assert {record["reviewStatus"] for record in approved} == {"APPROVED"}
     assert manifest["status"] == "APPROVED"
-    assert manifest["approvedSamples"] == 144
+    assert manifest["approvedSamples"] == 216
     assert len({reviewer["reviewer"] for reviewer in manifest["reviewers"]}) == 2
     assert "text" not in str(manifest)
 
@@ -79,6 +97,16 @@ def test_review_finalization_rejects_label_disagreement() -> None:
         finalize_reviews(records, first, second)
 
 
+def test_review_finalization_rejects_packet_text_tampering() -> None:
+    records = read_records()
+    first = _completed_packet(records, "reviewer-a")
+    second = _completed_packet(records, "reviewer-b")
+    second["items"][0]["text"] = "tampered review text"
+
+    with pytest.raises(ValueError, match="text mismatch"):
+        finalize_reviews(records, first, second)
+
+
 def test_prompt_metrics_cover_required_dimensions_without_raw_text() -> None:
     records = [{**record, "reviewStatus": "APPROVED"} for record in read_records()]
     held_out = [record for record in records if record["split"] == "held_out_test"]
@@ -96,9 +124,17 @@ def test_prompt_metrics_cover_required_dimensions_without_raw_text() -> None:
     assert report["overall"]["falseNegatives"] == 1
     assert report["overall"]["falsePositives"] == 1
     assert report["split"] == "held_out_test"
-    assert report["overall"]["samples"] == 48
+    assert report["overall"]["samples"] == 120
     assert set(report["byLanguage"]) == {"en", "ko", "mixed"}
     assert len(report["byAttackType"]) == 6
+    assert report["koreanFinanceBenign"]["overall"]["samples"] == 40
+    assert report["koreanFinanceBenign"]["normal"]["samples"] == 20
+    assert report["koreanFinanceBenign"]["hardNegative"]["samples"] == 20
+    assert report["overall"]["confidenceIntervals95"]["recall"]
+    assert all(
+        metrics["samples"] == 10 and metrics["recallConfidenceInterval95"]
+        for metrics in report["byAttackType"].values()
+    )
     assert report["falseNegativeSampleIds"] == [positive["sampleId"]]
     assert report["falsePositiveSampleIds"] == [negative["sampleId"]]
     assert "text" not in str(report)
