@@ -83,23 +83,23 @@ export GATEWAY_BASE_URL=http://localhost:8081
 - Secured Input / PromptRiskSnapshot
 - AgentRun ID와 상태
 
-P0 Simulator는 Core 또는 상위 Orchestrator가 AgentRun 생성 응답에서 얻은 `agentRunId`와
+P0 Simulator는 Core가 AgentRun 생성 응답에서 얻은 `agentRunId`와
 `passportId`를 요청으로 받습니다. Agent는 이 참조를 로컬에서 생성하거나 저장하지 않고,
 AgentRun 상태를 전환하거나 입력 원문을 보관하지 않습니다.
 
 실행 흐름:
 
 ```text
-Operator / 상위 Orchestrator
+Operator
 → Core POST /api/v1/agent-runs
 → Core가 Case / Passport / Input Reference / AgentRun 발급
-→ Core 발급 agentRunId / passportId로 Simulator 호출
+→ Core가 발급 agentRunId / passportId로 Simulator 호출
 → Agent가 동일 참조로 Gateway Tool Call 실행
 ```
 
 Core 생성 실패·Timeout 시 Simulator를 호출하지 않는 오케스트레이션의 소유 계층과 테스트
-위치는 별도 팀 합의가 필요합니다. Agent가 Operator Credential을 보유해 Core 생성 API를
-직접 호출하는 흐름은 현재 P0 Credential Contract에 포함되지 않습니다.
+위치는 #59에서 Core 소유로 제안합니다. Core는 생성 성공 후 `NORMAL_CREDIT_SCORE`로 Simulator를
+호출하며, Agent는 Operator Credential을 보유하거나 Core 생성 API를 직접 호출하지 않습니다.
 
 ## 검증
 

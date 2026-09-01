@@ -210,4 +210,9 @@ public class AgentRunService {
     private String agentIdFor(TaskType taskType) {
         return taskType == TaskType.LOAN_REVIEW ? "LOAN-AGENT-01" : "UNKNOWN-AGENT";
     }
+
+    @Transactional
+    public void fail(String agentRunId) {
+        agentRuns.findById(agentRunId).ifPresent(AgentRun::fail);
+    }
 }

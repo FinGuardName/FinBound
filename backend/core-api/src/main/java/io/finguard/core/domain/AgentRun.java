@@ -20,7 +20,8 @@ import jakarta.persistence.Table;
  * Agent 실행 단위. {@code docs/04-api-contract.md} §4.2.
  *
  * <p>Core가 소유한다 — {@code docs/02-architecture.md} §7.1이 AgentRun과 TaskPassport를 Core 책임으로
- * 두고, {@code docs/04-api-contract.md} §3이 발급 엔드포인트를 Core에 정의한다. Backend 3는 호출만 한다.
+ * 두고, {@code docs/04-api-contract.md} §3이 발급 엔드포인트를 Core에 정의한다. Agent는 Core가
+ * 전달한 실행 참조만 소비한다.
  */
 @Entity
 @Table(name = "agent_runs")
@@ -110,5 +111,11 @@ public class AgentRun {
 
     public Instant getStartedAt() {
         return startedAt;
+    }
+
+    public void fail() {
+        if (status == AgentRunStatus.RUNNING) {
+            status = AgentRunStatus.FAILED;
+        }
     }
 }

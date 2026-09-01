@@ -18,12 +18,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import io.finguard.core.agentrun.AgentSimulatorClient;
 import io.finguard.core.security.InternalCredentialFilter;
 
 /** {@code POST /internal/v1/context/resolve} 계약 및 오류 경계 테스트. */
@@ -54,6 +56,9 @@ class ContextResolveApiTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private AgentSimulatorClient agentSimulatorClient;
 
     @Test
     void returnsAllNineStatusesAndTheNotEvaluatedPromptSnapshot() {

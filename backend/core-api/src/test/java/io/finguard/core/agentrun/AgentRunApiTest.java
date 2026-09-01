@@ -1,6 +1,11 @@
 package io.finguard.core.agentrun;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.net.URI;
 
@@ -13,7 +18,9 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -49,6 +56,12 @@ class AgentRunApiTest {
     @Autowired
     private TestRestTemplate restTemplate;
 
+    @MockitoBean
+    private AgentSimulatorClient agentSimulatorClient;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     void startsARunAndReturnsTheIssuedPassportReference() {
         ResponseEntity<JsonNode> response =
@@ -70,6 +83,32 @@ class AgentRunApiTest {
         assertThat(body.get("employeeId").asText()).isEqualTo("EMP-101");
         assertThat(body.get("status").asText()).isEqualTo("RUNNING");
         assertThat(body.get("inputRefs")).hasSize(1);
+        verify(agentSimulatorClient).simulate(
+                argThat(value -> value.startsWith("RUN-")),
+                argThat(value -> value.startsWith("PASS-")));
+    }
+
+    @Test
+    void returnsSystemErrorWhenAgentCannotStart() {
+        doThrow(new AgentSimulatorCallException("AGENT_SIMULATOR_TIMEOUT"))
+                .when(agentSimulatorClient).simulate(anyString(), anyString());
+
+        ResponseEntity<JsonNode> response = post("""
+                {
+                  "employeeId": "EMP-101",
+                  "consumerId": "CUST-1001",
+                  "taskType": "LOAN_REVIEW",
+                  "inputText": "대출심사를 진행해줘."
+                }
+                """);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.GATEWAY_TIMEOUT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("reasonCode").asText())
+                .isEqualTo("AGENT_SIMULATOR_TIMEOUT");
+        String status = jdbcTemplate.queryForObject(
+                "select status from agent_runs order by started_at desc limit 1", String.class);
+        assertThat(status).isEqualTo("FAILED");
     }
 
     @Test
@@ -113,6 +152,7 @@ class AgentRunApiTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().get("reasonCode").asText()).isEqualTo("MANDATE_NOT_FOUND");
+        verifyNoInteractions(agentSimulatorClient);
     }
 
     @Test
