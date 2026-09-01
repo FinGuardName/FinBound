@@ -2,7 +2,7 @@
 
 ## 목적과 경계
 
-`prompt-guard-1`은 새 Prompt, Document, 외부 비신뢰 입력에서 Prompt Injection 위험 신호를
+`prompt-guard-2`는 새 Prompt, Document, 외부 비신뢰 입력에서 Prompt Injection 위험 신호를
 생성합니다. `promptRisk`, 탐지 여부와 공격 유형 근거만 반환하며 `ALLOW/BLOCK` 권한 결정은 만들지
 않습니다. 동일 `inputHash + modelVersion` 결과는 Core의 `PromptRiskSnapshot`으로 재사용합니다.
 
@@ -33,24 +33,26 @@ Domain Adapter는 새 Prompt Detector를 대체하는 대규모 학습 모델이
 
 ## 최종 평가
 
-승인 데이터 `finbound-prompt-eval-korean-primary-4`의 120건 Held-out Test에서 고정 설정을 한 번
-평가했습니다.
+의미상 같은 인용·분석 Hard Negative를 Group 단위로 재배치한 승인 데이터
+`finbound-prompt-eval-korean-primary-5`의 120건 Held-out Test에서 Adapter와 Validation Threshold를
+다시 고정한 뒤 평가했습니다.
 
 | 계층 | Precision | Recall | F1 | FPR |
 |---|---:|---:|---:|---:|
 | Rule only | 0.8750 | 0.2333 | 0.3684 | 0.0333 |
-| Model only | 0.8929 | 0.8333 | 0.8621 | 0.1000 |
-| Rule + Model | 0.8793 | 0.8500 | 0.8644 | 0.1167 |
+| Model only | 0.9273 | 0.8500 | 0.8870 | 0.0667 |
+| Rule + Model | 0.8947 | 0.8500 | 0.8718 | 0.1000 |
 
-결합 Recall은 한국어 0.90, 혼합어 0.90, 영어 0.60입니다. 공격 유형별 Recall은 Cross-customer
-0.60, Instruction override 0.90, Policy bypass 0.80, System prompt extraction 0.80,
+결합 Recall은 한국어 0.925, 혼합어 0.80, 영어 0.60입니다. 공격 유형별 Recall은 Cross-customer
+0.70, Instruction override 0.90, Policy bypass 0.70, System prompt extraction 0.80,
 Unauthorized tool 1.00, Unknown prompt attack 1.00입니다. 상세 지표와 Wilson 95% 신뢰구간은
 `evaluate/prompt_runtime_held_out.json`에 저장합니다.
 
 ## 한계와 해석
 
-- 최종 결합 FPR 11.67%는 Validation 목표 5%보다 높습니다. 특히 영어 FPR 30%로, 영어는 보조
-  평가로만 해석해야 합니다. 한국어 FPR은 7.5%입니다.
+- 최종 결합 FPR 10.00%는 Validation 목표 5%보다 높습니다. 영어 FPR은 20%, 한국어 FPR은 10%이고
+  한국어 Hard Negative FPR은 20%입니다. 작은 표본의 변동성이 크므로 영어는 보조 평가로만
+  해석하고, 한국어 인용·분석 문맥의 오탐도 운영 전 추가 검증해야 합니다.
 - 데이터는 216건의 가상·자체 작성 문장이라 실제 금융 환경 일반화 성능을 뜻하지 않습니다.
 - Held-out을 먼저 실행한 사전학습 단독 후보가 낮은 성능으로 폐기된 이력이 있습니다. 최종 Hybrid의
   Adapter와 Threshold는 그 원문이나 Sample별 결과를 사용하지 않고 Development/Validation에서만
@@ -62,11 +64,11 @@ Unauthorized tool 1.00, Unknown prompt attack 1.00입니다. 상세 지표와 Wi
 ## 재현성
 
 - 승인 데이터 SHA-256:
-  `13bb97cfe1f17f762a1d911fa87934aa57dd17591891c6da0126b04c544e9c8c`
+  `5a58eb00887c9f44f32138e52a65ae1f56d193456a0cefd2c280afd0e5371c13`
 - 사전학습 ONNX SHA-256:
   `151fa3a17cc4c11a5fa86173c9d5cf63846c74389e528ed420f28cc203cd9aaa`
 - Domain Adapter SHA-256:
-  `6610454c66b7bb4d8f1c5bfe6dd72c5531e108b4f5193c5554339298e41507b0`
+  `fb070a4c93503aca5e41a5a9266815afd1fe64dc0b6d19090d999b4738013958`
 - 학습 Random Seed: `42`
 - Threshold와 Artifact 경로: `models/prompt_detector.json`
 - 의존성: `requirements.lock`
