@@ -25,13 +25,16 @@ Backend 3이 Schema와 Runtime Event Contract를 주도하고 Backend 1 Core가 
 
 ## 합의 필요
 
-JSON Schema는 `docs/04-api-contract.md`, `docs/06-common-conventions.md`를 기계가 검사할 수 있게 옮긴 **P0 제안안**입니다. 팀 합의 전 불일치가 발견되면 두 문서가 우선합니다.
+JSON Schema는 `docs/04-api-contract.md`, `docs/06-common-conventions.md`의 P0 Runtime Contract를
+기계가 검사할 수 있게 옮긴 것입니다. 불일치가 발견되면 두 문서가 우선합니다.
 
 - 시스템 장애는 `decision=ERROR`가 아니라 `systemOutcome=ERROR`로 기록합니다.
 - OPA 호출 전 장애를 표현하기 위해 ERROR Outcome과 ERROR Audit의 `decision`은 선택값입니다.
 - `errorLocation`은 현재 `UPPER_SNAKE_CASE`만 강제합니다. 고정 Enum 목록은 팀 합의 후 추가해야 합니다.
 - `AuditEvent`는 Core의 저장 상태를 표현합니다. `POST /internal/v1/audits`, `PATCH .../outcome` 요청 DTO를 별도 Schema로 분리할지는 Backend1·2와 합의해야 합니다.
 - 알려지지 않은 필드와 민감 원문 필드는 `additionalProperties: false`로 거부합니다.
+- ALLOW 완료 Audit은 `success=true`와 실행 측정값을 저장하며, BLOCK Audit에는 실행 측정값을
+  넣지 않습니다.
 
 ## 인수 조건 대응
 

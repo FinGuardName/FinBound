@@ -6,8 +6,8 @@ Backend 3 소유 영역입니다.
 
 ## 현재 구현 상태
 
-> **팀 합의 전 임시 계약입니다.** Gateway와의 정식 Contract가 확정되면 Endpoint와 DTO를
-> `docs/04-api-contract.md` 기준으로 함께 수정합니다.
+P0 Runtime Contract입니다. Gateway는 Compose 내부 주소 `http://mock-finance:8083`과
+`X-FinGuard-Internal-Credential`을 사용합니다.
 
 ```http
 POST /internal/v1/finance/tool-calls

@@ -1,9 +1,10 @@
 {
-  "requestId": "REQ-002",
+  "requestId": "REQ-006",
   "decision": "BLOCK",
   "systemOutcome": "COMPLETED",
   "reasonCodes": ["CASE_SCOPE_VIOLATION"],
   "downstreamReached": false,
   "responseReleased": false,
-  "completedAt": "2026-08-17T21:33:11+09:00"
+  "latencyMs": 18,
+  "completedAt": "2026-08-17T21:37:11+09:00"
 }
