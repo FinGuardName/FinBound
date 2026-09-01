@@ -125,10 +125,14 @@
           "status": { "const": "COMPLETED" },
           "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
           "downstreamReached": { "const": false },
-          "responseReleased": { "const": false },
-          "success": false,
-          "recordsRead": false,
-          "latencyMs": false
+          "responseReleased": { "const": false }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["success"] },
+            { "required": ["recordsRead"] },
+            { "required": ["latencyMs"] }
+          ]
         }
       }
     },

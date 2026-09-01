@@ -70,6 +70,13 @@
           "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
           "downstreamReached": { "const": false },
           "responseReleased": { "const": false }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["success"] },
+            { "required": ["recordsRead"] },
+            { "required": ["latencyMs"] }
+          ]
         }
       }
     },
