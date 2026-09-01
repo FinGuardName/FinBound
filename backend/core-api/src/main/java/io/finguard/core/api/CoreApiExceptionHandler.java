@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
+import io.finguard.core.dashboard.AuditEventNotFoundException;
+import io.finguard.core.dashboard.PermissionComparisonNotFoundException;
 import io.finguard.core.history.InvalidBehaviorHistoryWindowException;
 import io.finguard.core.permission.PermissionNotIssuableException;
 import io.finguard.core.security.CoreApiAccessDeniedException;
@@ -106,6 +108,18 @@ public class CoreApiExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ProblemDetail> handleUnreadableBody(HttpMessageNotReadableException exception) {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_TOOL_REQUEST", "요청 본문을 해석할 수 없습니다.");
+    }
+
+    /**
+     * Dashboard 조회 대상이 없다. {@code reasonCode}를 붙이지 않는다 — {@code docs/06} §20의 Reason Code는
+     * Runtime 집행의 거부 사유를 정의하며 읽기 조회 실패에 해당하는 값이 없다. 억지로 가장 비슷한 값을
+     * 넣으면 대시보드가 집행 사유를 표시하게 되고, 그건 사실이 아니다.
+     */
+    @ExceptionHandler({AuditEventNotFoundException.class, PermissionComparisonNotFoundException.class})
+    ResponseEntity<ProblemDetail> handleDashboardLookup(RuntimeException exception) {
+        ProblemDetail body = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        body.setDetail("요청한 기록을 찾을 수 없습니다.");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
     private ResponseEntity<ProblemDetail> problem(HttpStatus status, String reasonCode, String detail) {
