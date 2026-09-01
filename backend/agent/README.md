@@ -12,8 +12,8 @@ Backend 3 소유 영역입니다. P0에서는 Spring AI 연동 또는 결정론�
 P0 통합 전 정상 요청과 Case Scope 공격 요청을 반복 가능하게 생성하는 결정론적
 Simulator를 제공합니다. 실제 LLM은 아직 사용하지 않습니다.
 
-> **팀 합의 전 임시 실행 계약입니다.** Core에서 Agent Simulator를 호출하는 정식 경로가
-> 확정되면 Endpoint와 DTO를 `docs/04-api-contract.md` 기준으로 함께 수정합니다.
+P0 Runtime Contract입니다. P1에서 실제 Agent Runtime으로 교체할 때 Endpoint와 DTO를
+`docs/04-api-contract.md` 기준으로 테스트와 함께 수정합니다.
 
 ```http
 POST /internal/v1/agent-simulations
