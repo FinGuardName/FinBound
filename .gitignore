@@ -23,6 +23,10 @@ venv/
 *.joblib
 !ai-risk/models/.gitkeep
 !ai-risk/models/behavior_iforest.joblib
+!ai-risk/models/prompt_domain_adapter.joblib
+ai-risk/models/prompt_guard_onnx/
+ai-risk/models/hikma_prompt_onnx/
+ai-risk/models/korean_prompt_model/
 
 # Node
 node_modules/

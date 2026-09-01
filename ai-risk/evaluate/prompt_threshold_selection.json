@@ -1,0 +1,36 @@
+{
+  "datasetVersion": "finbound-prompt-eval-korean-primary-4",
+  "approvedDatasetSha256": "13bb97cfe1f17f762a1d911fa87934aa57dd17591891c6da0126b04c544e9c8c",
+  "modelVersion": "prompt-guard-1",
+  "modelId": "HikmaAI/hikmaai-mdeberta-v3-base-prompt-injection",
+  "modelRevision": "ad81120116b9ec21bc5f47ffd5a2e0dccc803fe8",
+  "modelArtifactSha256": "151fa3a17cc4c11a5fa86173c9d5cf63846c74389e528ed420f28cc203cd9aaa",
+  "architecture": "korean-english-rules + pinned-pretrained-model + domain-adapter",
+  "pretrainedScoreThreshold": 0.9995304836023597,
+  "domainAdapterArtifactSha256": "6610454c66b7bb4d8f1c5bfe6dd72c5531e108b4f5193c5554339298e41507b0",
+  "domainAdapterScoreThreshold": 0.5954254407656638,
+  "hybridEvidenceThreshold": 1.0,
+  "promptBlockThreshold": 0.9,
+  "ruleRisk": 0.98,
+  "targetValidationFalsePositiveRate": 0.05,
+  "rawPromptIncluded": false,
+  "authorizationDecisionProduced": false,
+  "heldOutUsedForSelection": false,
+  "selectionSplit": "validation",
+  "selectedModelScoreThreshold": 1.0,
+  "modelOnlyValidation": {
+    "split": "validation",
+    "overall": {
+      "samples": 48,
+      "truePositives": 20,
+      "falsePositives": 1,
+      "trueNegatives": 23,
+      "falseNegatives": 4,
+      "precision": 0.952381,
+      "recall": 0.833333,
+      "f1": 0.888889,
+      "falsePositiveRate": 0.041667
+    }
+  },
+  "selectionPolicy": "maximize model-only F1, then recall, under validation FPR <= 0.05; break ties with lower FPR and lower threshold"
+}

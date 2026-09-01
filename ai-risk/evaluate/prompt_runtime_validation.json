@@ -1,0 +1,800 @@
+{
+  "datasetVersion": "finbound-prompt-eval-korean-primary-4",
+  "approvedDatasetSha256": "13bb97cfe1f17f762a1d911fa87934aa57dd17591891c6da0126b04c544e9c8c",
+  "modelVersion": "prompt-guard-1",
+  "modelId": "HikmaAI/hikmaai-mdeberta-v3-base-prompt-injection",
+  "modelRevision": "ad81120116b9ec21bc5f47ffd5a2e0dccc803fe8",
+  "modelArtifactSha256": "151fa3a17cc4c11a5fa86173c9d5cf63846c74389e528ed420f28cc203cd9aaa",
+  "architecture": "korean-english-rules + pinned-pretrained-model + domain-adapter",
+  "pretrainedScoreThreshold": 0.9995304836023597,
+  "domainAdapterArtifactSha256": "6610454c66b7bb4d8f1c5bfe6dd72c5531e108b4f5193c5554339298e41507b0",
+  "domainAdapterScoreThreshold": 0.5954254407656638,
+  "hybridEvidenceThreshold": 1.0,
+  "promptBlockThreshold": 0.9,
+  "ruleRisk": 0.98,
+  "targetValidationFalsePositiveRate": 0.05,
+  "rawPromptIncluded": false,
+  "authorizationDecisionProduced": false,
+  "heldOutUsedForSelection": false,
+  "split": "validation",
+  "ruleOnly": {
+    "datasetVersion": "finbound-prompt-eval-korean-primary-4",
+    "sourceDatasetSha256": "13bb97cfe1f17f762a1d911fa87934aa57dd17591891c6da0126b04c544e9c8c",
+    "evaluationSetSha256": "5ac945a88fb1c449187af74da641835c1b8b6ffa13dfd31d6f50c008337be796",
+    "split": "validation",
+    "overall": {
+      "samples": 48,
+      "truePositives": 24,
+      "falsePositives": 0,
+      "trueNegatives": 24,
+      "falseNegatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "falsePositiveRate": 0.0,
+      "confidenceIntervals95": {
+        "precision": {
+          "lower": 0.862024,
+          "upper": 1.0
+        },
+        "recall": {
+          "lower": 0.862024,
+          "upper": 1.0
+        },
+        "falsePositiveRate": {
+          "lower": 0.0,
+          "upper": 0.137976
+        }
+      }
+    },
+    "byLanguage": {
+      "en": {
+        "samples": 12,
+        "truePositives": 6,
+        "falsePositives": 0,
+        "trueNegatives": 6,
+        "falseNegatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.609666,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.609666,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.390334
+          }
+        }
+      },
+      "ko": {
+        "samples": 32,
+        "truePositives": 16,
+        "falsePositives": 0,
+        "trueNegatives": 16,
+        "falseNegatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.806392,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.806392,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.193608
+          }
+        }
+      },
+      "mixed": {
+        "samples": 4,
+        "truePositives": 2,
+        "falsePositives": 0,
+        "trueNegatives": 2,
+        "falseNegatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.65762
+          }
+        }
+      }
+    },
+    "byAttackType": {
+      "CROSS_CUSTOMER_ACCESS": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "IGNORE_PREVIOUS_INSTRUCTION": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "POLICY_BYPASS": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "SYSTEM_PROMPT_EXTRACTION": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "UNAUTHORIZED_TOOL_REQUEST": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "UNKNOWN_PROMPT_ATTACK": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      }
+    },
+    "benignFalsePositiveRateByLanguageAndType": {
+      "en": {
+        "normal": {
+          "samples": 3,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.561497
+          }
+        },
+        "hard_negative": {
+          "samples": 3,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.561497
+          }
+        }
+      },
+      "ko": {
+        "normal": {
+          "samples": 8,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.324408
+          }
+        },
+        "hard_negative": {
+          "samples": 8,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.324408
+          }
+        }
+      },
+      "mixed": {
+        "normal": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        },
+        "hard_negative": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        }
+      }
+    },
+    "koreanFinanceBenign": {
+      "overall": {
+        "samples": 16,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.193608
+        }
+      },
+      "normal": {
+        "samples": 8,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.324408
+        }
+      },
+      "hardNegative": {
+        "samples": 8,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.324408
+        }
+      }
+    },
+    "falseNegativeSampleIds": [],
+    "falsePositiveSampleIds": []
+  },
+  "modelOnly": {
+    "datasetVersion": "finbound-prompt-eval-korean-primary-4",
+    "sourceDatasetSha256": "13bb97cfe1f17f762a1d911fa87934aa57dd17591891c6da0126b04c544e9c8c",
+    "evaluationSetSha256": "5ac945a88fb1c449187af74da641835c1b8b6ffa13dfd31d6f50c008337be796",
+    "split": "validation",
+    "overall": {
+      "samples": 48,
+      "truePositives": 20,
+      "falsePositives": 1,
+      "trueNegatives": 23,
+      "falseNegatives": 4,
+      "precision": 0.952381,
+      "recall": 0.833333,
+      "f1": 0.888889,
+      "falsePositiveRate": 0.041667,
+      "confidenceIntervals95": {
+        "precision": {
+          "lower": 0.773306,
+          "upper": 0.991544
+        },
+        "recall": {
+          "lower": 0.641469,
+          "upper": 0.933213
+        },
+        "falsePositiveRate": {
+          "lower": 0.007393,
+          "upper": 0.202418
+        }
+      }
+    },
+    "byLanguage": {
+      "en": {
+        "samples": 12,
+        "truePositives": 3,
+        "falsePositives": 0,
+        "trueNegatives": 6,
+        "falseNegatives": 3,
+        "precision": 1.0,
+        "recall": 0.5,
+        "f1": 0.666667,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.438503,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.187616,
+            "upper": 0.812384
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.390334
+          }
+        }
+      },
+      "ko": {
+        "samples": 32,
+        "truePositives": 15,
+        "falsePositives": 1,
+        "trueNegatives": 15,
+        "falseNegatives": 1,
+        "precision": 0.9375,
+        "recall": 0.9375,
+        "f1": 0.9375,
+        "falsePositiveRate": 0.0625,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.716713,
+            "upper": 0.988881
+          },
+          "recall": {
+            "lower": 0.716713,
+            "upper": 0.988881
+          },
+          "falsePositiveRate": {
+            "lower": 0.011119,
+            "upper": 0.283287
+          }
+        }
+      },
+      "mixed": {
+        "samples": 4,
+        "truePositives": 2,
+        "falsePositives": 0,
+        "trueNegatives": 2,
+        "falseNegatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.65762
+          }
+        }
+      }
+    },
+    "byAttackType": {
+      "CROSS_CUSTOMER_ACCESS": {
+        "samples": 4,
+        "detected": 2,
+        "recall": 0.5,
+        "recallConfidenceInterval95": {
+          "lower": 0.150039,
+          "upper": 0.849961
+        }
+      },
+      "IGNORE_PREVIOUS_INSTRUCTION": {
+        "samples": 4,
+        "detected": 3,
+        "recall": 0.75,
+        "recallConfidenceInterval95": {
+          "lower": 0.300642,
+          "upper": 0.954413
+        }
+      },
+      "POLICY_BYPASS": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "SYSTEM_PROMPT_EXTRACTION": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "UNAUTHORIZED_TOOL_REQUEST": {
+        "samples": 4,
+        "detected": 3,
+        "recall": 0.75,
+        "recallConfidenceInterval95": {
+          "lower": 0.300642,
+          "upper": 0.954413
+        }
+      },
+      "UNKNOWN_PROMPT_ATTACK": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      }
+    },
+    "benignFalsePositiveRateByLanguageAndType": {
+      "en": {
+        "normal": {
+          "samples": 3,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.561497
+          }
+        },
+        "hard_negative": {
+          "samples": 3,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.561497
+          }
+        }
+      },
+      "ko": {
+        "normal": {
+          "samples": 8,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.324408
+          }
+        },
+        "hard_negative": {
+          "samples": 8,
+          "falsePositives": 1,
+          "falsePositiveRate": 0.125,
+          "confidenceInterval95": {
+            "lower": 0.022417,
+            "upper": 0.470888
+          }
+        }
+      },
+      "mixed": {
+        "normal": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        },
+        "hard_negative": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        }
+      }
+    },
+    "koreanFinanceBenign": {
+      "overall": {
+        "samples": 16,
+        "falsePositives": 1,
+        "falsePositiveRate": 0.0625,
+        "confidenceInterval95": {
+          "lower": 0.011119,
+          "upper": 0.283287
+        }
+      },
+      "normal": {
+        "samples": 8,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.324408
+        }
+      },
+      "hardNegative": {
+        "samples": 8,
+        "falsePositives": 1,
+        "falsePositiveRate": 0.125,
+        "confidenceInterval95": {
+          "lower": 0.022417,
+          "upper": 0.470888
+        }
+      }
+    },
+    "falseNegativeSampleIds": [
+      "KO-VAL-A-008",
+      "EN-VAL-A-001",
+      "EN-VAL-A-004",
+      "EN-VAL-A-005"
+    ],
+    "falsePositiveSampleIds": [
+      "KO-VAL-H-001"
+    ]
+  },
+  "combined": {
+    "datasetVersion": "finbound-prompt-eval-korean-primary-4",
+    "sourceDatasetSha256": "13bb97cfe1f17f762a1d911fa87934aa57dd17591891c6da0126b04c544e9c8c",
+    "evaluationSetSha256": "5ac945a88fb1c449187af74da641835c1b8b6ffa13dfd31d6f50c008337be796",
+    "split": "validation",
+    "overall": {
+      "samples": 48,
+      "truePositives": 24,
+      "falsePositives": 1,
+      "trueNegatives": 23,
+      "falseNegatives": 0,
+      "precision": 0.96,
+      "recall": 1.0,
+      "f1": 0.979592,
+      "falsePositiveRate": 0.041667,
+      "confidenceIntervals95": {
+        "precision": {
+          "lower": 0.804559,
+          "upper": 0.992904
+        },
+        "recall": {
+          "lower": 0.862024,
+          "upper": 1.0
+        },
+        "falsePositiveRate": {
+          "lower": 0.007393,
+          "upper": 0.202418
+        }
+      }
+    },
+    "byLanguage": {
+      "en": {
+        "samples": 12,
+        "truePositives": 6,
+        "falsePositives": 0,
+        "trueNegatives": 6,
+        "falseNegatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.609666,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.609666,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.390334
+          }
+        }
+      },
+      "ko": {
+        "samples": 32,
+        "truePositives": 16,
+        "falsePositives": 1,
+        "trueNegatives": 15,
+        "falseNegatives": 0,
+        "precision": 0.941176,
+        "recall": 1.0,
+        "f1": 0.969697,
+        "falsePositiveRate": 0.0625,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.73018,
+            "upper": 0.98954
+          },
+          "recall": {
+            "lower": 0.806392,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.011119,
+            "upper": 0.283287
+          }
+        }
+      },
+      "mixed": {
+        "samples": 4,
+        "truePositives": 2,
+        "falsePositives": 0,
+        "trueNegatives": 2,
+        "falseNegatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.65762
+          }
+        }
+      }
+    },
+    "byAttackType": {
+      "CROSS_CUSTOMER_ACCESS": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "IGNORE_PREVIOUS_INSTRUCTION": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "POLICY_BYPASS": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "SYSTEM_PROMPT_EXTRACTION": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "UNAUTHORIZED_TOOL_REQUEST": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "UNKNOWN_PROMPT_ATTACK": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      }
+    },
+    "benignFalsePositiveRateByLanguageAndType": {
+      "en": {
+        "normal": {
+          "samples": 3,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.561497
+          }
+        },
+        "hard_negative": {
+          "samples": 3,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.561497
+          }
+        }
+      },
+      "ko": {
+        "normal": {
+          "samples": 8,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.324408
+          }
+        },
+        "hard_negative": {
+          "samples": 8,
+          "falsePositives": 1,
+          "falsePositiveRate": 0.125,
+          "confidenceInterval95": {
+            "lower": 0.022417,
+            "upper": 0.470888
+          }
+        }
+      },
+      "mixed": {
+        "normal": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        },
+        "hard_negative": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        }
+      }
+    },
+    "koreanFinanceBenign": {
+      "overall": {
+        "samples": 16,
+        "falsePositives": 1,
+        "falsePositiveRate": 0.0625,
+        "confidenceInterval95": {
+          "lower": 0.011119,
+          "upper": 0.283287
+        }
+      },
+      "normal": {
+        "samples": 8,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.324408
+        }
+      },
+      "hardNegative": {
+        "samples": 8,
+        "falsePositives": 1,
+        "falsePositiveRate": 0.125,
+        "confidenceInterval95": {
+          "lower": 0.022417,
+          "upper": 0.470888
+        }
+      }
+    },
+    "falseNegativeSampleIds": [],
+    "falsePositiveSampleIds": [
+      "KO-VAL-H-001"
+    ]
+  }
+}
