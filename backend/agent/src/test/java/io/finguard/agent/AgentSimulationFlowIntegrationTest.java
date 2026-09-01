@@ -61,8 +61,8 @@ class AgentSimulationFlowIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {
-                          "agentRunId": "RUN-001",
-                          "passportId": "PASS-001",
+                          "agentRunId": "RUN-CORE-001",
+                          "passportId": "PASS-CORE-001",
                           "scenario": "NORMAL_CREDIT_SCORE"
                         }
                         """)
@@ -78,8 +78,8 @@ class AgentSimulationFlowIntegrationTest {
         assertThat(captured.requestId()).isNotBlank();
         assertThat(captured.traceparent()).matches("00-[0-9a-f]{32}-[0-9a-f]{16}-01");
         assertThat(captured.body()).contains(
-                "\"agentRunId\":\"RUN-001\"",
-                "\"passportId\":\"PASS-001\"",
+                "\"agentRunId\":\"RUN-CORE-001\"",
+                "\"passportId\":\"PASS-CORE-001\"",
                 "\"targetConsumerId\":\"CUST-1001\"",
                 "\"tool\":\"CREDIT_SCORE_READ\"",
                 "\"requestedData\":[\"CREDIT_SCORE\"]",
@@ -91,6 +91,12 @@ class AgentSimulationFlowIntegrationTest {
                 "caseId",
                 "allowedTools",
                 "allowedData"
+        );
+        assertThat(captured.body()).doesNotContain(
+                "inputText",
+                "inputRefs",
+                "prompt",
+                "documentText"
         );
     }
 

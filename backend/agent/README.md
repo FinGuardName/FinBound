@@ -74,7 +74,7 @@ export GATEWAY_BASE_URL=http://localhost:8081
 연결되지 않은 환경에서는 자동 테스트가 Mock Gateway Client를 사용해 요청 Contract를
 검증합니다.
 
-## Core Client 경계
+## Core 발급 참조 경계
 
 `POST /api/v1/agent-runs`와 다음 데이터의 발급·저장 책임은 Core에 있습니다.
 
@@ -83,21 +83,23 @@ export GATEWAY_BASE_URL=http://localhost:8081
 - Secured Input / PromptRiskSnapshot
 - AgentRun ID와 상태
 
-Agent 모듈은 `CoreAgentRunClient`를 통해 발급을 요청하고 Core가 반환한 `agentRunId`,
-`caseId`, `passportId`, `inputRefs`를 실행 참조로 사용합니다. 로컬 ID를 만들거나 입력 원문을
-별도로 저장하지 않으며 AgentRun 상태도 로컬에서 전환하지 않습니다.
-
-Core 주소는 `CORE_API_BASE_URL`로 설정하며 기본값은 `http://localhost:8080`입니다.
+P0 Simulator는 Core 또는 상위 Orchestrator가 AgentRun 생성 응답에서 얻은 `agentRunId`와
+`passportId`를 요청으로 받습니다. Agent는 이 참조를 로컬에서 생성하거나 저장하지 않고,
+AgentRun 상태를 전환하거나 입력 원문을 보관하지 않습니다.
 
 실행 흐름:
 
 ```text
-LoanAgent / Simulator
-→ CoreAgentRunClient
+Operator / 상위 Orchestrator
 → Core POST /api/v1/agent-runs
-→ Core가 Case / Passport / AgentRun 발급
-→ 반환된 Passport 참조로 Gateway를 통한 Tool Call 실행
+→ Core가 Case / Passport / Input Reference / AgentRun 발급
+→ Core 발급 agentRunId / passportId로 Simulator 호출
+→ Agent가 동일 참조로 Gateway Tool Call 실행
 ```
+
+Core 생성 실패·Timeout 시 Simulator를 호출하지 않는 오케스트레이션의 소유 계층과 테스트
+위치는 별도 팀 합의가 필요합니다. Agent가 Operator Credential을 보유해 Core 생성 API를
+직접 호출하는 흐름은 현재 P0 Credential Contract에 포함되지 않습니다.
 
 ## 검증
 
@@ -105,5 +107,6 @@ LoanAgent / Simulator
 ./gradlew :backend:agent:check
 ```
 
-테스트는 정상/공격 Scenario 변환, 내부 Credential 거부, Gateway Header와 Body,
+테스트는 Core 발급 참조의 정확한 전달, 필수 참조 누락 시 Gateway 미호출,
+정상/공격 Scenario 변환, 내부 Credential 거부, Gateway Header와 최소 Runtime Body,
 `ALLOW/BLOCK` 구분, Timeout/5xx/잘못된 응답의 명시적 실패를 검증합니다.
