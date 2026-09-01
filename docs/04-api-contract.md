@@ -100,9 +100,18 @@ POST /api/v1/agent-runs
   "employeeId": "EMP-101",
   "consumerId": "CUST-1001",
   "taskType": "LOAN_REVIEW",
-  "inputText": "CUST-1001의 대출심사를 진행해줘."
+  "inputText": "CUST-1001의 대출심사를 진행해줘.",
+  "scenario": "NORMAL_CREDIT_SCORE"
 }
 ```
+
+> **제안 — 팀 확정 필요.** `scenario`는 이번 PR에서 추가한 필드다. `docs/05` §15에 따라 Contract 파일은
+> 합의 후 지정 편집자가 수정하므로, 여기서는 구현과 문서가 어긋나지 않도록 함께 올리고 리뷰에서 확정한다.
+
+`scenario`는 §3.1 Agent Simulator에 그대로 전달하는 값이며 **선택**이다. 생략하면
+`NORMAL_CREDIT_SCORE`로 처리한다 — 지정하지 않은 요청이 공격 경로를 실행해서는 안 된다.
+Core는 이 값으로 권한을 판단하지 않는다. 어느 고객을 노리는지는 Agent가 정하고, Scope 위반 여부는
+Financial Context Resolver와 OPA가 판정한다.
 
 이 Endpoint는 `OPERATOR_CREDENTIAL`만 호출할 수 있다. Core는 Credential에 연결된 Employee ID와
 Request의 `employeeId`가 같은지 확인하며, 다르면 `403 EMPLOYEE_IDENTITY_MISMATCH`로 거부한다.

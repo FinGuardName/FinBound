@@ -1,5 +1,6 @@
 package io.finguard.core.agentrun;
 
+import io.finguard.core.domain.AgentSimulationScenario;
 import io.finguard.core.domain.TaskType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -13,5 +14,16 @@ public record AgentRunCreateRequest(
         @NotBlank String employeeId,
         @NotBlank String consumerId,
         @NotNull TaskType taskType,
-        @NotBlank String inputText) {
+        @NotBlank String inputText,
+        AgentSimulationScenario scenario) {
+
+    /**
+     * {@code scenario}는 선택이고 기본값은 {@link AgentSimulationScenario#NORMAL_CREDIT_SCORE}다.
+     *
+     * <p>필수로 두면 이 값을 모르는 기존 호출자가 전부 깨진다. 그리고 기본값은 안전한 쪽이어야 한다 —
+     * 지정하지 않았는데 공격 시나리오가 돌면 곤란하다.
+     */
+    public AgentRunCreateRequest {
+        scenario = scenario == null ? AgentSimulationScenario.NORMAL_CREDIT_SCORE : scenario;
+    }
 }

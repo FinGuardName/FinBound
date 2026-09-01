@@ -18,12 +18,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import io.finguard.core.agentrun.AgentRunLauncher;
 import io.finguard.core.security.InternalCredentialFilter;
 
 /** {@code POST /internal/v1/context/resolve} 계약 및 오류 경계 테스트. */
@@ -54,6 +56,13 @@ class ContextResolveApiTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    /**
+     * Agent 실행 지시를 태우지 않는다. 이 테스트가 보는 것은 Context 해석이고, 실제 Agent가 없으면
+     * Launcher가 AgentRun을 FAILED로 바꿔 그다음 resolve가 정당하게 거부된다 — 여기서 확인할 동작이 아니다.
+     */
+    @MockitoBean
+    private AgentRunLauncher agentRunLauncher;
 
     @Test
     void returnsAllNineStatusesAndTheNotEvaluatedPromptSnapshot() {
