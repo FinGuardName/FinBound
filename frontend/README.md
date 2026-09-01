@@ -22,7 +22,7 @@ Frontend 이미지는 pnpm Build Stage와 non-root Nginx Runtime Stage를 분리
 Build Argument나 이미지에 넣지 않습니다.
 
 ```bash
-docker build -t finbound-frontend:local frontend
+docker build -t finbound-frontend:local .
 docker run --rm \
   -p 127.0.0.1:8088:8080 \
   -e CORE_API_UPSTREAM=http://host.docker.internal:8080 \
@@ -36,13 +36,18 @@ docker run --rm \
 docker build \
   --build-arg VITE_FINBOUND_API_MODE=mock \
   -t finbound-frontend:mock \
-  frontend
+  .
 ```
 
-Runtime의 `CORE_API_UPSTREAM`은 Nginx가 `/core-api/**` 요청에서 Prefix를 제거해 Core API로
-전달하는 데만 사용됩니다. 따라서 Core 주소를 정적 JavaScript Bundle에 굽지 않고 Compose 서비스
-주소로 바꿀 수 있습니다. `/health`는 Credential 없이 컨테이너 생존 상태를 반환하며 SPA Route는
-`index.html`로 fallback합니다.
+위 명령은 앞 절의 `cd frontend` 상태에서 실행합니다. 저장소 Root에서 실행하려면 마지막 Build
+Context `.` 대신 `frontend`를 사용합니다.
+
+Runtime의 `CORE_API_UPSTREAM`은 Nginx가 `/core-api/api/v1/**` 요청에서 `/core-api` Prefix만
+제거해 Core Public API로 전달하는 데만 사용됩니다. `/core-api/internal/**`,
+`/core-api/actuator/**` 등 Public API가 아닌 경로는 `404`로 차단합니다. 따라서 Core 주소를 정적
+JavaScript Bundle에 굽지 않고 Compose 서비스 주소로 바꿀 수 있으며, Frontend가 internal-zone에
+연결되더라도 브라우저가 Core Internal API로 접근하는 경로를 만들지 않습니다. `/health`는
+Credential 없이 컨테이너 생존 상태를 반환하며 SPA Route는 `index.html`로 fallback합니다.
 
 Frontend는 Spring Core API만 호출하며 PostgreSQL에 직접 연결하지 않습니다. AI 업무 지원 화면은
 AgentRun 생성 Command API를 사용하고, 권한 비교와 Dashboard는 Spring Read-only API를 사용합니다.
