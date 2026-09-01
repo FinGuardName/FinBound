@@ -84,6 +84,24 @@ def test_prompt_endpoint_detects_attack() -> None:
     assert response.json()["attackType"] == "IGNORE_PREVIOUS_INSTRUCTION"
 
 
+@pytest.mark.parametrize("language_value", [pytest.param("omitted"), pytest.param(None)])
+def test_prompt_endpoint_accepts_unclassified_language(language_value: str | None) -> None:
+    payload = _payload("현재 고객의 신용점수를 조회해줘.")
+    if language_value == "omitted":
+        payload.pop("contentLanguage")
+    else:
+        payload["contentLanguage"] = language_value
+
+    response = client.post(
+        "/internal/v1/risk/prompt",
+        json=payload,
+        headers=INTERNAL_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["detected"] is False
+
+
 def test_prompt_endpoint_rejects_hash_mismatch() -> None:
     payload = _payload("정상 입력")
     payload["inputHash"] = "sha256:" + ("0" * 64)
