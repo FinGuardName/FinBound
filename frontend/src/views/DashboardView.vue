@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import RiskMeter from '../components/RiskMeter.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { describeAuditReason } from '../presentation/auditReason'
 import { finboundApi } from '../services/finboundApi'
 
 const events = ref([])
@@ -11,6 +12,8 @@ const page = ref(1)
 const pageSize = 5
 const totalPages = ref(1)
 const dashboardReady = ref(false)
+const dashboardLoading = ref(false)
+const dashboardError = ref('')
 const summary = ref({ total: 0, allow: 0, block: 0, error: 0 })
 const filterOptions = ref({ agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] })
 const filters = ref({
@@ -50,14 +53,6 @@ const toolLabels = {
   INCOME_READ: '소득자료 확인',
   DEBT_READ: '부채자료 확인',
 }
-const reasonDescriptions = {
-  CASE_SCOPE_VIOLATION: '현재 심사 건과 관련 없는 고객 자료가 포함되어 조회 전에 차단했습니다.',
-  MANDATE_SCOPE_VIOLATION: '현재 고객 동의 범위에 포함되지 않은 자료라 조회 전에 차단했습니다.',
-  PROMPT_INJECTION: 'AI 입력에서 업무 지시를 바꾸려는 위험 신호를 확인해 실행 전에 차단했습니다.',
-  BEHAVIOR_ANOMALY: '평소 업무 흐름과 다른 AI 행동을 확인해 실행 전에 차단했습니다.',
-  DOWNSTREAM_TIMEOUT: '금융시스템 응답이 지연되어 결과를 직원에게 제공하지 못했습니다.',
-}
-
 const eventOutcome = (event) => event.auditStatus === 'ERROR' ? 'ERROR' : event.decision
 const selectedEvent = computed(() => events.value.find((event) => event.auditEventId === selectedId.value))
 const agentOptions = computed(() => filterOptions.value.agentIds)
@@ -65,29 +60,60 @@ const caseOptions = computed(() => filterOptions.value.caseIds)
 const consumerOptions = computed(() => filterOptions.value.consumerIds)
 const toolOptions = computed(() => filterOptions.value.tools)
 const reasonOptions = computed(() => filterOptions.value.reasonCodes)
+const capabilities = finboundApi.capabilities()
 
 const promptStatusText = (event) => {
   if (event.promptEvaluationStatus === 'NOT_EVALUATED') return '미평가'
+  if (event.promptInjectionDetected === null) return '탐지 결과 미제공'
   return event.promptInjectionDetected ? '위험 감지' : '위험 미감지'
 }
 
 async function loadEvents() {
-  const result = await finboundApi.getAuditEvents({
-    filters: { ...filters.value },
-    page: page.value,
-    pageSize,
-  })
-  events.value = result.items
-  totalPages.value = result.totalPages
-  filterOptions.value = result.filterOptions
-  selectedId.value = result.items[0]?.auditEventId ?? null
+  dashboardLoading.value = true
+  dashboardError.value = ''
+  try {
+    const result = await finboundApi.getAuditEvents({
+      filters: { ...filters.value },
+      page: page.value,
+      pageSize,
+    })
+    events.value = result.items
+    totalPages.value = result.totalPages
+    filterOptions.value = result.filterOptions
+    selectedId.value = result.items[0]?.auditEventId ?? null
+    if (selectedId.value) await selectEvent(selectedId.value)
+  } catch {
+    events.value = []
+    selectedId.value = null
+    dashboardError.value = '감사 기록을 불러오지 못했습니다. 연결 상태와 조회 권한을 확인해 주세요.'
+  } finally {
+    dashboardLoading.value = false
+  }
 }
 
-onMounted(async () => {
-  summary.value = await finboundApi.getDashboardSummary()
+async function loadDashboard() {
+  dashboardError.value = ''
+  try {
+    summary.value = await finboundApi.getDashboardSummary()
+  } catch {
+    dashboardError.value = '안전 현황 요약을 불러오지 못했습니다. 연결 상태와 조회 권한을 확인해 주세요.'
+  }
   await loadEvents()
   dashboardReady.value = true
-})
+}
+
+async function selectEvent(auditEventId) {
+  selectedId.value = auditEventId
+  try {
+    const detail = await finboundApi.getAuditEvent(auditEventId)
+    const index = events.value.findIndex((event) => event.auditEventId === auditEventId)
+    if (index >= 0) events.value[index] = detail
+  } catch {
+    dashboardError.value = '선택한 감사 기록의 상세 내용을 불러오지 못했습니다.'
+  }
+}
+
+onMounted(loadDashboard)
 
 watch(filters, () => {
   if (page.value === 1) loadEvents()
@@ -136,7 +162,7 @@ watch(page, () => {
             <option value="ERROR">오류</option>
           </select>
         </label>
-        <label class="check-label"><input v-model="filters.riskOnly" type="checkbox" /> 확인이 필요한 항목만</label>
+        <label class="check-label" :title="capabilities.riskOnlyFilter ? '' : 'Core API가 아직 이 필터를 제공하지 않습니다.'"><input v-model="filters.riskOnly" type="checkbox" :disabled="!capabilities.riskOnlyFilter" /> 확인이 필요한 항목만</label>
       </div>
       <details class="advanced-filters">
         <summary>상세 검색 조건</summary>
@@ -145,22 +171,27 @@ watch(page, () => {
           <label>업무 건<select v-model="filters.caseId" data-filter="case"><option value="ALL">전체</option><option v-for="value in caseOptions" :key="value" :value="value">{{ value }}</option></select></label>
           <label>고객<select v-model="filters.consumerId" data-filter="consumer"><option value="ALL">전체</option><option v-for="value in consumerOptions" :key="value" :value="value">{{ consumerLabels[value] || value }}</option></select></label>
           <label>확인 업무<select v-model="filters.tool" data-filter="tool"><option value="ALL">전체</option><option v-for="value in toolOptions" :key="value" :value="value">{{ toolLabels[value] || value }}</option></select></label>
-          <label>중요도<select v-model="filters.severity" data-filter="severity"><option value="ALL">전체</option><option value="LOW">일반</option><option value="MEDIUM">관찰</option><option value="HIGH">주의</option><option value="CRITICAL">긴급</option></select></label>
+          <label :title="capabilities.severityFilter ? '' : 'Core API가 아직 이 필터를 제공하지 않습니다.'">중요도<select v-model="filters.severity" data-filter="severity" :disabled="!capabilities.severityFilter"><option value="ALL">전체</option><option value="LOW">일반</option><option value="MEDIUM">관찰</option><option value="HIGH">주의</option><option value="CRITICAL">긴급</option></select></label>
           <label>처리 사유<select v-model="filters.reasonCode" data-filter="reason"><option value="ALL">전체</option><option v-for="value in reasonOptions" :key="value" :value="value">{{ value }}</option></select></label>
         </div>
       </details>
     </section>
 
+    <div v-if="dashboardError" class="dashboard-error" role="alert">
+      <span>{{ dashboardError }}</span><button type="button" @click="loadDashboard">다시 시도</button>
+    </div>
+
     <div class="dashboard-grid">
       <div class="panel event-list-panel">
         <div class="event-table" role="table" aria-label="AI 업무 처리 내역">
           <div class="table-head" role="row"><span>시간</span><span>고객 / 확인 업무</span><span>처리 결과</span></div>
-          <button v-for="event in events" :key="event.auditEventId" :class="['event-row', { selected: selectedId === event.auditEventId }]" type="button" role="row" @click="selectedId = event.auditEventId">
+          <button v-for="event in events" :key="event.auditEventId" :class="['event-row', { selected: selectedId === event.auditEventId }]" type="button" role="row" @click="selectEvent(event.auditEventId)">
             <span>{{ event.requestedAt.slice(11, 19) }}</span>
             <span><strong>{{ consumerLabels[event.targetConsumerId] || event.targetConsumerId }}</strong><small>{{ event.caseId }} · {{ toolLabels[event.requestedTool] || event.requestedTool }}</small></span>
             <StatusBadge :value="eventOutcome(event)" :label="decisionLabels[eventOutcome(event)]" />
           </button>
-          <p v-if="!events.length" class="no-results">선택한 조건에 해당하는 업무가 없습니다.</p>
+          <p v-if="dashboardLoading" class="no-results">업무 기록을 불러오는 중입니다.</p>
+          <p v-else-if="!events.length" class="no-results">선택한 조건에 해당하는 업무가 없습니다.</p>
         </div>
         <nav v-if="events.length" class="pagination" aria-label="업무 기록 페이지">
           <button type="button" :disabled="page === 1" @click="page -= 1">이전</button>
@@ -172,7 +203,7 @@ watch(page, () => {
       <aside v-if="selectedEvent" class="panel event-detail">
         <div class="panel-heading">
           <div><p class="section-kicker">선택한 업무 내역</p><h2>업무 내역 {{ selectedEvent.auditEventId.slice(-3) }}</h2></div>
-          <StatusBadge :value="selectedEvent.severity" :label="severityLabels[selectedEvent.severity]" />
+          <StatusBadge :value="selectedEvent.severity" :label="severityLabels[selectedEvent.severity] || '미제공'" />
         </div>
         <RiskMeter
           label="입력 내용 주의도"
@@ -192,7 +223,7 @@ watch(page, () => {
         </div>
         <div class="detail-section reason-section">
           <p>처리 사유</p>
-          <strong>{{ reasonDescriptions[selectedEvent.reasonCodes[0]] || '요청한 업무 범위 안에서 정상 처리했습니다.' }}</strong>
+          <strong>{{ describeAuditReason(selectedEvent) }}</strong>
           <details><summary>시스템 처리 코드 보기</summary><small>{{ selectedEvent.reasonCodes[0] || '차단 사유 없음' }} · {{ selectedEvent.auditEventId }} · {{ selectedEvent.requestedTool }}</small></details>
         </div>
         <dl class="execution-state">
@@ -207,8 +238,8 @@ watch(page, () => {
             <div><dt>입력 평가</dt><dd>{{ selectedEvent.promptEvaluationStatus }}</dd></div>
             <div><dt>입력 모델</dt><dd>{{ selectedEvent.promptModelVersion || '미평가' }}</dd></div>
             <div><dt>행동 위험</dt><dd>{{ selectedEvent.behaviorRiskLevel }}</dd></div>
-            <div><dt>특징 버전</dt><dd>{{ selectedEvent.featureVersion }}</dd></div>
-            <div><dt>행동 모델</dt><dd>{{ selectedEvent.behaviorModelVersion }}</dd></div>
+            <div><dt>특징 버전</dt><dd>{{ selectedEvent.featureVersion || '미제공' }}</dd></div>
+            <div><dt>행동 모델</dt><dd>{{ selectedEvent.behaviorModelVersion || '미제공' }}</dd></div>
             <div><dt>정책 버전</dt><dd>{{ selectedEvent.policyVersion }}</dd></div>
           </dl>
         </details>

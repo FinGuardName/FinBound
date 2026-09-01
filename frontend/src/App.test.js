@@ -1,8 +1,10 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App.vue'
-import { finboundApi } from './services/finboundApi'
+import { configureFinboundApi, finboundApi, resetFinboundApi } from './services/finboundApi'
+
+afterEach(() => resetFinboundApi())
 
 const getAllAuditEvents = async () => {
   const result = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, pageSize: 100 })
@@ -10,6 +12,24 @@ const getAllAuditEvents = async () => {
 }
 
 describe('FinBound P0 application', () => {
+  it('keeps the real Core credential in memory instead of Web Storage', async () => {
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem')
+    configureFinboundApi({ mode: 'real' })
+    const wrapper = mount(App)
+
+    expect(wrapper.text()).toContain('업무 세션 Credential을 입력해 주세요')
+    expect(wrapper.findAll('.work-card')).toHaveLength(0)
+
+    await wrapper.get('#core-credential').setValue('operator-runtime-only')
+    await wrapper.get('.credential-panel form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.findAll('.work-card')).toHaveLength(3)
+    expect(finboundApi.hasCredential()).toBe(true)
+    expect(storageWrite).not.toHaveBeenCalled()
+    expect(wrapper.html()).not.toContain('operator-runtime-only')
+  })
+
   it('shows bank work instead of asking an employee to configure security', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -61,6 +81,43 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).toContain('업무 처리 상태를 확인할 수 없습니다')
     expect(wrapper.text()).toContain('금융시스템 조회 여부는 업무 기록에서 확인해 주세요')
     expect(wrapper.text()).not.toContain('자료를 조회하지 않았습니다')
+    executeAgentTask.mockRestore()
+  })
+
+  it('does not present an allowed policy decision with a system error as a successful check', async () => {
+    const executeAgentTask = vi.spyOn(finboundApi, 'executeAgentTask').mockResolvedValueOnce({
+      status: 'COMPLETED',
+      title: 'AI 업무 처리 중 오류가 발생했습니다',
+      message: '정상 완료로 처리하지 않았습니다.',
+      resultHeading: 'Agent 실행 결과',
+      resultItems: ['처리 오류 1건'],
+      nextAction: '업무 기록을 확인해 주세요.',
+      attempts: [{
+        requestId: 'REQ-ERROR-1',
+        decision: 'ALLOW',
+        systemOutcome: 'ERROR',
+        label: '신용정보 확인',
+        description: '업무 시스템 처리 중 오류가 발생했습니다.',
+        targetConsumerId: 'CUST-1001',
+        scopeStatus: { customerScope: 'OK' },
+        reasonCodes: ['DOWNSTREAM_ERROR'],
+        downstreamReached: null,
+        responseReleased: false,
+        tool: 'CREDIT_SCORE_READ',
+        requestedData: ['CREDIT_SCORE'],
+      }],
+    })
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('업무 오류')
+    expect(wrapper.text()).toContain('0건 확인 · 0건 차단 · 1건 오류')
+    expect(wrapper.text()).toContain('처리 오류')
+    expect(wrapper.text()).toContain('금융시스템 조회확인 불가')
+    expect(wrapper.text()).not.toContain('1건 확인 · 0건 차단')
     executeAgentTask.mockRestore()
   })
 
