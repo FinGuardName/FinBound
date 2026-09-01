@@ -22,6 +22,7 @@ Source Revision, Parquet Revision, SHA-256, License를 통해 재현합니다. H
 - `validation`: 후보 모델 선택, Rule 결합식과 Threshold 선정에 사용
 - `held_out_test`: 모델과 Threshold를 고정한 후 한 번만 최종 평가
 - 동일 `groupId`의 변형 문장은 반드시 같은 Split에 둠
+- 같은 기본 의미·요청 의도의 번역·패러프레이즈는 언어와 외부 문맥이 달라도 같은 Group으로 취급
 - 서로 다른 Split의 문자 3-gram 유사도가 `0.82` 이상이면 단순 변형 누수로 보고 실패
 - 공개 영어 데이터의 번역본을 Native Korean이라고 부르지 않음
 
