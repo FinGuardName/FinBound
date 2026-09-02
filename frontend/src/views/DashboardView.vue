@@ -205,6 +205,7 @@ watch(page, () => {
             <div><dt>권한 판단</dt><dd>{{ selectedEvent.decision }}</dd></div>
             <div><dt>시스템 처리</dt><dd>{{ selectedEvent.auditStatus }}</dd></div>
             <div><dt>입력 평가</dt><dd>{{ selectedEvent.promptEvaluationStatus }}</dd></div>
+            <div><dt>입력 위험 등급</dt><dd>{{ selectedEvent.promptRiskLevel }}</dd></div>
             <div><dt>입력 모델</dt><dd>{{ selectedEvent.promptModelVersion || '미평가' }}</dd></div>
             <div><dt>행동 위험</dt><dd>{{ selectedEvent.behaviorRiskLevel }}</dd></div>
             <div><dt>특징 버전</dt><dd>{{ selectedEvent.featureVersion }}</dd></div>

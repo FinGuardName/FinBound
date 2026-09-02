@@ -1,7 +1,7 @@
 {
   "datasetVersion": "finbound-prompt-eval-korean-primary-7",
   "approvedDatasetSha256": "c402b408aa97ab34e31b5df6223ba9f85b5a32efb5f6a5a2466cd22efa17db8a",
-  "modelVersion": "prompt-guard-5",
+  "modelVersion": "prompt-guard-6",
   "modelId": "HikmaAI/hikmaai-mdeberta-v3-base-prompt-injection",
   "modelRevision": "ad81120116b9ec21bc5f47ffd5a2e0dccc803fe8",
   "modelArtifactSha256": "151fa3a17cc4c11a5fa86173c9d5cf63846c74389e528ed420f28cc203cd9aaa",
@@ -9,9 +9,11 @@
   "pretrainedScoreThreshold": 0.9995304836023597,
   "domainAdapterArtifactSha256": "cf82500ce5c0bfd9929416a7c82c827f61da6eb627ff313164b2840a182ef85f",
   "domainAdapterScoreThreshold": 0.5824927030355832,
-  "hybridEvidenceThreshold": 1.0,
+  "modelSupportThreshold": 0.6353324782354942,
+  "modelHighThreshold": 1.0,
+  "promptAlertThreshold": 0.5,
   "promptBlockThreshold": 0.9,
-  "ruleRisk": 0.98,
+  "ruleAlertRisk": 0.5,
   "targetValidationFalsePositiveRate": 0.05,
   "rawPromptIncluded": false,
   "authorizationDecisionProduced": false,
@@ -540,7 +542,7 @@
       "EN-VAL-H-001"
     ]
   },
-  "combined": {
+  "legacyRuleOrModel": {
     "datasetVersion": "finbound-prompt-eval-korean-primary-7",
     "sourceDatasetSha256": "c402b408aa97ab34e31b5df6223ba9f85b5a32efb5f6a5a2466cd22efa17db8a",
     "evaluationSetSha256": "6750801e6fe8cb09ea046bf774afe8eb4a3b7d621d1c8b1fde0bee5d6743131d",
@@ -795,6 +797,267 @@
       }
     },
     "falseNegativeSampleIds": [],
+    "falsePositiveSampleIds": [
+      "EN-VAL-H-001"
+    ]
+  },
+  "aiPrimaryGated": {
+    "datasetVersion": "finbound-prompt-eval-korean-primary-7",
+    "sourceDatasetSha256": "c402b408aa97ab34e31b5df6223ba9f85b5a32efb5f6a5a2466cd22efa17db8a",
+    "evaluationSetSha256": "6750801e6fe8cb09ea046bf774afe8eb4a3b7d621d1c8b1fde0bee5d6743131d",
+    "split": "validation",
+    "overall": {
+      "samples": 48,
+      "truePositives": 23,
+      "falsePositives": 1,
+      "trueNegatives": 23,
+      "falseNegatives": 1,
+      "precision": 0.958333,
+      "recall": 0.958333,
+      "f1": 0.958333,
+      "falsePositiveRate": 0.041667,
+      "confidenceIntervals95": {
+        "precision": {
+          "lower": 0.797582,
+          "upper": 0.992607
+        },
+        "recall": {
+          "lower": 0.797582,
+          "upper": 0.992607
+        },
+        "falsePositiveRate": {
+          "lower": 0.007393,
+          "upper": 0.202418
+        }
+      }
+    },
+    "byLanguage": {
+      "en": {
+        "samples": 12,
+        "truePositives": 6,
+        "falsePositives": 1,
+        "trueNegatives": 5,
+        "falseNegatives": 0,
+        "precision": 0.857143,
+        "recall": 1.0,
+        "f1": 0.923077,
+        "falsePositiveRate": 0.166667,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.486872,
+            "upper": 0.97432
+          },
+          "recall": {
+            "lower": 0.609666,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.030053,
+            "upper": 0.563503
+          }
+        }
+      },
+      "ko": {
+        "samples": 32,
+        "truePositives": 15,
+        "falsePositives": 0,
+        "trueNegatives": 16,
+        "falseNegatives": 1,
+        "precision": 1.0,
+        "recall": 0.9375,
+        "f1": 0.967742,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.796117,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.716713,
+            "upper": 0.988881
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.193608
+          }
+        }
+      },
+      "mixed": {
+        "samples": 4,
+        "truePositives": 2,
+        "falsePositives": 0,
+        "trueNegatives": 2,
+        "falseNegatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "falsePositiveRate": 0.0,
+        "confidenceIntervals95": {
+          "precision": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "recall": {
+            "lower": 0.34238,
+            "upper": 1.0
+          },
+          "falsePositiveRate": {
+            "lower": 0.0,
+            "upper": 0.65762
+          }
+        }
+      }
+    },
+    "byAttackType": {
+      "CROSS_CUSTOMER_ACCESS": {
+        "samples": 4,
+        "detected": 3,
+        "recall": 0.75,
+        "recallConfidenceInterval95": {
+          "lower": 0.300642,
+          "upper": 0.954413
+        }
+      },
+      "IGNORE_PREVIOUS_INSTRUCTION": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "POLICY_BYPASS": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "SYSTEM_PROMPT_EXTRACTION": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "UNAUTHORIZED_TOOL_REQUEST": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      },
+      "UNKNOWN_PROMPT_ATTACK": {
+        "samples": 4,
+        "detected": 4,
+        "recall": 1.0,
+        "recallConfidenceInterval95": {
+          "lower": 0.510109,
+          "upper": 1.0
+        }
+      }
+    },
+    "benignFalsePositiveRateByLanguageAndType": {
+      "en": {
+        "normal": {
+          "samples": 3,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.561497
+          }
+        },
+        "hard_negative": {
+          "samples": 3,
+          "falsePositives": 1,
+          "falsePositiveRate": 0.333333,
+          "confidenceInterval95": {
+            "lower": 0.061492,
+            "upper": 0.79234
+          }
+        }
+      },
+      "ko": {
+        "normal": {
+          "samples": 8,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.324408
+          }
+        },
+        "hard_negative": {
+          "samples": 8,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.324408
+          }
+        }
+      },
+      "mixed": {
+        "normal": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        },
+        "hard_negative": {
+          "samples": 1,
+          "falsePositives": 0,
+          "falsePositiveRate": 0.0,
+          "confidenceInterval95": {
+            "lower": 0.0,
+            "upper": 0.793451
+          }
+        }
+      }
+    },
+    "koreanFinanceBenign": {
+      "overall": {
+        "samples": 16,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.193608
+        }
+      },
+      "normal": {
+        "samples": 8,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.324408
+        }
+      },
+      "hardNegative": {
+        "samples": 8,
+        "falsePositives": 0,
+        "falsePositiveRate": 0.0,
+        "confidenceInterval95": {
+          "lower": 0.0,
+          "upper": 0.324408
+        }
+      }
+    },
+    "falseNegativeSampleIds": [
+      "KO-VAL-A-008"
+    ],
     "falsePositiveSampleIds": [
       "EN-VAL-H-001"
     ]

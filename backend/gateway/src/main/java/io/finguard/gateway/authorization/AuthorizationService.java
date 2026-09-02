@@ -8,9 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import io.finguard.gateway.client.AiClient;
 import io.finguard.gateway.client.CoreClient;
 import io.finguard.gateway.client.OpaClient;
+import io.finguard.gateway.dto.BehaviorRiskInput;
 import io.finguard.gateway.dto.HardLimits;
+import io.finguard.gateway.dto.ResolvedContext;
 import io.finguard.gateway.dto.RiskInput;
-import io.finguard.gateway.dto.ScopeStatus;
 import io.finguard.gateway.dto.ToolCallRequest;
 import io.finguard.gateway.exception.AiUnavailableException;
 import io.finguard.gateway.exception.CoreUnavailableException;
@@ -30,9 +31,15 @@ public class AuthorizationService {
                                        ToolCallRequest request,
                                        String requestId) {
         try {
-            ScopeStatus scope = coreClient.resolveContext(identity, request, requestId);
-            RiskInput risk = aiClient.evaluate(identity, request, requestId);
-            AuthorizationContext context = new AuthorizationContext(scope, risk, new HardLimits(false));
+            ResolvedContext resolved = coreClient.resolveContext(identity, request, requestId);
+            if (!"EVALUATED".equals(resolved.promptRisk().evaluationStatus())) {
+                log.warn("PROMPT_RISK_UNAVAILABLE requestId={}", requestId);
+                return PolicyDecisionResult.block("PROMPT_RISK_UNAVAILABLE");
+            }
+            BehaviorRiskInput behavior = aiClient.evaluate(identity, request, requestId);
+            RiskInput risk = RiskInput.combine(resolved.promptRisk(), behavior);
+            AuthorizationContext context =
+                new AuthorizationContext(resolved.scopeStatus(), risk, new HardLimits(false));
             return opaClient.decide(context);
         } catch (CoreUnavailableException e) {
             return failClosed("CONTEXT_SERVICE_UNAVAILABLE", requestId, e);

@@ -2,6 +2,7 @@ import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 
+from app.prompt.decision import decide_prompt_risk
 from app.prompt.model import (
     HybridPromptClassifier,
     PromptClassifier,
@@ -9,7 +10,12 @@ from app.prompt.model import (
     PromptModelError,
 )
 from app.prompt.rules import detect_rule_matches, normalize_prompt_text
-from app.schemas.prompt import PromptAttackType, PromptRiskRequest, PromptRiskResponse
+from app.schemas.prompt import (
+    PromptAttackType,
+    PromptRiskLevel,
+    PromptRiskRequest,
+    PromptRiskResponse,
+)
 
 
 class PromptInputError(ValueError):
@@ -33,16 +39,6 @@ class PromptRiskService:
     def check_ready(self) -> None:
         self._classifier.check_ready()
 
-    def _calibrate_model_risk(self, model_score: float) -> float:
-        model_threshold = self._config.hybrid_evidence_threshold
-        block_threshold = self._config.prompt_block_threshold
-        if model_score < model_threshold:
-            return (block_threshold - 0.01) * (model_score / model_threshold)
-        if model_threshold == 1:
-            return 1.0
-        tail_position = (model_score - model_threshold) / (1 - model_threshold)
-        return block_threshold + ((1 - block_threshold) * tail_position)
-
     def evaluate(self, request: PromptRiskRequest) -> PromptRiskResponse:
         if input_hash(request.input_text) != request.input_hash:
             raise PromptInputError("PROMPT_INPUT_HASH_MISMATCH")
@@ -52,19 +48,21 @@ class PromptRiskService:
 
         matches = detect_rule_matches(normalized)
         model_score = self._classifier.predict_attack_score(normalized)
-        rule_score = self._config.rule_risk if matches else 0.0
-        prompt_risk = max(rule_score, self._calibrate_model_risk(model_score))
-        prompt_risk = round(min(1.0, max(0.0, prompt_risk)), 6)
-        detected = prompt_risk >= self._config.prompt_block_threshold
+        decision = decide_prompt_risk(model_score, matches, self._config)
         attack_type = (
             matches[0].attack_type
-            if detected and matches
-            else (PromptAttackType.UNKNOWN_PROMPT_ATTACK if detected else None)
+            if decision.risk_level is not PromptRiskLevel.LOW and matches
+            else (
+                PromptAttackType.UNKNOWN_PROMPT_ATTACK
+                if decision.risk_level is not PromptRiskLevel.LOW
+                else None
+            )
         )
 
         return PromptRiskResponse(
-            detected=detected,
-            prompt_risk=prompt_risk,
+            detected=decision.detected,
+            prompt_risk=decision.prompt_risk,
+            risk_level=decision.risk_level,
             attack_type=attack_type,
             matched_rules=[match.rule_id for match in matches],
             input_hash=request.input_hash,

@@ -225,14 +225,17 @@ Audit Reason Code가 아니다. Simulator는 이를 `ALLOW` 또는 `BLOCK`으로
   "inputHash": "sha256:...",
   "detected": false,
   "promptRisk": 0.05,
+  "riskLevel": "LOW",
   "attackType": null,
   "matchedRules": [],
-  "modelVersion": "prompt-guard-5",
+  "modelVersion": "prompt-guard-6",
   "evaluatedAt": "2026-08-17T21:30:01+09:00"
 }
 ```
 
 동일 `inputHash + modelVersion`은 Tool Call마다 재평가하지 않는다.
+`detected`는 `riskLevel == "CRITICAL"`과 정확히 같은 뜻이다. `ALERT`는 감사 대상으로
+표시하지만 Prompt Risk만으로 Tool Call을 차단하지 않는다.
 
 ---
 
@@ -381,9 +384,10 @@ POST /internal/v1/context/resolve
   "promptRiskSnapshot": {
     "evaluationStatus": "EVALUATED",
     "promptRisk": 0.05,
+    "riskLevel": "LOW",
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-5"
+    "modelVersion": "prompt-guard-6"
   }
 }
 ```
@@ -396,6 +400,11 @@ Context Resolver가 Scope 비교의 Single Source of Truth다.
 
 Detector가 아직 없는 단계에서는 `NOT_EVALUATED`로 채우고 Audit·대시보드에 그대로 노출한다.
 Detector가 붙은 뒤에는 `NOT_EVALUATED`를 **fail-closed로 처리한다** — `false`로 번역하지 않는다.
+
+Gateway는 `promptRisk`, `promptRiskLevel`, `promptInjectionDetected`를 이 Core 응답의 저장된
+`promptRiskSnapshot`에서 가져오고, Behavior 필드만 현재 Tool Call의 AI Risk 응답에서 가져온다.
+Tool Call 시점에 Prompt Detector를 다시 호출하지 않는다. `evaluationStatus != EVALUATED`이면 OPA에
+낮은 Risk를 보내지 않고 `PROMPT_RISK_UNAVAILABLE`로 fail-closed한다.
 
 ---
 
@@ -439,10 +448,11 @@ POST /internal/v1/risk/prompt
 {
   "detected": true,
   "promptRisk": 0.96,
+  "riskLevel": "CRITICAL",
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
   "inputHash": "sha256:...",
-  "modelVersion": "prompt-guard-5",
+  "modelVersion": "prompt-guard-6",
   "evaluatedAt": "2026-08-17T21:32:00+09:00"
 }
 ```
@@ -669,6 +679,7 @@ POST /v1/data/finguard/authorization/decision
     },
     "risk": {
       "promptRisk": 0.05,
+      "promptRiskLevel": "LOW",
       "promptInjectionDetected": false,
       "behaviorRisk": 0.21,
       "behaviorRiskLevel": "LOW",
@@ -687,7 +698,7 @@ POST /v1/data/finguard/authorization/decision
 {
   "result": {
     "decision": "BLOCK",
-    "severity": "HIGH",
+    "severity": "CRITICAL",
     "riskFlagged": true,
     "reasonCodes": ["CASE_SCOPE_VIOLATION"],
     "policyVersion": "loan-review-policy-1"
@@ -828,7 +839,10 @@ Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 �
   "caseId": "LOAN-2026-001",
   "targetConsumerId": "CUST-1001",
   "requestedTool": "CREDIT_SCORE_READ",
+  "promptRiskEvaluationStatus": "EVALUATED",
   "promptRisk": 0.05,
+  "promptRiskLevel": "LOW",
+  "promptModelVersion": "prompt-guard-6",
   "behaviorRisk": 0.21,
   "decision": "ALLOW",
   "reasonCodes": [],

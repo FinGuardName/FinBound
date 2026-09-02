@@ -16,6 +16,7 @@ base_input := {
         "dataScope": "OK",
     },
     "risk": {
+        "promptRiskLevel": "LOW",
         "promptInjectionDetected": false,
         "behaviorRiskLevel": "LOW",
     },
@@ -57,6 +58,37 @@ test_behavior_alert_is_allowed_and_flagged if {
     result := authorization.decision with input as request
     result.decision == "ALLOW"
     result.riskFlagged
+}
+
+test_prompt_alert_is_allowed_and_flagged if {
+    request := object.union(base_input, {
+        "risk": object.union(base_input.risk, {"promptRiskLevel": "ALERT"}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "ALLOW"
+    result.severity == "HIGH"
+    result.riskFlagged
+}
+
+test_prompt_critical_is_blocked if {
+    request := object.union(base_input, {
+        "risk": object.union(base_input.risk, {
+            "promptRiskLevel": "CRITICAL",
+            "promptInjectionDetected": true,
+        }),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["PROMPT_INJECTION"]
+}
+
+test_inconsistent_prompt_boolean_and_level_fail_closed if {
+    request := object.union(base_input, {
+        "risk": object.union(base_input.risk, {"promptInjectionDetected": true}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["CONTEXT_NOT_FOUND"]
 }
 
 test_missing_scope_key_is_blocked if {

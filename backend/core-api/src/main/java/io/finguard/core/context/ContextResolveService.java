@@ -151,6 +151,7 @@ public class ContextResolveService {
                 new PromptRiskView(
                         promptRisk.getEvaluationStatus(),
                         promptRisk.getPromptRisk(),
+                        promptRisk.getRiskLevel(),
                         promptRisk.isDetected(),
                         promptRisk.getInputHash(),
                         promptRisk.getModelVersion()));

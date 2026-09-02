@@ -37,6 +37,10 @@
       "enum": ["EVALUATED", "NOT_EVALUATED"]
     },
     "promptRisk": { "$ref": "#/$defs/riskScore" },
+    "promptRiskLevel": {
+      "type": "string",
+      "enum": ["LOW", "ALERT", "CRITICAL"]
+    },
     "promptModelVersion": { "$ref": "#/$defs/nonEmptyIdentifier" },
     "behaviorRisk": { "$ref": "#/$defs/riskScore" },
     "behaviorRiskLevel": {

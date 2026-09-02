@@ -3,11 +3,14 @@ package io.finguard.gateway.authorization;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import io.finguard.gateway.client.AiClient;
 import io.finguard.gateway.client.CoreClient;
@@ -16,7 +19,9 @@ import io.finguard.gateway.contract.FinancialAction;
 import io.finguard.gateway.contract.FinancialDataType;
 import io.finguard.gateway.contract.FinancialTool;
 import io.finguard.gateway.contract.PolicyDecision;
-import io.finguard.gateway.dto.RiskInput;
+import io.finguard.gateway.dto.BehaviorRiskInput;
+import io.finguard.gateway.dto.PromptRiskInput;
+import io.finguard.gateway.dto.ResolvedContext;
 import io.finguard.gateway.dto.ScopeStatus;
 import io.finguard.gateway.dto.ToolCallRequest;
 import io.finguard.gateway.exception.AiUnavailableException;
@@ -36,6 +41,13 @@ class AuthorizationServiceTest {
         "RUN-001", "PASS-001", FinancialTool.CREDIT_SCORE_READ, "CUST-1001",
         List.of(FinancialDataType.CREDIT_SCORE), FinancialAction.READ);
 
+    private final ResolvedContext safeContext = new ResolvedContext(
+        ScopeStatus.allOk(),
+        new PromptRiskInput("EVALUATED", 0.05, "LOW", false)
+    );
+
+    private final BehaviorRiskInput safeBehavior = new BehaviorRiskInput(0.10, "LOW", false);
+
     @Test
     void coreFailureYieldsContextUnavailable() {
         when(core.resolveContext(any(), any(), any()))
@@ -49,7 +61,7 @@ class AuthorizationServiceTest {
 
     @Test
     void aiFailureYieldsBehaviorUnavailable() {
-        when(core.resolveContext(any(), any(), any())).thenReturn(ScopeStatus.allOk());
+        when(core.resolveContext(any(), any(), any())).thenReturn(safeContext);
         when(ai.evaluate(any(), any(), any())).thenThrow(new AiUnavailableException("boom"));
 
         PolicyDecisionResult decision = service.decide(identity, request, "REQ-2");
@@ -58,10 +70,23 @@ class AuthorizationServiceTest {
     }
 
     @Test
+    void unevaluatedPromptRiskFailsClosedBeforeBehaviorAndOpa() {
+        ResolvedContext unevaluated = new ResolvedContext(
+            ScopeStatus.allOk(),
+            new PromptRiskInput("NOT_EVALUATED", 0.0, "LOW", false)
+        );
+        when(core.resolveContext(any(), any(), any())).thenReturn(unevaluated);
+
+        PolicyDecisionResult decision = service.decide(identity, request, "REQ-PROMPT-PENDING");
+
+        assertThat(decision.reasonCodes()).containsExactly("PROMPT_RISK_UNAVAILABLE");
+        verifyNoInteractions(ai, opa);
+    }
+
+    @Test
     void opaFailureYieldsPolicyEngineUnavailable() {
-        when(core.resolveContext(any(), any(), any())).thenReturn(ScopeStatus.allOk());
-        when(ai.evaluate(any(), any(), any())).thenReturn(
-            new RiskInput(0.0, false, 0.0, "LOW", false));
+        when(core.resolveContext(any(), any(), any())).thenReturn(safeContext);
+        when(ai.evaluate(any(), any(), any())).thenReturn(safeBehavior);
         when(opa.decide(any())).thenThrow(new OpaUnavailableException("boom"));
 
         PolicyDecisionResult decision = service.decide(identity, request, "REQ-3");
@@ -71,14 +96,19 @@ class AuthorizationServiceTest {
 
     @Test
     void allHealthyDelegatesToOpaDecision() {
-        when(core.resolveContext(any(), any(), any())).thenReturn(ScopeStatus.allOk());
-        when(ai.evaluate(any(), any(), any())).thenReturn(
-            new RiskInput(0.0, false, 0.0, "LOW", false));
+        when(core.resolveContext(any(), any(), any())).thenReturn(safeContext);
+        when(ai.evaluate(any(), any(), any())).thenReturn(safeBehavior);
         when(opa.decide(any())).thenReturn(
             new PolicyDecisionResult(PolicyDecision.ALLOW, "LOW", false, List.of(), "policy-1"));
 
         PolicyDecisionResult decision = service.decide(identity, request, "REQ-4");
 
         assertThat(decision.isAllow()).isTrue();
+        ArgumentCaptor<AuthorizationContext> context =
+            ArgumentCaptor.forClass(AuthorizationContext.class);
+        verify(opa).decide(context.capture());
+        assertThat(context.getValue().risk().promptRisk()).isEqualTo(0.05);
+        assertThat(context.getValue().risk().promptRiskLevel()).isEqualTo("LOW");
+        assertThat(context.getValue().risk().behaviorRisk()).isEqualTo(0.10);
     }
 }

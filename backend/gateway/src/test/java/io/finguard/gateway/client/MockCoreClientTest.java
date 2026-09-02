@@ -10,7 +10,7 @@ import io.finguard.gateway.client.impl.MockCoreClient;
 import io.finguard.gateway.contract.FinancialAction;
 import io.finguard.gateway.contract.FinancialDataType;
 import io.finguard.gateway.contract.FinancialTool;
-import io.finguard.gateway.dto.ScopeStatus;
+import io.finguard.gateway.dto.ResolvedContext;
 import io.finguard.gateway.dto.ToolCallRequest;
 import io.finguard.gateway.identity.VerifiedAgentIdentity;
 
@@ -24,8 +24,11 @@ class MockCoreClientTest {
         ToolCallRequest request = new ToolCallRequest(
             "RUN-001", "PASS-001", FinancialTool.CREDIT_SCORE_READ, "CUST-1001",
             List.of(FinancialDataType.CREDIT_SCORE), FinancialAction.READ);
-        ScopeStatus scope = client.resolveContext(identity, request, "REQ-001");
-        assertThat(scope.customerScope()).isEqualTo("OK");
+        ResolvedContext resolved = client.resolveContext(identity, request, "REQ-001");
+        assertThat(resolved.scopeStatus().customerScope()).isEqualTo("OK");
+        assertThat(resolved.promptRisk().evaluationStatus()).isEqualTo("EVALUATED");
+        assertThat(resolved.promptRisk().promptRiskLevel()).isEqualTo("LOW");
+        assertThat(resolved.promptRisk().promptInjectionDetected()).isFalse();
     }
 
     @Test
@@ -33,9 +36,9 @@ class MockCoreClientTest {
         ToolCallRequest request = new ToolCallRequest(
             "RUN-001", "PASS-001", FinancialTool.CREDIT_SCORE_READ, "CUST-9999",
             List.of(FinancialDataType.CREDIT_SCORE), FinancialAction.READ);
-        ScopeStatus scope = client.resolveContext(identity, request, "REQ-002");
-        assertThat(scope.customerScope()).isEqualTo("VIOLATION");
-        assertThat(scope.employeeAuthority()).isEqualTo("OK");
+        ResolvedContext resolved = client.resolveContext(identity, request, "REQ-002");
+        assertThat(resolved.scopeStatus().customerScope()).isEqualTo("VIOLATION");
+        assertThat(resolved.scopeStatus().employeeAuthority()).isEqualTo("OK");
     }
 
     @Test

@@ -2,23 +2,44 @@
 
 ## 목적과 경계
 
-`prompt-guard-5`는 새 Prompt, Document, 외부 비신뢰 입력에서 Prompt Injection 위험 신호를
-생성합니다. `promptRisk`, 탐지 여부와 공격 유형 근거만 반환하며 `ALLOW/BLOCK` 권한 결정은 만들지
-않습니다. 다만 현재 OPA 정책은 `detected=true`를 `PROMPT_INJECTION` 차단 사유로 직접 사용하므로,
-이 출력은 단순 참고 정보가 아니라 실제 BLOCK을 유발할 수 있는 정책 입력입니다. 동일
+`prompt-guard-6`는 새 Prompt, Document, 외부 비신뢰 입력에서 Prompt Injection 위험 신호를
+생성합니다. `promptRisk`, `LOW | ALERT | CRITICAL` 등급, 탐지 여부와 공격 유형 근거만 반환하며
+`ALLOW/BLOCK` 권한 결정은 만들지 않습니다. OPA는 `CRITICAL`만 직접 차단하고 `ALERT`는 허용하되
+감사 신호로 기록합니다. `detected=true`는 `riskLevel=CRITICAL`과 정확히 같은 하위 호환 표현입니다. 동일
 `inputHash + modelVersion` 결과는 Core의 `PromptRiskSnapshot`으로 재사용합니다.
 
 ## 최종 구조
 
-- 한국어·영어 명시 공격 Rule과 인용·분석 문맥 예외
+- 전체 정규화 텍스트를 평가하는 AI 모델을 주 판단 신호로 사용
+- 한국어·영어 명시 공격 Rule과 인용·분석 문맥 예외를 설명 가능한 보조 증거로 사용
 - `HikmaAI/hikmaai-mdeberta-v3-base-prompt-injection` 고정 Revision
   `ad81120116b9ec21bc5f47ffd5a2e0dccc803fe8`의 MIT License INT8 ONNX Artifact
 - 승인 Development 48건으로 학습한 문자 2~5-gram Logistic Regression Domain Adapter
-- Validation FPR 5% 제약 안에서 각 모델 Threshold를 고정한 최대 증거 결합
-- Rule과 결합된 risk가 `promptBlockThreshold=0.9` 이상이면 탐지
+- Validation FPR 5% 제약 안에서 모델 고신뢰 Threshold와 보강 Threshold를 고정
+- Rule 단독은 `ALERT`, AI 고신뢰 또는 AI 중간신뢰+Rule만 `CRITICAL`
 
 사전학습 Artifact와 Domain Adapter는 시작 시 SHA-256을 검증합니다. 모델 또는 Feature 추론이
 실패하면 낮은 Risk로 대체하지 않고 `PROMPT_RISK_UNAVAILABLE`로 fail-closed 처리합니다.
+
+이 구조를 선택한 이유는 기존 `max(ruleRisk, modelRisk)`가 어휘 Rule 하나만으로 AI 판단을
+우회해 즉시 차단할 수 있었기 때문입니다. 금융 권한·Scope·Hard Limit은 계속 결정적 정책으로
+강제하지만, Prompt Injection의 의미 판단은 AI가 주도해야 AI의 독립 가치와 오탐 통제를 함께
+설명할 수 있습니다.
+
+| 모델 증거 | Rule 증거 | 등급 |
+|---|---|---|
+| `modelScore >= 1.0` | 무관 | `CRITICAL` |
+| `modelScore >= 0.6353324782` | 있음 | `CRITICAL` |
+| `modelScore >= 0.6353324782` | 없음 | `ALERT` |
+| 낮음 | 있음 | `ALERT` |
+| 낮음 | 없음 | `LOW` |
+
+`modelScore`는 공격 확률이 아니라 사전학습 모델과 Domain Adapter 각각의 Validation Threshold 대비
+증거비를 정규화하고 1.0에서 상한 처리한 값입니다. 따라서 `modelHighThreshold=1.0`은 확률 100%가
+아니라 선택된 AI 고신뢰 경계에 도달했다는 뜻입니다.
+
+Rule 보강 Threshold는 이미 반복 관측된 Held-out이 아니라 Validation에서만 선택했습니다. AI 증거가
+사실상 0인 상태에서 Rule이 다시 단독 차단 신호가 되지 않도록 후보 하한을 0.5로 고정했습니다.
 
 ## 후보 선택
 
@@ -33,6 +54,9 @@ Domain Adapter는 새 Prompt Detector를 대체하는 대규모 학습 모델이
 부족을 보정하는 P0용 소형 계층입니다. 학습에는 `development`, Threshold 선정에는 `validation`만
 사용합니다.
 
+Validation 48건에서 Model-only는 Precision 0.9500, Recall 0.7917, F1 0.8636, FPR 0.0417이고,
+선택된 AI-primary gated 결합은 Precision/Recall/F1 0.9583, FPR 0.0417입니다.
+
 ## 최종 회귀 평가
 
 의미상 같은 인용·분석·난독화 Hard Negative를 Group 단위로 재배치한 승인 데이터
@@ -45,21 +69,32 @@ Domain Adapter는 새 Prompt Detector를 대체하는 대규모 학습 모델이
 |---|---:|---:|---:|---:|
 | Rule only | 0.8750 | 0.2333 | 0.3684 | 0.0333 |
 | Model only | 0.9412 | 0.8000 | 0.8649 | 0.0500 |
-| Rule + Model | 0.9074 | 0.8167 | 0.8596 | 0.0833 |
+| 기존 Rule OR Model | 0.9074 | 0.8167 | 0.8596 | 0.0833 |
+| AI-primary gated | 0.9074 | 0.8167 | 0.8596 | 0.0833 |
 
 결합 Recall은 한국어 0.90, 혼합어 0.80, 영어 0.50입니다. 공격 유형별 Recall은 Cross-customer
 0.50, Instruction override 1.00, Policy bypass 0.70, System prompt extraction 0.80,
 Unauthorized tool 1.00, Unknown prompt attack 0.90입니다. 상세 지표와 Wilson 95% 신뢰구간은
 `evaluate/prompt_runtime_held_out.json`에 저장합니다.
 
+이번 반복 Held-out에서는 기존 OR과 AI-primary gated의 수치가 우연히 같습니다. 이는 성능 향상을
+주장할 근거가 아니며, Rule 단독 차단을 제거하고 AI 증거를 필수화한 정책 의미의 변경입니다. 다음
+성능 주장은 사전에 고정한 신규 Blind Set으로 검증해야 합니다.
+
+### 인용문-only 경계
+
+공격 문구가 따옴표 안에만 있고 따옴표 밖에 실행 요청이 없으면 Rule은 일치시키지 않습니다. 이 예외는
+정상적인 보안 분석·인용 요청의 False Block을 줄이기 위해 유지합니다. 대신 AI 모델은 인용부를 포함한
+전체 텍스트를 평가하므로 의미상 공격성이 높으면 `ALERT` 또는 `CRITICAL`을 만들 수 있습니다. 따옴표
+밖에 실행·요청 동사가 있으면 Rule 보조 증거도 유지합니다. 이 경계는 Runtime 회귀 테스트로 고정합니다.
+
 ### 사용 가능성 판단
 
-- AI 서비스가 권한 결정을 직접 만들지는 않지만 OPA가 `detected=true`를 차단 조건으로 사용합니다.
+- AI 서비스가 권한 결정을 직접 만들지는 않지만 OPA가 `riskLevel=CRITICAL`을 차단 조건으로 사용합니다.
 - Held-out 결합 F1 0.8596/Recall 0.8167은 P0 탐지 가능성을 보여주지만, 전체 FPR 8.33%, 한국어
   Hard Negative FPR 20%와 영어 Recall 50%는 운영 자동 차단 품질로 충분하지 않습니다.
-- 현재 정책을 유지하는 MVP에서는 오탐 가능성을 팀이 명시적으로 수용하고 통제된 시나리오에서만
-  사용해야 합니다. 운영 전에는 신규 Blind Set과 실제 트래픽으로 오탐을 재검증하고, 필요하면
-  Rule 근거 또는 높은 신뢰도 신호만 직접 차단하는 정책을 별도로 결정해야 합니다.
+- MVP에서는 `ALERT`를 감사·표시하고 `CRITICAL`만 차단합니다. 운영 전에는 신규 Blind Set과 실제
+  트래픽으로 False Block과 공격 Recall을 재검증해야 합니다.
 
 ## 한계와 해석
 
@@ -70,8 +105,8 @@ Unauthorized tool 1.00, Unknown prompt attack 0.90입니다. 상세 지표와 Wi
 - 동일 Held-out의 이전 평가 이력이 있습니다. 최종 Adapter와 Threshold 계산에는 Held-out 원문이나
   Sample별 결과를 사용하지 않았지만, 엄격한 단일 시도 프로토콜의 독립 최종 성능으로 주장하지
   않습니다. 운영 전 별도 외부 Blind Set이 필요합니다.
-- 공격 미탐은 Financial Context Resolver와 Hard Limit로 추가 방어합니다. Prompt Risk는 권한을
-  확대하지 않지만 현재 OPA에서 직접 차단될 수 있으므로 오탐 영향도 함께 관리해야 합니다.
+- 공격 미탐은 Financial Context Resolver와 Hard Limit로 추가 방어합니다. 이 결정적 제약은 AI의
+  역할을 대체하지 않고 권한 경계를 보장합니다. Prompt Rule은 단독 차단하지 않습니다.
 - 운영 배포 전 실제 트래픽과 별도 외부 Benchmark에서 Drift와 FPR을 다시 검증해야 합니다.
 
 ## 재현성

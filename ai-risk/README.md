@@ -1,6 +1,7 @@
 # FinBound AI Risk Engine
 
-Frontend & AI 담당 영역입니다. FastAPI는 `promptRisk`와 `behaviorRisk`를 반환하며 `ALLOW/BLOCK`을 반환하지 않습니다.
+Frontend & AI 담당 영역입니다. FastAPI는 Prompt `promptRisk`·`riskLevel`과 `behaviorRisk`를
+반환하며 `ALLOW/BLOCK`을 반환하지 않습니다.
 
 ## 구조
 
@@ -20,7 +21,8 @@ uv run pytest
 ```
 
 Prompt Runtime은 고정 리비전의 다국어 사전학습 모델, 한국어·영어 Rule, FinBound Development
-Set으로 학습한 소형 문자 n-gram Domain Adapter를 결합합니다. Adapter는 권한 결정을 만들지 않고
+Set으로 학습한 소형 문자 n-gram Domain Adapter를 AI-primary 방식으로 결합합니다. Rule은 설명
+가능한 보조 증거이며 단독으로 `CRITICAL`을 만들지 않습니다. Adapter는 권한 결정을 만들지 않고
 사전학습 모델의 한국어 금융 문맥 부족을 보정하는 risk signal만 제공합니다.
 
 ```bash

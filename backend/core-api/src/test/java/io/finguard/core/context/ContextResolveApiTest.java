@@ -85,10 +85,11 @@ class ContextResolveApiTest {
         assertThat(scope.get("dataScope").asText()).isEqualTo("OK");
         JsonNode promptRisk = body.get("promptRiskSnapshot");
         assertThat(promptRisk.get("evaluationStatus").asText()).isEqualTo("NOT_EVALUATED");
+        assertThat(promptRisk.get("riskLevel").asText()).isEqualTo("LOW");
         assertThat(promptRisk.get("detected").asBoolean()).isFalse();
         assertThat(promptRisk.get("promptRisk").decimalValue()).isZero();
         assertThat(promptRisk.get("inputHash").asText()).startsWith("sha256:");
-        assertThat(promptRisk.get("modelVersion").asText()).isEqualTo("prompt-guard-5");
+        assertThat(promptRisk.get("modelVersion").asText()).isEqualTo("prompt-guard-6");
     }
 
     @Test
@@ -197,8 +198,8 @@ class ContextResolveApiTest {
         jdbcTemplate.update(
                 "insert into prompt_risk_snapshots"
                         + " (input_ref, input_hash, evaluation_status, detected, prompt_risk,"
-                        + "  model_version, evaluated_at)"
-                        + " values (?, ?, 'EVALUATED', false, 0.1000, 'prompt-guard-5', now())",
+                        + "  risk_level, model_version, evaluated_at)"
+                        + " values (?, ?, 'EVALUATED', false, 0.1000, 'LOW', 'prompt-guard-6', now())",
                 "INPUT-LATER",
                 "sha256:later-input");
         jdbcTemplate.update(

@@ -62,9 +62,10 @@ UNKNOWN_PROMPT_ATTACK
 {
   "detected": true,
   "promptRisk": 0.96,
+  "riskLevel": "CRITICAL",
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
-  "modelVersion": "prompt-guard-5",
+  "modelVersion": "prompt-guard-6",
   "evaluatedAt": "2026-08-17T14:01:00+09:00"
 }
 ```
@@ -79,7 +80,7 @@ UNKNOWN_PROMPT_ATTACK
 → 입력 정규화
 → Rule Detection
 → Prompt 분류 모델
-→ Risk 결합
+→ AI-primary 다단계 Risk 결합
 → Prompt Risk Snapshot 저장
 ```
 
@@ -119,6 +120,21 @@ P0에서는 명시적 공격 표현에 대한 한국어·영어 Rule Set을 사�
 "허용되지 않은 Tool을 사용"
 ```
 
+Rule은 설명 가능한 보조 증거다. 어휘 Rule만 일치한 입력은 `ALERT`이며 Rule만으로
+`CRITICAL`을 만들지 않는다. 분류 모델이 전체 정규화 텍스트를 주 판단 신호로 사용한다.
+
+| 모델 증거 | Rule 증거 | Prompt Risk Level |
+|---|---|---|
+| 고신뢰 | 무관 | `CRITICAL` |
+| 중간 이상 | 있음 | `CRITICAL` |
+| 중간 이상 | 없음 | `ALERT` |
+| 낮음 | 있음 | `ALERT` |
+| 낮음 | 없음 | `LOW` |
+
+따옴표 안에만 있는 공격 문구는 Rule이 차단 근거로 취급하지 않는다. 다만 모델은 인용부를
+포함한 전체 텍스트를 평가하므로 의미상 공격성이 높으면 `ALERT` 또는 `CRITICAL`을 만들 수 있다.
+따옴표 밖에 실행·요청 동사가 함께 있는 경우에는 Rule 보조 증거도 유지한다.
+
 Rule Match는 탐지 근거로 반환할 수 있지만 원문 전체는 Audit에 저장하지 않는다.
 
 ### Model Detection
@@ -131,19 +147,18 @@ P0는 사전학습 Prompt Injection Detector를 비교·검증하여 사용한�
 - 공격 Recall
 - 금융 공격 유형별 Recall
 - 한국어/영어 혼합 입력 평가
-- Rule + Model 결합 Threshold 선정
+- AI 고신뢰·Rule 보강 Threshold 선정
 
 ### Risk 결합
 
 ```text
-Rule Result
-+
-Prompt Model Score
-        ↓
-promptRisk [0,1]
+Prompt Model Score ────────────────┐
+                                   ├→ 공용 판정 함수 → promptRisk + riskLevel
+Rule Result (선택적 보조 증거) ───┘
 ```
 
-실제 결합식과 Threshold는 Validation 결과에 따라 고정하고 Config로 관리한다.
+모델 고신뢰 Threshold와 AI+Rule 보강 Threshold는 Validation 결과에 따라 고정하고 Config로
+관리한다. Runtime과 평가는 같은 판정 함수를 호출한다.
 
 ## 4. Prompt Evaluation Set
 
@@ -155,14 +170,30 @@ P0 Prompt Detector는 사전학습 모델을 사용하므로 Prompt 데이터는
 
 ```text
 Rule 조정
-Rule + Model 결합 방식 조정
+AI-primary 결합 방식 조정
 Threshold 선정
 후보 Prompt Detector 선택
 ```
 
 ### Held-out Test Set
 
-최종 모델/Threshold 확정 후 한 번 평가하는 별도 Set이다. 모델 선택과 Threshold 조정에 사용하지 않는다.
+최종 모델/Threshold 확정 후 평가하는 별도 Set이다. 현재 Set은 이전 평가에서 반복 관측됐으므로
+회귀 진단에만 사용하고 모델 선택과 Threshold 조정에는 사용하지 않는다. 다음 성능 확정에는 신규
+Blind Set을 사전에 고정한다.
+
+AI 독립 기여는 다음 네 가지를 분리해서 보고한다.
+
+```text
+Rule-only
+AI-only
+기존 Rule OR AI
+AI-primary gated hybrid
+```
+
+현재 반복 Held-out에서 Rule-only Recall/F1은 `0.2333/0.3684`, AI-only는
+`0.8000/0.8649`다. 이 차이는 의미적·의역 공격 탐지의 주된 기여가 Rule이 아니라 AI 모델에서
+나온다는 근거다. 기존 OR과 gated 결과가 같은 것은 이번 반복 Set의 진단 결과일 뿐이며 성능 개선으로
+주장하지 않는다.
 
 ### 정상 데이터
 
@@ -547,6 +578,7 @@ AI 독립 가치 검증에서는 `Scope 정상 + Hard Limit 미초과 + behavior
 ```json
 {
   "promptRisk": 0.96,
+  "promptRiskLevel": "CRITICAL",
   "promptInjectionDetected": true,
   "promptAttackType": "CROSS_CUSTOMER_ACCESS",
   "behaviorRisk": 0.97,
@@ -554,13 +586,16 @@ AI 독립 가치 검증에서는 `Scope 정상 + Hard Limit 미초과 + behavior
   "behaviorRiskLevel": "CRITICAL",
   "historyStatus": "READY",
   "modelVersions": {
-    "prompt": "prompt-guard-5",
+    "prompt": "prompt-guard-6",
     "behavior": "iforest-1"
   },
   "featureVersion": "behavior-features-1",
   "evaluatedAt": "2026-08-17T14:01:00+09:00"
 }
 ```
+
+`promptInjectionDetected`는 하위 호환 필드이며 `promptRiskLevel == "CRITICAL"`과 정확히 같은
+뜻이다. OPA는 `CRITICAL`만 직접 차단하고 `ALERT`는 허용하되 `riskFlagged=true`로 기록한다.
 
 ---
 

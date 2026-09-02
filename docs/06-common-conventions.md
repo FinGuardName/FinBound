@@ -392,6 +392,9 @@ Isolation Forest raw score와 `behaviorRisk`를 명확히 구분한다.
 ## 22. Threshold Naming
 
 ```text
+modelSupportThreshold
+modelHighThreshold
+promptAlertThreshold
 promptBlockThreshold
 behaviorAlertThreshold
 behaviorCriticalThreshold
@@ -399,6 +402,14 @@ hardRequestLimit1m
 ```
 
 Threshold 값은 Config/환경변수/정책 설정에서 단일 관리하고 여러 코드에 Magic Number로 중복하지 않는다.
+Prompt Detector의 `modelSupportThreshold`와 `modelHighThreshold`는 모델 원점수의 증거 경계이고,
+`promptAlertThreshold`와 `promptBlockThreshold`는 외부로 내보내는 Risk 등급 경계다.
+현재 결합 `modelScore`는 공격 확률이 아니라 각 AI 계층의 Validation Threshold 대비 정규화된
+증거비이며 1.0에서 상한 처리한다. 따라서 `modelHighThreshold=1.0`은 확률 100%를 뜻하지 않는다.
+
+Prompt Risk Level은 `LOW | ALERT | CRITICAL`이다. Rule 단독 증거는 최대 `ALERT`이고,
+AI 고신뢰 또는 AI 중간신뢰+Rule 일치만 `CRITICAL`이 된다. 하위 호환 Boolean
+`promptInjectionDetected`는 `CRITICAL`과 정확히 같아야 한다.
 
 ---
 
@@ -415,7 +426,7 @@ templateVersion
 예:
 
 ```text
-prompt-guard-5
+prompt-guard-6
 iforest-1
 behavior-features-1
 synthetic-agent-log-1

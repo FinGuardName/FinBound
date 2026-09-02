@@ -94,6 +94,10 @@ Behavior History 조회
 Prompt Risk Snapshot 조회
 ```
 
+Runtime에서 Gateway는 Core 응답의 저장된 Prompt Risk Snapshot과 AI Risk Engine이 현재 Tool Call에
+대해 계산한 Behavior Risk를 조립한다. Prompt Detector를 Tool Call마다 다시 호출하거나 Behavior
+Client가 Prompt Risk를 새로 만들어서는 안 된다.
+
 ---
 
 ## 4. Prompt Risk Lifecycle
