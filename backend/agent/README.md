@@ -7,6 +7,46 @@ Backend 3 소유 영역입니다. P0에서는 Spring AI 연동 또는 결정론�
 - Body의 Agent ID나 권한 목록을 권한 근거로 사용하지 않습니다.
 - Mock Financial API를 직접 호출하지 않습니다.
 
+## 컨테이너 실행
+
+이미지는 저장소 루트를 Build Context로 사용합니다. 이미지 빌드에는 Credential을 전달하지
+않으며, `Dockerfile.dockerignore`가 개인용 `gradle.properties`, `.env`, 다른 모듈과 빌드
+산출물을 Context에서 제외합니다.
+
+```bash
+docker build -f backend/agent/Dockerfile -t finguard-agent:local .
+
+export AGENT_SERVICE_CREDENTIAL="$(openssl rand -base64 32)"
+export FINGUARD_INTERNAL_CREDENTIAL="$(openssl rand -base64 32)"
+docker run --rm --name finguard-agent \
+  --memory=512m \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --security-opt no-new-privileges:true \
+  -p 127.0.0.1:8082:8082 \
+  -e AGENT_SERVICE_CREDENTIAL \
+  -e FINGUARD_INTERNAL_CREDENTIAL \
+  -e GATEWAY_BASE_URL=http://host.docker.internal:8081 \
+  finguard-agent:local
+```
+
+`AGENT_SERVICE_CREDENTIAL`과 `FINGUARD_INTERNAL_CREDENTIAL`은 Runtime에만 주입합니다.
+둘 중 하나가 없으면 설정 검증 단계에서 기동이 실패합니다. `/actuator/health`는 Credential
+없이 조회할 수 있지만 `/internal/v1/agent-simulations`는 유효한 Internal Credential이
+없으면 `401 INTERNAL_CREDENTIAL_INVALID`로 거부됩니다.
+
+```bash
+curl -fsS http://localhost:8082/actuator/health
+docker run --rm --entrypoint java finguard-agent:local -version
+docker run --rm --entrypoint id finguard-agent:local -u
+docker history --no-trunc finguard-agent:local
+bash infrastructure/tests/service-container-smoke.sh
+```
+
+Runtime은 Java 21, UID/GID `10001`, 컨테이너 메모리 상한의 75% 이하 Heap으로 동작합니다.
+위 `docker run` 예시는 512 MiB 상한을 명시합니다. Compose 서비스 연결은 Issue #62에서
+담당합니다.
+
 ## 현재 구현 상태
 
 P0 통합 전 정상 요청과 Case Scope 공격 요청을 반복 가능하게 생성하는 결정론적

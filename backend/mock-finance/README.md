@@ -66,6 +66,42 @@ $env:FINGUARD_INTERNAL_CREDENTIAL = "local-development-only"
 기본 Port는 `8083`입니다. `/actuator/health`는 Credential 없이 조회할 수 있지만,
 `/internal/v1/finance/**`는 내부 Credential이 필요합니다.
 
+## 컨테이너 실행
+
+이미지는 저장소 루트를 Build Context로 사용합니다. 이미지 빌드에는 Credential을 전달하지
+않으며, `Dockerfile.dockerignore`가 개인용 `gradle.properties`, `.env`, 다른 모듈과 빌드
+산출물을 Context에서 제외합니다.
+
+```bash
+docker build -f backend/mock-finance/Dockerfile -t finguard-mock-finance:local .
+
+export FINGUARD_INTERNAL_CREDENTIAL="$(openssl rand -base64 32)"
+docker run --rm --name finguard-mock-finance \
+  --memory=512m \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --security-opt no-new-privileges:true \
+  -p 127.0.0.1:8083:8083 \
+  -e FINGUARD_INTERNAL_CREDENTIAL \
+  finguard-mock-finance:local
+```
+
+`FINGUARD_INTERNAL_CREDENTIAL`은 Runtime에만 주입하며, 없으면 설정 검증 단계에서 기동이
+실패합니다. `/actuator/health`는 Credential 없이 조회할 수 있지만
+`/internal/v1/finance/tool-calls`는 Credential이 없으면
+`401 INTERNAL_CREDENTIAL_INVALID`로 거부됩니다.
+
+```bash
+curl -fsS http://localhost:8083/actuator/health
+docker run --rm --entrypoint java finguard-mock-finance:local -version
+docker run --rm --entrypoint id finguard-mock-finance:local -u
+docker history --no-trunc finguard-mock-finance:local
+```
+
+Runtime은 Java 21, UID/GID `10001`, 컨테이너 메모리 상한의 75% 이하 Heap으로 동작합니다.
+위 `docker run` 예시는 512 MiB 상한을 명시합니다. Compose 서비스 연결은 Issue #62에서
+담당합니다.
+
 ## 검증
 
 ```powershell
@@ -75,3 +111,9 @@ $env:FINGUARD_INTERNAL_CREDENTIAL = "local-development-only"
 테스트는 정상 Tool 3종, Credential 누락·불일치, 지원하지 않는 Tool, 존재하지 않는
 Consumer, Tool별 호출 횟수를 검증합니다. 호출 계수는 테스트용 Bean에서 확인하며 외부
 운영 Endpoint로 노출하지 않습니다.
+
+이미지 전체 스모크 테스트는 저장소 루트에서 다음과 같이 실행합니다.
+
+```bash
+bash infrastructure/tests/service-container-smoke.sh
+```
