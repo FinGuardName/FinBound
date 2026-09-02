@@ -119,18 +119,21 @@ def test_prompt_endpoint_rejects_hash_mismatch() -> None:
 def test_prompt_endpoint_rejects_unknown_language_and_excessive_input() -> None:
     language = _payload("정상 입력")
     language["contentLanguage"] = "ja"
-    excessive = _payload("a" * 4097)
+    sensitive_prompt = "private-financial-prompt-" + ("a" * 4097)
+    excessive = _payload(sensitive_prompt)
 
-    assert (
-        client.post("/internal/v1/risk/prompt", json=language, headers=INTERNAL_HEADERS).status_code
-        == 422
+    language_response = client.post(
+        "/internal/v1/risk/prompt", json=language, headers=INTERNAL_HEADERS
     )
-    assert (
-        client.post(
-            "/internal/v1/risk/prompt", json=excessive, headers=INTERNAL_HEADERS
-        ).status_code
-        == 422
+    excessive_response = client.post(
+        "/internal/v1/risk/prompt", json=excessive, headers=INTERNAL_HEADERS
     )
+
+    assert language_response.status_code == 422
+    assert language_response.json() == {"detail": "REQUEST_VALIDATION_FAILED"}
+    assert excessive_response.status_code == 422
+    assert excessive_response.json() == {"detail": "REQUEST_VALIDATION_FAILED"}
+    assert sensitive_prompt not in excessive_response.text
 
 
 def test_prompt_endpoint_requires_internal_credential() -> None:

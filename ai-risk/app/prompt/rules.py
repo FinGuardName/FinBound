@@ -124,7 +124,12 @@ def normalize_prompt_text(text: str) -> str:
 
 
 def detect_rule_matches(text: str) -> tuple[RuleMatch, ...]:
-    searchable = QUOTED_TEXT.sub(" ", text)
+    unquoted = QUOTED_TEXT.sub(" ", text)
+    has_direct_action = DIRECT_ACTION.search(unquoted) is not None
+    # Quoted attack text is normally treated as data so explanations and reviews do not
+    # become false positives. An explicit action outside the quote changes that context:
+    # the quoted text is then part of the instruction and must remain searchable.
+    searchable = text if has_direct_action else unquoted
     matches: list[RuleMatch] = []
     for rule in RULES:
         if any(
@@ -132,7 +137,7 @@ def detect_rule_matches(text: str) -> tuple[RuleMatch, ...]:
             for pattern in rule.patterns
         ):
             matches.append(RuleMatch(rule.rule_id, rule.attack_type))
-    if META_CONTEXT.search(searchable) and not DIRECT_ACTION.search(searchable):
+    if META_CONTEXT.search(unquoted) and not has_direct_action:
         return tuple(
             match
             for match in matches

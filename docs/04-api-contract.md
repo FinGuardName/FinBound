@@ -448,6 +448,8 @@ POST /internal/v1/risk/prompt
 ```
 
 Core가 결과를 PromptRiskSnapshot으로 저장한다. FastAPI는 원문을 저장하거나 로깅하지 않는다.
+Request Schema 검증 실패는 거부된 값이나 원문을 반사하지 않고
+`422 {"detail":"REQUEST_VALIDATION_FAILED"}`로 응답한다.
 
 ---
 

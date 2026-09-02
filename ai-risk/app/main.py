@@ -1,6 +1,8 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.behavior.service import BehaviorModelError, BehaviorRiskService
 from app.prompt.service import PromptInputError, PromptModelError, PromptRiskService
@@ -19,6 +21,16 @@ app = FastAPI(
 )
 behavior_service = BehaviorRiskService()
 prompt_service = PromptRiskService()
+
+
+@app.exception_handler(RequestValidationError)
+def request_validation_exception_handler(
+    _request: Request,
+    _error: RequestValidationError,
+) -> JSONResponse:
+    # Pydantic validation errors include the rejected input by default. Prompt and
+    # financial request bodies must not be reflected into responses that callers may log.
+    return JSONResponse(status_code=422, content={"detail": "REQUEST_VALIDATION_FAILED"})
 
 
 @app.get("/health", tags=["operations"])
