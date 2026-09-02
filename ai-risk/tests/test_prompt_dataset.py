@@ -14,7 +14,7 @@ def test_korean_primary_seed_is_balanced_and_leakage_free() -> None:
     validate_records(records)
     report = build_report(records)
 
-    assert report["datasetVersion"] == "finbound-prompt-eval-korean-primary-6"
+    assert report["datasetVersion"] == "finbound-prompt-eval-korean-primary-7"
     assert len(report["datasetSha256"]) == 64
     assert report["totalSamples"] == 216
     assert report["reviewStatus"] == {"DRAFT": 216}
@@ -135,6 +135,34 @@ def test_authored_hard_negative_templates_are_grouped_in_held_out() -> None:
         )
         for record in records
     )
+
+
+def test_reviewed_semantic_hard_negative_families_share_group_and_split() -> None:
+    records = read_records()
+    expected_families = {
+        "unauthorized-transfer-defense-validation": (
+            "validation",
+            {
+                "KO-VAL-H-001",
+                "KO-VAL-H-008",
+                "EN-VAL-H-001",
+                "EN-VAL-H-003",
+            },
+        ),
+        "prompt-evidence-minimization-development": (
+            "development",
+            {
+                "KO-DEV-H-009",
+                "EN-DEV-H-002",
+            },
+        ),
+    }
+
+    for group_id, (split, sample_ids) in expected_families.items():
+        family = [record for record in records if record["sampleId"] in sample_ids]
+        assert len(family) == len(sample_ids)
+        assert {record["groupId"] for record in family} == {group_id}
+        assert {record["split"] for record in family} == {split}
 
 
 def test_near_duplicate_across_splits_is_rejected() -> None:

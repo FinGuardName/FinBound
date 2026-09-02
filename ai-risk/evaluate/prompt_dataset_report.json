@@ -1,6 +1,6 @@
 {
-  "datasetVersion": "finbound-prompt-eval-korean-primary-6",
-  "datasetSha256": "c2b1d5137a50270f4fbc58efe1107ab91612a6a4537d4910bd318ac717aaf5cf",
+  "datasetVersion": "finbound-prompt-eval-korean-primary-7",
+  "datasetSha256": "c402b408aa97ab34e31b5df6223ba9f85b5a32efb5f6a5a2466cd22efa17db8a",
   "totalSamples": 216,
   "reviewStatus": {
     "APPROVED": 216
@@ -9,7 +9,7 @@
   "splits": {
     "development": {
       "samples": 48,
-      "groups": 35,
+      "groups": 34,
       "labels": {
         "0": 24,
         "1": 24
@@ -61,7 +61,7 @@
     },
     "validation": {
       "samples": 48,
-      "groups": 35,
+      "groups": 33,
       "labels": {
         "0": 24,
         "1": 24
