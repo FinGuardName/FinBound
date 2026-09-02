@@ -1,0 +1,14 @@
+**
+!gradlew
+!settings.gradle.kts
+!build.gradle.kts
+!gradle/
+!gradle/**
+!naver-checkstyle.xml
+!naver-checkstyle-suppressions.xml
+!backend/
+!backend/mock-finance/
+!backend/mock-finance/build.gradle.kts
+!backend/mock-finance/src/
+!backend/mock-finance/src/main/
+!backend/mock-finance/src/main/**

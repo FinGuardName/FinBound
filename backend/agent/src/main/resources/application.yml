@@ -10,6 +10,6 @@ finguard:
     base-url: ${CORE_API_BASE_URL:http://localhost:8080}
   agent:
     gateway-base-url: ${GATEWAY_BASE_URL:http://localhost:8081}
-    service-credential: ${AGENT_SERVICE_CREDENTIAL}
-    internal-credential: ${FINGUARD_INTERNAL_CREDENTIAL}
+    service-credential: ${AGENT_SERVICE_CREDENTIAL:}
+    internal-credential: ${FINGUARD_INTERNAL_CREDENTIAL:}
     gateway-timeout: ${GATEWAY_TIMEOUT:3s}

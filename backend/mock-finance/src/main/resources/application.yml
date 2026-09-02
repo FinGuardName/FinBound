@@ -7,4 +7,4 @@ server:
 
 finguard:
   mock-finance:
-    internal-credential: ${FINGUARD_INTERNAL_CREDENTIAL}
+    internal-credential: ${FINGUARD_INTERNAL_CREDENTIAL:}
