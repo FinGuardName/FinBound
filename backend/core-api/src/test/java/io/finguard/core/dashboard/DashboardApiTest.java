@@ -112,8 +112,22 @@ class DashboardApiTest {
         assertThat(body.get("auditEventId").asText()).isEqualTo("AUD-001");
         assertThat(body.get("decision").asText()).isEqualTo("ALLOW");
         assertThat(body.get("systemOutcome").asText()).isEqualTo("COMPLETED");
-        // 아직 Resolver를 거치지 않은 기록이라 근거는 비어 있다. 칸이 없는 것과 다르다.
-        assertThat(body.hasNonNull("scopeStatus")).isFalse();
+        // 아직 Resolver를 거치지 않은 기록이라 근거가 없다. 스키마의 scopeStatus는 enum이라
+        // null을 허용하지 않으므로 키 자체가 없어야 한다. hasNonNull은 "키는 있고 값이 null"을
+        // 통과시켜 이 위반을 못 잡는다 — has로 부재를 본다.
+        assertThat(body.has("scopeStatus")).isFalse();
+    }
+
+    @Test
+    void auditEventWithoutResolvedScopeOmitsRequestedDataInsteadOfSendingAnEmptyList() {
+        // audit-event.schema.json이 requestedData에 minItems:1을 건다. Resolver 전에는 담을 값이
+        // 없으므로 빈 배열이 아니라 키가 없어야 한다. 빈 배열은 "요청한 자료가 없다"는 거짓 사실이다.
+        insertAudit("AUD-001", "REQ-001", "ALLOW", "COMPLETED", "2026-08-25T10:00:00Z");
+
+        JsonNode body = getAsViewer("/api/v1/audit-events/AUD-001").getBody();
+
+        assertThat(body).isNotNull();
+        assertThat(body.has("requestedData")).isFalse();
     }
 
     @Test
@@ -138,9 +152,11 @@ class DashboardApiTest {
 
         assertThat(body).isNotNull();
         assertThat(body.get("decision").asText()).isEqualTo("BLOCK");
-        assertThat(body.hasNonNull("success")).isFalse();
-        assertThat(body.hasNonNull("recordsRead")).isFalse();
-        assertThat(body.hasNonNull("latencyMs")).isFalse();
+        // 스키마는 값이 아니라 키의 존재 자체를 금지한다("not": {"anyOf": [{"required": [...]}]}).
+        // JSON Schema의 required는 값이 null이어도 "있음"으로 보므로 "success": null도 위반이다.
+        assertThat(body.has("success")).isFalse();
+        assertThat(body.has("recordsRead")).isFalse();
+        assertThat(body.has("latencyMs")).isFalse();
     }
 
     @Test
@@ -153,7 +169,8 @@ class DashboardApiTest {
 
         assertThat(body).isNotNull();
         assertThat(body.get("status").asText()).isEqualTo("PROCESSING");
-        assertThat(body.hasNonNull("systemOutcome")).isFalse();
+        // systemOutcome은 type:string 이라 null이면 타입 위반이다. 키가 없어야 한다.
+        assertThat(body.has("systemOutcome")).isFalse();
     }
 
     @Test

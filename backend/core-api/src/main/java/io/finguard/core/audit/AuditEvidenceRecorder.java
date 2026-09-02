@@ -34,12 +34,25 @@ public class AuditEvidenceRecorder {
     /**
      * 부르는 쪽 트랜잭션에 합류한다. 별도 트랜잭션으로 떼면 기록이 실패해도 resolve가 성공하는데,
      * 그게 바로 막으려는 상태다.
+     *
+     * <p><strong>행을 찾은 뒤 그 행이 이 실행의 것인지 확인한다.</strong> {@code requestId}는 요청
+     * 본문에서 오므로 대상을 고르는 값이지 소유를 증명하는 값이 아니다({@code docs/04} §1.4가
+     * {@code verifiedAgentId}에 대해 이미 같은 입장이다). 확인하지 않으면 남의 감사행에 내 Passport와
+     * Scope를 적을 수 있고, set-once라 원래 주인은 자기 근거를 영영 남기지 못한다.
+     *
+     * <p><strong>대조 대상은 {@code agentRunId}이지 Agent가 아니다.</strong> 헤더의 Agent가 감사행과
+     * 다른 것은 거부할 일이 아니라 {@code agentBinding} VIOLATION으로 <em>기록할</em> 일이다. 그걸
+     * 409로 막으면 스푸핑 시도가 아무 흔적도 남기지 않고 사라진다. 실행 단위가 같은지만 본다.
+     *
+     * <p>불일치를 부재와 같은 409로 돌려준다. 나누면 어떤 requestId가 살아 있는지 되물어 확인하는
+     * 통로가 된다({@code docs/06} §26).
      */
     @Transactional
-    public void record(String requestId, ResolvedAuditContext context) {
+    public void record(String requestId, String agentRunId, ResolvedAuditContext context) {
         AuditEvent event =
                 auditEvents
                         .findByRequestId(requestId)
+                        .filter(candidate -> candidate.getAgentRunId().equals(agentRunId))
                         .orElseThrow(() -> new AuditEvidenceRejectedException(requestId));
 
         try {

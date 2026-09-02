@@ -116,6 +116,39 @@ class AuditPersistenceApiTest {
         assertThat(auditCount(requestId)).isZero();
     }
 
+    /**
+     * {@code audit-event.schema.json}:8-16이 {@code traceId}를 필수로 정의한다. 생성 경로가 이걸
+     * 받지 않으면 저장되는 모든 기록이 스키마 위반이고, 조회 응답은 필수 속성을 빠뜨린 채 나간다.
+     */
+    @Test
+    void rejectsCreationWithoutTheRequiredTraceId() {
+        String requestId = requestId();
+        HttpHeaders headers = internalHeaders(true);
+        headers.set(VERIFIED_AGENT_HEADER, "LOAN-AGENT-01");
+
+        ResponseEntity<JsonNode> response =
+                exchange(
+                        "/internal/v1/audits",
+                        HttpMethod.POST,
+                        """
+                        {
+                          "requestId": "%s",
+                          "agentRunId": "RUN-21",
+                          "verifiedAgentId": "LOAN-AGENT-01",
+                          "caseId": "LOAN-2026-001",
+                          "targetConsumerId": "CUST-1001",
+                          "requestedTool": "CREDIT_SCORE_READ",
+                          "status": "PROCESSING",
+                          "requestedAt": "%s"
+                        }
+                        """
+                                .formatted(requestId, REQUESTED_AT),
+                        headers);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(auditCount(requestId)).isZero();
+    }
+
     @Test
     void rejectsDuplicateRequestIdSoOnlyTheWinnerCanProceed() {
         String requestId = requestId();
@@ -433,6 +466,91 @@ class AuditPersistenceApiTest {
         assertThat(auditStatus(requestId)).isEqualTo("PROCESSING");
     }
 
+    /**
+     * 아래 다섯은 {@code contracts/audit/execution-outcome.schema.json}:48-104의 조건부 불변식 중
+     * 그동안 코드에 없던 것들이다. 스키마가 금지하는 상태를 저장하면 감사 기록이 거짓 사실을
+     * 말하게 된다 — "차단했다면서 응답은 내보냈다"가 그대로 남는다.
+     */
+    @Test
+    void rejectsABlockedOutcomeThatClaimsTheResponseWasReleased() {
+        assertOutcomeRejected(
+                """
+                {
+                  "decision": "BLOCK",
+                  "systemOutcome": "COMPLETED",
+                  "reasonCodes": ["CASE_SCOPE_VIOLATION"],
+                  "downstreamReached": false,
+                  "responseReleased": true,
+                  "completedAt": "%s"
+                }
+                """);
+    }
+
+    @Test
+    void rejectsABlockedOutcomeWithoutAnyReasonCode() {
+        assertOutcomeRejected(
+                """
+                {
+                  "decision": "BLOCK",
+                  "systemOutcome": "COMPLETED",
+                  "reasonCodes": [],
+                  "downstreamReached": false,
+                  "responseReleased": false,
+                  "completedAt": "%s"
+                }
+                """);
+    }
+
+    @Test
+    void rejectsAnErrorOutcomeThatClaimsTheResponseWasReleased() {
+        assertOutcomeRejected(
+                """
+                {
+                  "decision": "ALLOW",
+                  "systemOutcome": "ERROR",
+                  "reasonCodes": ["DOWNSTREAM_TIMEOUT"],
+                  "downstreamReached": true,
+                  "responseReleased": true,
+                  "success": false,
+                  "errorLocation": "DOWNSTREAM",
+                  "completedAt": "%s"
+                }
+                """);
+    }
+
+    @Test
+    void rejectsAnErrorOutcomeWithoutAnyReasonCode() {
+        assertOutcomeRejected(
+                """
+                {
+                  "decision": "ALLOW",
+                  "systemOutcome": "ERROR",
+                  "reasonCodes": [],
+                  "downstreamReached": true,
+                  "responseReleased": false,
+                  "success": false,
+                  "errorLocation": "DOWNSTREAM",
+                  "completedAt": "%s"
+                }
+                """);
+    }
+
+    @Test
+    void rejectsAnAllowedCompletionThatNeverReachedDownstream() {
+        assertOutcomeRejected(
+                """
+                {
+                  "decision": "ALLOW",
+                  "systemOutcome": "COMPLETED",
+                  "reasonCodes": [],
+                  "downstreamReached": false,
+                  "responseReleased": true,
+                  "success": true,
+                  "completedAt": "%s"
+                }
+                """);
+    }
+
     @Test
     void doesNotAllowAFinalAuditToBeOverwritten() {
         String requestId = requestId();
@@ -561,6 +679,18 @@ class AuditPersistenceApiTest {
                 """
                         .formatted(requestId, bodyAgentId, REQUESTED_AT);
         return exchange("/internal/v1/audits", HttpMethod.POST, body, headers);
+    }
+
+    /** 결과 본문이 거부되고 감사행이 PROCESSING에 머무르는지 본다. {@code %s}는 completedAt이다. */
+    private void assertOutcomeRejected(String outcomeTemplate) {
+        String requestId = requestId();
+        createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        ResponseEntity<JsonNode> response =
+                updateOutcome(requestId, "LOAN-AGENT-01", outcomeTemplate.formatted(COMPLETED_AT));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(auditStatus(requestId)).isEqualTo("PROCESSING");
     }
 
     private ResponseEntity<JsonNode> updateOutcome(

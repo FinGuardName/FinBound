@@ -170,6 +170,30 @@ class ContextResolveApiTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
+    /**
+     * requestId는 요청 본문에서 온다. 그 값으로 찾은 감사행이 지금 해석 중인 실행의 것인지 보지
+     * 않으면, 남의 행에 내 Passport·Employee·Scope를 적을 수 있다. 게다가 한 번 적히면 set-once라
+     * 원래 주인은 자기 근거를 영영 남기지 못한다 — 증거 위조이면서 동시에 봉쇄다.
+     */
+    @Test
+    void refusesToWriteEvidenceOntoAnAuditRowThatBelongsToAnotherRun() {
+        RunReferences owner = startAgentRun();
+        createAudit(owner);
+        RunReferences other = startAgentRun();
+
+        ResponseEntity<JsonNode> response =
+                resolve(other, "LOAN-AGENT-01", "CUST-1001", "CREDIT_SCORE_READ", "CREDIT_SCORE");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        // 주인의 행은 손대지 않은 채로 남아야 한다.
+        Map<String, Object> row =
+                jdbcTemplate.queryForMap(
+                        "select agent_run_id, passport_id from audit_events where request_id = ?",
+                        REQUEST_ID);
+        assertThat(row.get("agent_run_id")).isEqualTo(owner.agentRunId());
+        assertThat(row.get("passport_id")).isNull();
+    }
+
     @Test
     void reportsAMissingPassportAsTaskPassportNotFound() {
         RunReferences missing = new RunReferences("RUN-MISSING", "PASS-MISSING", "LOAN-2026-001");

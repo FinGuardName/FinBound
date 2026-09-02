@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.finguard.core.domain.AuditEvent;
 import io.finguard.core.domain.AuditScopeStatus;
 import io.finguard.core.domain.AuditStatus;
@@ -23,7 +25,13 @@ import io.finguard.core.domain.Tool;
  *
  * <p>behavior 등급·버전 3개는 여기 없다. 저장 칸은 {@code V3}가 만들었지만 Gateway가 실어 보내는
  * 경로가 아직 없어 항상 null이다 — 없는 값을 키만 만들어 내보내면 "채워졌는데 비었다"로 읽힌다.
+ *
+ * <p><strong>null은 키째로 뺀다.</strong> 스키마의 선택적 속성은 대부분 enum이거나 타입이 정해져 있어
+ * null을 값으로 허용하지 않고, BLOCK의 실행 측정값 셋은 값이 아니라 <em>키의 존재 자체</em>를 금지한다
+ * ({@code "not": {"anyOf": [{"required": [...]}]}}). JSON Schema의 {@code required}는 값이 null이어도
+ * "있음"으로 보므로 {@code "success": null}도 위반이다. Jackson 기본값은 키를 남기므로 여기서 끈다.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuditEventView(
         String auditEventId,
         String requestId,
@@ -72,7 +80,7 @@ public record AuditEventView(
                 event.getPassportId(),
                 event.getTargetConsumerId(),
                 event.getRequestedTool(),
-                Set.copyOf(event.getRequestedData()),
+                requestedDataOf(event),
                 event.getScopeStatus(),
                 event.getPromptRiskEvaluationStatus(),
                 event.getPromptRisk(),
@@ -91,6 +99,18 @@ public record AuditEventView(
                 event.getStatus(),
                 event.getRequestedAt(),
                 event.getCompletedAt());
+    }
+
+    /**
+     * Resolver를 거치기 전에는 요청 자료가 없다.
+     *
+     * <p>{@code audit-event.schema.json}이 {@code requestedData}에 {@code minItems: 1}을 건다. 빈
+     * 배열은 스키마 위반이면서 동시에 <strong>"요청한 자료가 없다"는 거짓 사실</strong>이다 — 아직
+     * 해석되지 않은 것과 해석했더니 비어 있는 것은 다르다. 값이 없으면 키를 만들지 않는다.
+     */
+    private static Set<DataType> requestedDataOf(AuditEvent event) {
+        Set<DataType> requestedData = event.getRequestedData();
+        return requestedData.isEmpty() ? null : Set.copyOf(requestedData);
     }
 
     /**

@@ -154,6 +154,7 @@ public class ContextResolveService {
         // 식별자는 요청 본문이 아니라 해석된 Passport에서 가져온다 — 본문 값은 인증수단이 아니다(docs/04 §1.4).
         auditEvidence.record(
                 request.requestId().toString(),
+                agentRun.getAgentRunId(),
                 new ResolvedAuditContext(
                         passport.getEmployeeId(),
                         passport.getPassportId(),
