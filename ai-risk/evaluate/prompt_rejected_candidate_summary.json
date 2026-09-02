@@ -1,0 +1,21 @@
+{
+  "candidateStatus": "REJECTED",
+  "candidate": "HikmaAI pretrained ONNX + rules without domain adapter",
+  "selectionReason": "Held-out recall was insufficient; aggregate result is retained for transparency and was not used to tune the final adapter or thresholds.",
+  "heldOut": {
+    "samples": 120,
+    "modelOnly": {
+      "precision": 1.0,
+      "recall": 0.133333,
+      "f1": 0.235294,
+      "falsePositiveRate": 0.0
+    },
+    "combined": {
+      "precision": 0.909091,
+      "recall": 0.333333,
+      "f1": 0.487805,
+      "falsePositiveRate": 0.033333
+    }
+  },
+  "rawPromptIncluded": false
+}
