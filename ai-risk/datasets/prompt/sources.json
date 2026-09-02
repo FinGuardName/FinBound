@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "reviewedAt": "2026-09-01",
+  "sources": [
+    {
+      "sourceId": "hf-deepset-prompt-injections",
+      "repository": "deepset/prompt-injections",
+      "revision": "4f61ecb038e9c3fb77e21034b22511b523772cdd",
+      "parquetRevision": "569e5647fe4f7a9288923f9c6402ec66f865bdf7",
+      "license": "apache-2.0",
+      "config": "default",
+      "splits": { "train": 546, "test": 116 },
+      "artifacts": {
+        "train": [
+          {
+            "path": "default/train/0000.parquet",
+            "size": 40323,
+            "sha256": "2e10bc7ab30f542c97e4e83e2a5683000b5057d25ec10908784c631d44124c04"
+          }
+        ],
+        "test": [
+          {
+            "path": "default/test/0000.parquet",
+            "size": 10892,
+            "sha256": "39ac797cabc157eeed58435a08593b2952bb6cb16fc394a2d383f447cc7b246e"
+          }
+        ]
+      },
+      "decision": "APPROVED_BASELINE",
+      "notes": "Small English binary baseline. Keep its upstream test separate from FinBound held-out data."
+    },
+    {
+      "sourceId": "hf-neuralchemy-prompt-injection",
+      "repository": "neuralchemy/Prompt-injection-dataset",
+      "revision": "7d70432dfcf47a821612cbf9d34e9d9e3ad20e75",
+      "license": "apache-2.0",
+      "config": "core",
+      "splits": { "train": 4391, "validation": 941, "test": 942 },
+      "decision": "REVIEW_PROVENANCE",
+      "notes": "Useful groupId and hard-negative schema. Do not ingest until mixed upstream source terms are reviewed row by row."
+    },
+    {
+      "sourceId": "hf-lakera-gandalf-ignore",
+      "repository": "Lakera/gandalf_ignore_instructions",
+      "revision": "04737b65e90a6794ec227012e4a255a7def6344b",
+      "parquetRevision": "4b6e4b33f91faaff472a7225a4555937a34e1531",
+      "license": "mit",
+      "config": "default",
+      "splits": { "train": 777, "validation": 111, "test": 112 },
+      "artifacts": {
+        "train": [
+          {
+            "path": "default/train/0000.parquet",
+            "size": 36715,
+            "sha256": "5b6acf3e5a5998d21f8e1222bb45bbdec25a14408747b1cd63bebef4a75fa439"
+          }
+        ],
+        "validation": [
+          {
+            "path": "default/validation/0000.parquet",
+            "size": 7464,
+            "sha256": "f51ab3e3407a368845b0f57932cc745c09280429416d7507bd178a16326a79f6"
+          }
+        ],
+        "test": [
+          {
+            "path": "default/test/0000.parquet",
+            "size": 7336,
+            "sha256": "56b646d133335ebc535266bd55dbe1b5bee7caa4b95bf49d040684b9b5dd9972"
+          }
+        ]
+      },
+      "decision": "APPROVED_ATTACK_SUPPLEMENT",
+      "notes": "Attack-only English supplement with acknowledged automatic-filtering noise; never use as the sole evaluation set."
+    },
+    {
+      "sourceId": "hf-reshabhs-spml",
+      "repository": "reshabhs/SPML_Chatbot_Prompt_Injection",
+      "revision": "02ce8084e979bc7d4c24ee35d22ecb7f2db96ff5",
+      "license": "mit",
+      "config": "default",
+      "splits": { "train": 16012 },
+      "decision": "REFERENCE_ONLY",
+      "notes": "Contains useful finance-role scenarios but uses generated system prompts derived from leaked prompt seeds."
+    },
+    {
+      "sourceId": "hf-promptwall-injection",
+      "repository": "cyberec/promptwall-injection-dataset",
+      "revision": "ff1840ff2e36a8037fd5d851c88d04d3d08b028f",
+      "license": "mit",
+      "config": "default",
+      "splits": { "train": 500 },
+      "decision": "REJECT_KOREAN_EVALUATION",
+      "notes": "430 attacks and 70 safe prompts, but only four Korean attacks, zero Korean safe prompts, and uneven translation quality."
+    }
+  ]
+}
