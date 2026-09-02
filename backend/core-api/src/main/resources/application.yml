@@ -15,9 +15,6 @@ spring:
     fail-on-missing-locations: true
 
 finguard:
-  agent-simulator:
-    base-url: ${AGENT_BASE_URL:http://localhost:8082}
-    timeout: ${AGENT_TIMEOUT:3s}
   internal:
     # 값이 없으면 기동에 실패한다. 인증이 사실상 꺼진 Internal API가 떠 있는 상태를 만들지 않는다.
     credential: ${FINGUARD_INTERNAL_CREDENTIAL:}

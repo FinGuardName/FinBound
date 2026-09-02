@@ -17,20 +17,15 @@ import jakarta.validation.Valid;
  * AgentRun 생성과 Task Passport 발급 — {@code docs/04-api-contract.md} §3.
  *
  * <p>Core가 AgentRun과 TaskPassport를 소유한다({@code docs/02-architecture.md} §7.1).
- * 생성 성공 후 Core가 발급 참조로 P0 Agent Simulator를 호출한다.
+ * Agent 측은 이 엔드포인트를 호출한다.
  */
 @RestController
 public class AgentRunController {
 
     private final AgentRunService agentRunService;
-    private final AgentSimulatorClient agentSimulatorClient;
 
-    public AgentRunController(
-            AgentRunService agentRunService,
-            AgentSimulatorClient agentSimulatorClient
-    ) {
+    public AgentRunController(AgentRunService agentRunService) {
         this.agentRunService = agentRunService;
-        this.agentSimulatorClient = agentSimulatorClient;
     }
 
     /**
@@ -55,12 +50,6 @@ public class AgentRunController {
         AgentRunStarted started =
                 agentRunService.start(
                         request.employeeId(), request.consumerId(), request.taskType(), request.inputText());
-        try {
-            agentSimulatorClient.simulate(started.agentRunId(), started.passportId());
-        } catch (AgentSimulatorCallException exception) {
-            agentRunService.fail(started.agentRunId());
-            throw exception;
-        }
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(

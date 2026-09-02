@@ -126,39 +126,20 @@ Employee Authority / Permission Template / Mandate 조회
 
 새 Document가 AgentRun에 추가될 때도 동일한 입력 등록/Prompt Risk 절차를 수행한다.
 
-### P0 Agent 실행 연결 — #59 제안
+### P0 Agent 실행 책임 — #59 / #74
 
-> #59 PR의 제안 구현이다. Review에서 Core가 실행 오케스트레이션을 소유하는 것으로 승인되면
-> P0 Contract로 유지한다.
+Core가 Agent 실행 오케스트레이션을 소유한다. Agent가 Core 생성 API를 호출하는 흐름이 아니다.
+#59는 Core가 전달한 `agentRunId`, `passportId`, `scenario`를 받는 Simulator와
+Gateway 요청 생성·응답 검증을 담당한다. Case/Input Reference는 Core의 AgentRun에 연결하며,
+Agent는 식별자를 발급·저장하거나 입력 원문·Operator Credential을 보유하지 않는다.
 
-Core는 위 트랜잭션이 성공해 `agentRunId`와 `passportId`가 발급된 뒤 §3.1 Agent Simulator를
-동기 호출한다. P0 업무 생성 요청에는 Simulator Scenario가 없으므로 Core는
-`NORMAL_CREDIT_SCORE`를 사용한다. `CASE_SCOPE_ATTACK`은 보안 테스트와 데모가 §3.1 Endpoint를
-직접 호출할 때만 사용한다.
+Core의 생성 트랜잭션 이후 호출, 실행 상태 갱신 및 오류 처리는 #74 / PR #75의 담당 범위다.
+PR #75의 커밋 후 비동기 실행과 선택적 `scenario` 필드는 해당 PR에서 검토한다.
+#59는 동기/비동기 실행 방식, Core API의 실행 오류 응답 코드 및 완료 상태 계약을 별도로
+확정하지 않는다. Agent의 입력/응답 계약은 §3.1을 따른다.
 
-```text
-POST /api/v1/agent-runs 성공
-→ Core 발급 agentRunId / passportId
-→ Core POST /internal/v1/agent-simulations (NORMAL_CREDIT_SCORE)
-→ Agent POST /gateway/v1/tool-calls
-```
-
-Core는 Agent Simulator 호출에 `X-FinGuard-Internal-Credential`을 사용한다. Agent 호출의
-Timeout·4xx·5xx·빈 본문·잘못된 응답은 AgentRun 생성 성공 응답이나 `ALLOW`로 변환하지 않는다.
-Agent가 호출되지 않으면 Gateway도 호출되지 않으며, Agent는 Core Operator Credential을
-보유하거나 Core AgentRun 생성 API를 호출하지 않는다.
-
-제안 Core API 오류 Code:
-
-```text
-AGENT_SIMULATOR_TIMEOUT
-AGENT_SIMULATOR_UNAVAILABLE
-AGENT_SIMULATOR_RESPONSE_INVALID
-```
-
-위 값은 Core 호출자에게 반환하는 시스템 오류 Code이며 Policy Decision이나 Audit Reason Code가
-아니다.
-
+생성 실패로 Simulator를 호출하지 않은 요청은 Gateway로 진행하지 않는다.
+Simulator 호출 이후 Timeout은 이미 시작된 금융 실행의 취소나 미도달을 보장하지 않는다.
 ---
 
 ## 3.1 Agent Simulator — P0 Runtime Contract
@@ -194,6 +175,9 @@ CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 
 Simulator는 Scenario를 §5의 Gateway Tool Call로 변환한다. Gateway 응답의 `ALLOW/BLOCK`은
 정책 결과로 그대로 반환하며, Timeout·5xx·본문 누락은 성공이나 `ALLOW`로 바꾸지 않는다.
+Agent는 `requestId`와 `decision`, ALLOW의 비어 있지 않은 객체 `result`, BLOCK의 비어 있지
+않은 `reasonCodes`를 검증한다. `403 + ALLOW` 또는 금융 결과가 포함된 BLOCK처럼 서로
+모순되는 응답과 잘못된 JSON은 `GATEWAY_RESPONSE_INVALID`로 처리한다.
 
 Agent Simulator 오류 Code:
 

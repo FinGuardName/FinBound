@@ -274,11 +274,15 @@ Employee Authority 조회
 → Effective Permission 계산
 → Task Passport 발급
 → AgentRun RUNNING
+→ 생성 트랜잭션 커밋 후 Core가 Agent Simulator 호출
+→ Agent가 발급된 agentRunId / passportId로 Gateway 호출
 ```
 
 ### 보안 규칙
 
 - AgentRun 입력 원문은 통제된 저장소에 보관한다.
+- AgentRun/Case/Passport/Input Reference의 발급·저장은 Core 책임이다.
+- P0 Agent는 Core가 호출하는 결정론적 Simulator이며 Core 생성 API를 호출하지 않는다.
 - Audit에는 원문 대신 `inputRef / inputHash`만 저장한다.
 - Tool Call 시 Agent가 Prompt를 다시 첨부한 값을 신뢰하지 않는다.
 

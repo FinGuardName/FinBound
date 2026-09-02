@@ -42,6 +42,18 @@ PASS-001
 
 ## 3. 정상 ALLOW
 
+### #59 AgentRun → Simulator 연결 (F06, F07, AC-01, AC-14)
+
+- Core는 AgentRun 생성 트랜잭션 커밋 후에만 Simulator를 호출한다 (#74 검증 범위).
+- Core 생성 거부·저장 실패·Timeout이면 Simulator 미호출이며 Gateway로 진행하지 않는다 (#74).
+- Agent는 Core 발급 `agentRunId`/`passportId`를 변경 없이 Gateway Body에 전달한다.
+- 참조 누락/null/공백은 HTTP 400이며 Gateway 호출 0회다.
+- 정상 Simulator 실행은 Gateway 호출 1회이며 Runtime Body에 Identity/권한/입력 원문이 없다.
+- Gateway BLOCK은 그대로 전달하고 오류·Timeout·잘못된 응답은 실행 오류로 구분한다.
+- Simulator 호출 이후 Timeout은 금융 실행 미도달을 보장하지 않는다. 자동 재시도하지 않는다.
+
+### Gateway 이후 정상 흐름
+
 Given:
 
 ```text

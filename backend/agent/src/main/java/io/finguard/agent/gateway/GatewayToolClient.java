@@ -1,9 +1,9 @@
 package io.finguard.agent.gateway;
 
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import org.springframework.core.codec.DecodingException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -17,11 +17,6 @@ import reactor.core.publisher.Mono;
 public class GatewayToolClient {
     static final String REQUEST_ID_HEADER = "X-Request-Id";
     static final String TRACEPARENT_HEADER = "Traceparent";
-
-    private static final Set<PolicyDecision> SUPPORTED_DECISIONS = Set.of(
-            PolicyDecision.ALLOW,
-            PolicyDecision.BLOCK
-    );
 
     private final WebClient webClient;
     private final AgentProperties properties;
@@ -43,13 +38,16 @@ public class GatewayToolClient {
                                 .switchIfEmpty(Mono.error(new GatewayCallException(
                                         "GATEWAY_RESPONSE_INVALID"
                                 )))
-                                .flatMap(this::validateResponse);
+                                .flatMap(body -> validateResponse(
+                                        body, response.statusCode().value()));
                     }
                     return response.releaseBody().then(Mono.error(
                             new GatewayCallException("GATEWAY_REQUEST_FAILED")
                     ));
                 })
                 .timeout(properties.gatewayTimeout())
+                .onErrorMap(DecodingException.class, exception ->
+                        new GatewayCallException("GATEWAY_RESPONSE_INVALID"))
                 .onErrorMap(TimeoutException.class, exception ->
                         new GatewayCallException("GATEWAY_TIMEOUT"))
                 .onErrorMap(
@@ -58,8 +56,22 @@ public class GatewayToolClient {
                 );
     }
 
-    private Mono<GatewayToolCallResponse> validateResponse(GatewayToolCallResponse response) {
-        if (response.decision() == null || !SUPPORTED_DECISIONS.contains(response.decision())) {
+    private Mono<GatewayToolCallResponse> validateResponse(
+            GatewayToolCallResponse response, int status) {
+        if (response.requestId() == null || response.requestId().isBlank()
+                || response.decision() == null) {
+            return Mono.error(new GatewayCallException("GATEWAY_RESPONSE_INVALID"));
+        }
+        if (response.decision() == PolicyDecision.ALLOW
+                && (status == HttpStatus.FORBIDDEN.value()
+                || response.result() == null || !response.result().isObject()
+                || response.result().isEmpty())) {
+            return Mono.error(new GatewayCallException("GATEWAY_RESPONSE_INVALID"));
+        }
+        if (response.decision() == PolicyDecision.BLOCK
+                && (response.reasonCodes().isEmpty()
+                || response.reasonCodes().stream().anyMatch(String::isBlank)
+                || (response.result() != null && !response.result().isNull()))) {
             return Mono.error(new GatewayCallException("GATEWAY_RESPONSE_INVALID"));
         }
         return Mono.just(response);

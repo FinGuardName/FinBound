@@ -38,7 +38,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
       # 값이 없으면 compose가 여기서 멈춘다. 인증이 사실상 꺼진 Internal API를 띄우지 않는다.
       FINGUARD_INTERNAL_CREDENTIAL: ${FINGUARD_INTERNAL_CREDENTIAL:?set FINGUARD_INTERNAL_CREDENTIAL in .env}
-      AGENT_BASE_URL: http://agent:8082
       # 기본은 프로파일 없음 = 데모 시드를 넣지 않는다.
       # PostgreSQL 볼륨이 영속이라 한 번 들어간 시드는 프로파일을 나중에 꺼도 남는다.
       # 되돌릴 수 없는 쪽을 기본값으로 두지 않는다. 시드가 필요하면 docker-compose.demo.yml.
