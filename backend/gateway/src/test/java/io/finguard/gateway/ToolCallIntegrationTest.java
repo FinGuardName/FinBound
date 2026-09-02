@@ -22,6 +22,8 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.http.Fault;
 
+import io.finguard.gateway.filter.RequestIdFilter;
+
 /**
  * Phase 1 회의 데모 시나리오 3개:
  *  - 정상 인증 + customerScope=VIOLATION → 403 CASE_SCOPE_VIOLATION
@@ -37,6 +39,9 @@ class ToolCallIntegrationTest {
 
     @Autowired
     private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private RequestIdFilter requestIdFilter;
 
     @BeforeAll
     static void startOpa() {
@@ -66,7 +71,9 @@ class ToolCallIntegrationTest {
     @BeforeEach
     void setUp() {
         opaMock.resetAll();
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+            .addFilters(requestIdFilter)
+            .build();
     }
 
     @Test
@@ -89,7 +96,7 @@ class ToolCallIntegrationTest {
 
         mockMvc.perform(post("/gateway/v1/tool-calls")
                 .header("Authorization", "Bearer valid-agent-token")
-                .header("X-Request-Id", "DEMO-001")
+                .header("X-Request-Id", "550e8400-e29b-41d4-a716-446655440000")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {

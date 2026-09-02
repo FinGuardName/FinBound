@@ -35,6 +35,7 @@ class RateLimitFilterTest {
             filter.doFilter(request, response, new MockFilterChain());
         }
         assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getContentAsString()).contains("REQUEST_RATE_LIMITED");
     }
 
     @Test
