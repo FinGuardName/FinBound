@@ -64,7 +64,7 @@ UNKNOWN_PROMPT_ATTACK
   "promptRisk": 0.96,
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
-  "modelVersion": "prompt-guard-4",
+  "modelVersion": "prompt-guard-5",
   "evaluatedAt": "2026-08-17T14:01:00+09:00"
 }
 ```
@@ -554,7 +554,7 @@ AI 독립 가치 검증에서는 `Scope 정상 + Hard Limit 미초과 + behavior
   "behaviorRiskLevel": "CRITICAL",
   "historyStatus": "READY",
   "modelVersions": {
-    "prompt": "prompt-guard-4",
+    "prompt": "prompt-guard-5",
     "behavior": "iforest-1"
   },
   "featureVersion": "behavior-features-1",

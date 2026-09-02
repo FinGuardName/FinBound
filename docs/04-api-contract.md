@@ -227,7 +227,7 @@ Audit Reason Code가 아니다. Simulator는 이를 `ALLOW` 또는 `BLOCK`으로
   "promptRisk": 0.05,
   "attackType": null,
   "matchedRules": [],
-  "modelVersion": "prompt-guard-4",
+  "modelVersion": "prompt-guard-5",
   "evaluatedAt": "2026-08-17T21:30:01+09:00"
 }
 ```
@@ -383,7 +383,7 @@ POST /internal/v1/context/resolve
     "promptRisk": 0.05,
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-4"
+    "modelVersion": "prompt-guard-5"
   }
 }
 ```
@@ -442,7 +442,7 @@ POST /internal/v1/risk/prompt
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
   "inputHash": "sha256:...",
-  "modelVersion": "prompt-guard-4",
+  "modelVersion": "prompt-guard-5",
   "evaluatedAt": "2026-08-17T21:32:00+09:00"
 }
 ```

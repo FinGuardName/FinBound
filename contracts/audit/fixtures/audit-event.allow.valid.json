@@ -23,7 +23,7 @@
   },
   "promptRiskEvaluationStatus": "EVALUATED",
   "promptRisk": 0.05,
-  "promptModelVersion": "prompt-guard-4",
+  "promptModelVersion": "prompt-guard-5",
   "behaviorRisk": 0.21,
   "behaviorRiskLevel": "LOW",
   "behaviorFeatureVersion": "behavior-features-1",

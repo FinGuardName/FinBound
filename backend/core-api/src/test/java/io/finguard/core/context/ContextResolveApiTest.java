@@ -88,7 +88,7 @@ class ContextResolveApiTest {
         assertThat(promptRisk.get("detected").asBoolean()).isFalse();
         assertThat(promptRisk.get("promptRisk").decimalValue()).isZero();
         assertThat(promptRisk.get("inputHash").asText()).startsWith("sha256:");
-        assertThat(promptRisk.get("modelVersion").asText()).isEqualTo("prompt-guard-4");
+        assertThat(promptRisk.get("modelVersion").asText()).isEqualTo("prompt-guard-5");
     }
 
     @Test
@@ -198,7 +198,7 @@ class ContextResolveApiTest {
                 "insert into prompt_risk_snapshots"
                         + " (input_ref, input_hash, evaluation_status, detected, prompt_risk,"
                         + "  model_version, evaluated_at)"
-                        + " values (?, ?, 'EVALUATED', false, 0.1000, 'prompt-guard-4', now())",
+                        + " values (?, ?, 'EVALUATED', false, 0.1000, 'prompt-guard-5', now())",
                 "INPUT-LATER",
                 "sha256:later-input");
         jdbcTemplate.update(
