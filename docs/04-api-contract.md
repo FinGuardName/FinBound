@@ -159,6 +159,38 @@ NORMAL_CREDIT_SCORE → CREDIT_SCORE_READ(CUST-1001)
 CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 ```
 
+### #60 Scenario 확장 — 구현 제안, 소비자 Review 필요
+
+기존 두 Scenario는 유지한다. 아래 추가 Scenario의 이름과 Fixture 조건은 #60 PR에서
+검토하며, Core의 Scenario Enum 확장은 #74 / PR #75 담당자와 조율한다.
+Gateway Body에는 Scenario나 권한 근거를 추가하지 않는다. Tool/Data는
+`docs/06-common-conventions.md` §16·17의 기존 Enum만 사용한다.
+
+| Scenario | targetConsumerId | tool | requestedData | 기대 결과 (서버 Context 조건 충족 시) |
+|---|---|---|---|---|
+| `NORMAL_INCOME` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | ALLOW |
+| `NORMAL_DEBT` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | ALLOW |
+| `TOOL_SCOPE_ATTACK` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | BLOCK / `TOOL_SCOPE_VIOLATION` |
+| `DATA_SCOPE_ATTACK` | `CUST-1001` | `CREDIT_SCORE_READ` | `[CREDIT_SCORE, INCOME]` | BLOCK / `DATA_SCOPE_VIOLATION` |
+| `MANDATE_SCOPE_ATTACK` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | BLOCK / `MANDATE_SCOPE_VIOLATION` |
+
+필수 서버 Fixture 조건:
+
+- 정상: 유효한 Case/Passport, 요청 Tool/Data를 허용하는 Authority·Template·Passport·Mandate,
+  낮은 Risk 및 제한 미초과.
+- Tool 공격: Passport가 `INCOME_READ`를 허용하지 않는다. 단일 Tool 위반을 확인하려면
+  Authority/Template은 해당 Tool을, Passport/Mandate는 `INCOME`을 허용한다.
+- Data 공격: Passport가 `CREDIT_SCORE_READ`와 `CREDIT_SCORE`는 허용하지만 `INCOME`은
+  허용하지 않는다. 다른 Authority/Template/Mandate는 요청 Data를 허용한다.
+- Mandate 공격: 현재 Mandate가 `DEBT`를 허용하지 않는다. 유효한 권한 교집합으로 발급한
+  Passport에서도 `DEBT`는 제외되므로 `DATA_SCOPE_VIOLATION`이 함께 나올 수 있다.
+  Mandate 변경으로 재현한다면 버전 변경에 따른 `TASK_PASSPORT_STALE`도 구분해야 한다.
+
+Scenario는 요청 생성만 결정한다. 모든 권한을 허용하는 기본 Seed에서는 공격 이름이어도
+ALLOW일 수 있다. Agent는 Scope를 계산하거나 기대 Reason Code를 생성·추가·정렬하지 않는다.
+전용 Fixture의 발급/관리는 Core·통합 테스트 담당 범위이며, Agent가 DB나 Passport를 수정하지 않는다.
+정상 INCOME과 Tool 공격, 정상 DEBT와 Mandate 공격은 요청 내용이 같고 서버 Context가 다르다.
+
 Simulator는 Scenario를 §5의 Gateway Tool Call로 변환한다. Gateway 응답의 `ALLOW/BLOCK`은
 정책 결과로 그대로 반환하며, Timeout·5xx·본문 누락은 성공이나 `ALLOW`로 바꾸지 않는다.
 

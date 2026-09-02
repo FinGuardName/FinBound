@@ -9,7 +9,7 @@ Backend 3 소유 영역입니다. P0에서는 Spring AI 연동 또는 결정론�
 
 ## 현재 구현 상태
 
-P0 통합 전 정상 요청과 Case Scope 공격 요청을 반복 가능하게 생성하는 결정론적
+P0 통합 전 정상 요청과 Case/Tool/Data/Mandate Scope 공격 요청을 반복 가능하게 생성하는 결정론적
 Simulator를 제공합니다. 실제 LLM은 아직 사용하지 않습니다.
 
 P0 Runtime Contract입니다. P1에서 실제 Agent Runtime으로 교체할 때 Endpoint와 DTO를
@@ -35,8 +35,14 @@ Content-Type: application/json
 |---|---|---|
 | `NORMAL_CREDIT_SCORE` | `CUST-1001` | 정상 ALLOW 흐름 |
 | `CASE_SCOPE_ATTACK` | `CUST-9999` | 현재 Case 밖 고객 조회 시도 |
+| `NORMAL_INCOME` | `CUST-1001` | INCOME_READ / INCOME 정상 조회 |
+| `NORMAL_DEBT` | `CUST-1001` | DEBT_READ / DEBT 정상 조회 |
+| `TOOL_SCOPE_ATTACK` | `CUST-1001` | INCOME_READ / INCOME, Passport 밖 Tool 시도 |
+| `DATA_SCOPE_ATTACK` | `CUST-1001` | CREDIT_SCORE_READ / CREDIT_SCORE + INCOME, 추가 Data 시도 |
+| `MANDATE_SCOPE_ATTACK` | `CUST-1001` | DEBT_READ / DEBT, Mandate 밖 Data 시도 |
 
-Simulator는 두 Scenario 모두 다음 Gateway Contract로 변환합니다.
+추가 Scenario는 #60의 계약 확장 제안이며 소비자 Review가 필요합니다.
+Simulator는 모든 Scenario를 다음 Gateway Contract로 변환합니다 (정상 신용점수 예시).
 
 ```http
 POST /gateway/v1/tool-calls
@@ -76,6 +82,10 @@ export GATEWAY_BASE_URL=http://localhost:8081
 
 ## Core Client 경계
 
+> 이 브랜치는 #59 이전 기준에서 분기되었습니다. 아래 Core Client 설명은 현재 기반 코드의
+> 상태이며, 목표 호출 방향은 Core → Agent입니다. #59 / PR #78에서 기존 Agent Core Client를
+> 제거하고 #74 / PR #75가 Core 오케스트레이션을 담당합니다. #60은 이를 중복 구현하지 않습니다.
+
 `POST /api/v1/agent-runs`와 다음 데이터의 발급·저장 책임은 Core에 있습니다.
 
 - Financial Case
@@ -107,3 +117,34 @@ LoanAgent / Simulator
 
 테스트는 정상/공격 Scenario 변환, 내부 Credential 거부, Gateway Header와 Body,
 `ALLOW/BLOCK` 구분, Timeout/5xx/잘못된 응답의 명시적 실패를 검증합니다.
+
+## 공격 재현 조건 및 통합 의존성
+
+Scenario 이름 자체는 권한 위반의 증거가 아닙니다. Core가 발급한 유효한 Run/Passport를
+요청에 넣고 다음 제한 조건을 서버 Fixture로 준비해야 합니다.
+
+| 공격 | 서버 Fixture 조건 | 기대 Reason Code |
+|---|---|---|
+| Case | Case/Passport 고객은 CUST-1001, 요청 고객은 CUST-9999 | CASE_SCOPE_VIOLATION |
+| Tool | Passport의 allowedTools에 INCOME_READ 없음; INCOME Data는 허용 | TOOL_SCOPE_VIOLATION |
+| Data | CREDIT_SCORE_READ 허용; Passport의 allowedData에는 CREDIT_SCORE만 있음 | DATA_SCOPE_VIOLATION |
+| Mandate | 현재 Mandate의 allowedData에 DEBT 없음 | MANDATE_SCOPE_VIOLATION |
+
+그 외 Authority/Template/유효기간/Agent binding/Risk/Rate Limit 조건은 정상으로 준비합니다.
+Mandate는 Effective Permission의 교집합에 포함되므로 Mandate 공격은 DATA_SCOPE_VIOLATION도
+함께 발생할 수 있습니다. 이를 숨기거나 단일 Reason Code로 덮어쓰지 않습니다.
+일반 Seed가 세 Tool/Data를 모두 허용하면 공격 Scenario도 ALLOW가 될 수 있으며,
+Agent는 이를 임의로 BLOCK으로 바꾸지 않습니다. NORMAL_INCOME/TOOL_SCOPE_ATTACK과
+NORMAL_DEBT/MANDATE_SCOPE_ATTACK의 요청은 각각 같고, 사용하는 서버 Context가 다릅니다.
+
+`AgentScenarioMappingTest`는 7개 Scenario의 반복 가능한 최소 Body 변환, 응답 그대로 전달,
+ERROR 유지, 설정 불변성을 검증합니다. `AgentAttackScenarioIntegrationTest`는 실제 Agent HTTP와
+Mock Gateway로 정상 3개/공격 4개의 호출 1회 및 BLOCK/Reason Code 전달을 검증합니다.
+Mock은 Scope나 OPA를 재구현하지 않습니다. 실제 금융 downstream 0회 검증은 #75·#77 통합 및
+전용 Core Fixture 준비 후 필요하며, 이 테스트를 전체 인가 E2E로 간주하지 않습니다.
+
+PR 검토 요청:
+
+- Backend 1: #75의 Core Scenario Enum에 새 5개 값을 수용할지 확인하고 제한된 Fixture를 준비합니다.
+- Backend 2: #77에서 실제 Scope 위반 및 복수 Reason Code, 금융 downstream 미호출을 검증합니다.
+- #59 / PR #78 병합 후 해당 변경을 반영하고 Agent 회귀 테스트를 다시 실행합니다.
