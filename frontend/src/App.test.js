@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
 import { configureFinboundApi, finboundApi, resetFinboundApi } from './services/finboundApi'
 
-afterEach(() => resetFinboundApi())
+afterEach(() => {
+  resetFinboundApi()
+  vi.restoreAllMocks()
+})
 
 const getAllAuditEvents = async () => {
   const result = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, pageSize: 100 })
@@ -28,6 +31,56 @@ describe('FinBound P0 application', () => {
     expect(finboundApi.hasCredential()).toBe(true)
     expect(storageWrite).not.toHaveBeenCalled()
     expect(wrapper.html()).not.toContain('operator-runtime-only')
+  })
+
+  it('renders the real AgentRun, Passport, and effective permission in the protection panel', async () => {
+    const jsonResponse = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) })
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-REAL-1',
+        passportId: 'PASS-REAL-1',
+        status: 'RUNNING',
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: {
+          allowedTools: ['CREDIT_SCORE_READ'],
+          allowedData: ['CREDIT_SCORE'],
+        },
+        withheldTools: ['INCOME_READ', 'DEBT_READ'],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-REAL-1',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: 'REQ-REAL-1',
+          requestedTool: 'CREDIT_SCORE_READ',
+          targetConsumerId: 'CUST-1001',
+          requestedData: ['CREDIT_SCORE'],
+          decision: 'ALLOW',
+          systemOutcome: 'COMPLETED',
+          reasonCodes: [],
+          downstreamReached: true,
+          responseReleased: true,
+          scopeStatus: { customerScope: 'OK' },
+        }],
+      }))
+    configureFinboundApi({ mode: 'real', fetchImpl })
+    const wrapper = mount(App)
+
+    await wrapper.get('#core-credential').setValue('operator-runtime-only')
+    await wrapper.get('.credential-panel form').trigger('submit')
+    await flushPromises()
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    const details = wrapper.get('.security-details').text()
+    expect(details).toContain('RUN-REAL-1')
+    expect(details).toContain('PASS-REAL-1')
+    expect(details).toContain('허용 업무: CREDIT_SCORE_READ')
+    expect(details).toContain('허용 자료: CREDIT_SCORE')
+    expect(details).toContain('권한 제외 업무: INCOME_READ · DEBT_READ')
+    expect(details).not.toContain('RUN-001')
+    expect(details).not.toContain('INCOME · DEBT')
   })
 
   it('shows bank work instead of asking an employee to configure security', async () => {
@@ -181,6 +234,46 @@ describe('FinBound P0 application', () => {
     expect(timeoutEvent.downstreamReached).toBe(true)
     expect(timeoutEvent.responseReleased).toBe(false)
     expect(events.every((event) => ['ALLOW', 'BLOCK'].includes(event.decision))).toBe(true)
+  })
+
+  it('renders a processing audit record without treating a null decision as an error', async () => {
+    const current = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, pageSize: 1 })
+    const processing = {
+      ...current.items[0],
+      auditEventId: 'AUD-PROCESSING',
+      auditStatus: 'PROCESSING',
+      decision: null,
+    }
+    vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 0, block: 0, error: 0 })
+    vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
+      items: [processing],
+      page: 1,
+      pageSize: 5,
+      totalItems: 1,
+      totalPages: 1,
+      filterOptions: { agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] },
+    })
+    vi.spyOn(finboundApi, 'getAuditEvent').mockResolvedValue(processing)
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.event-row .status-badge').text()).toBe('처리 중')
+    expect(wrapper.get('.event-row .status-badge').classes()).toContain('status-processing')
+  })
+
+  it('keeps a failed dashboard summary unavailable when the event list succeeds', async () => {
+    vi.spyOn(finboundApi, 'getDashboardSummary').mockRejectedValue(new Error('summary unavailable'))
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('안전 현황 요약을 불러오지 못했습니다')
+    expect(wrapper.findAll('.metric-grid strong').map((node) => node.text())).toEqual(['—', '—', '—', '—'])
+    expect(wrapper.findAll('.event-row').length).toBeGreaterThan(0)
+    expect(wrapper.text()).not.toContain('안전 현황 요약을 불러오지 못했습니다. 연결 상태와 조회 권한을 확인해 주세요.0')
   })
 
   it('blocks an AI behavior anomaly even when all permission scopes are valid', async () => {

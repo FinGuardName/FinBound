@@ -14,7 +14,9 @@ const totalPages = ref(1)
 const dashboardReady = ref(false)
 const dashboardLoading = ref(false)
 const dashboardError = ref('')
-const summary = ref({ total: 0, allow: 0, block: 0, error: 0 })
+const summaryLoading = ref(false)
+const summaryError = ref('')
+const summary = ref(null)
 const filterOptions = ref({ agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] })
 const filters = ref({
   period: '24H',
@@ -28,7 +30,13 @@ const filters = ref({
   riskOnly: false,
 })
 
-const decisionLabels = { ALLOW: '정상 처리', BLOCK: '차단', ERROR: '오류' }
+const decisionLabels = {
+  ALLOW: '정상 처리',
+  BLOCK: '차단',
+  ERROR: '오류',
+  PROCESSING: '처리 중',
+  UNKNOWN: '확인 불가',
+}
 const severityLabels = { LOW: '일반', MEDIUM: '관찰', HIGH: '주의', CRITICAL: '긴급' }
 const scopeLabels = {
   employeeAuthority: '담당 직원 권한',
@@ -53,7 +61,12 @@ const toolLabels = {
   INCOME_READ: '소득자료 확인',
   DEBT_READ: '부채자료 확인',
 }
-const eventOutcome = (event) => event.auditStatus === 'ERROR' ? 'ERROR' : event.decision
+const eventOutcome = (event) => {
+  if (event.auditStatus === 'ERROR') return 'ERROR'
+  if (event.auditStatus === 'PROCESSING') return 'PROCESSING'
+  return event.decision ?? 'UNKNOWN'
+}
+const summaryMetric = (key) => summary.value?.[key] ?? '—'
 const selectedEvent = computed(() => events.value.find((event) => event.auditEventId === selectedId.value))
 const agentOptions = computed(() => filterOptions.value.agentIds)
 const caseOptions = computed(() => filterOptions.value.caseIds)
@@ -91,14 +104,21 @@ async function loadEvents() {
   }
 }
 
-async function loadDashboard() {
-  dashboardError.value = ''
+async function loadSummary() {
+  summaryLoading.value = true
+  summaryError.value = ''
   try {
     summary.value = await finboundApi.getDashboardSummary()
   } catch {
-    dashboardError.value = '안전 현황 요약을 불러오지 못했습니다. 연결 상태와 조회 권한을 확인해 주세요.'
+    summary.value = null
+    summaryError.value = '안전 현황 요약을 불러오지 못했습니다. 연결 상태와 조회 권한을 확인해 주세요.'
+  } finally {
+    summaryLoading.value = false
   }
-  await loadEvents()
+}
+
+async function loadDashboard() {
+  await Promise.all([loadSummary(), loadEvents()])
   dashboardReady.value = true
 }
 
@@ -137,10 +157,14 @@ watch(page, () => {
     </div>
 
     <div class="metric-grid">
-      <article><span>전체 업무</span><strong>{{ summary.total }}</strong><small>최근 수집 기록</small></article>
-      <article><span>정상 처리</span><strong class="metric-allow">{{ summary.allow }}</strong><small>업무 범위 안에서 완료</small></article>
-      <article><span>안전 차단</span><strong class="metric-block">{{ summary.block }}</strong><small>금융시스템 조회 전 중단</small></article>
-      <article><span>처리 오류</span><strong class="metric-error">{{ summary.error }}</strong><small>확인 또는 재처리 필요</small></article>
+      <article><span>전체 업무</span><strong>{{ summaryMetric('total') }}</strong><small>{{ summaryLoading ? '요약 불러오는 중' : '최근 수집 기록' }}</small></article>
+      <article><span>정상 처리</span><strong class="metric-allow">{{ summaryMetric('allow') }}</strong><small>업무 범위 안에서 완료</small></article>
+      <article><span>안전 차단</span><strong class="metric-block">{{ summaryMetric('block') }}</strong><small>금융시스템 조회 전 중단</small></article>
+      <article><span>처리 오류</span><strong class="metric-error">{{ summaryMetric('error') }}</strong><small>확인 또는 재처리 필요</small></article>
+    </div>
+
+    <div v-if="summaryError" class="dashboard-error" role="alert">
+      <span>{{ summaryError }}</span><button type="button" @click="loadSummary">요약 다시 시도</button>
     </div>
 
     <section class="panel dashboard-filters" aria-label="업무 기록 검색 조건">
@@ -178,7 +202,7 @@ watch(page, () => {
     </section>
 
     <div v-if="dashboardError" class="dashboard-error" role="alert">
-      <span>{{ dashboardError }}</span><button type="button" @click="loadDashboard">다시 시도</button>
+      <span>{{ dashboardError }}</span><button type="button" @click="loadEvents">목록 다시 시도</button>
     </div>
 
     <div class="dashboard-grid">

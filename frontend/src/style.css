@@ -61,6 +61,7 @@ main { min-width: 0; padding: 29px clamp(24px, 4vw, 52px) 60px; }
 .status-running, .status-active, .status-allow, .status-ok, .status-low { color: #08705a; background: #e4f5ef; }
 .status-block, .status-violation, .status-critical { color: #b72c3d; background: #ffe9ec; }
 .status-error, .status-high, .status-alert { color: #986008; background: #fff2d9; }
+.status-processing, .status-unknown { color: #42638e; background: #edf3fb; }
 
 .agent-workspace { width: min(100%, 1420px); margin: 0 auto; }
 .work-catalog { padding: 20px; }

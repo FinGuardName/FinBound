@@ -16,6 +16,34 @@ onMounted(async () => {
 })
 
 const workContext = computed(() => workCatalog.value.find((work) => work.id === selectedWorkId.value))
+const protectionContext = computed(() => {
+  const mockPassport = workContext.value?.passport ?? {}
+  const agentRun = execution.value?.agentRun
+  const permission = execution.value?.permission
+  const effectivePermission = permission?.agentEffectivePermission
+
+  if (!agentRun || !effectivePermission) {
+    return {
+      agentRunId: mockPassport.agentRunId,
+      passportId: mockPassport.passportId,
+      expiresAtLabel: mockPassport.expiresAtLabel,
+      allowedTools: mockPassport.allowedTools ?? [],
+      allowedData: mockPassport.allowedData ?? [],
+      withheldTools: [],
+      source: 'preview',
+    }
+  }
+
+  return {
+    agentRunId: agentRun.agentRunId ?? '미제공',
+    passportId: agentRun.passportId ?? '미제공',
+    expiresAtLabel: agentRun.expiresAt ?? 'Core 응답 미제공',
+    allowedTools: effectivePermission.allowedTools ?? [],
+    allowedData: effectivePermission.allowedData ?? [],
+    withheldTools: permission.withheldTools ?? [],
+    source: 'core',
+  }
+})
 const allowedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'ALLOW' && attempt.systemOutcome !== 'ERROR') ?? [])
 const blockedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'BLOCK' && attempt.systemOutcome !== 'ERROR') ?? [])
 const errorAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.systemOutcome === 'ERROR') ?? [])
@@ -162,12 +190,13 @@ async function runAgentTask() {
           <summary>시스템 정보 보기</summary>
           <dl>
             <div><dt>업무 번호</dt><dd>{{ workContext.case.caseId }}</dd></div>
-            <div><dt>AI 실행 번호</dt><dd>{{ workContext.passport.agentRunId }}</dd></div>
-            <div><dt>권한 확인서</dt><dd>{{ workContext.passport.passportId }}</dd></div>
-            <div><dt>유효 시간</dt><dd>{{ workContext.passport.expiresAtLabel }}</dd></div>
+            <div><dt>AI 실행 번호</dt><dd>{{ protectionContext.agentRunId }}</dd></div>
+            <div><dt>권한 확인서</dt><dd>{{ protectionContext.passportId }}</dd></div>
+            <div><dt>유효 시간</dt><dd>{{ protectionContext.expiresAtLabel }}</dd></div>
           </dl>
-          <p>허용 업무: {{ workContext.passport.allowedTools.join(' · ') }}</p>
-          <p>허용 자료: {{ workContext.passport.allowedData.join(' · ') }}</p>
+          <p>허용 업무: {{ protectionContext.allowedTools.join(' · ') || '없음' }}</p>
+          <p>허용 자료: {{ protectionContext.allowedData.join(' · ') || '없음' }}</p>
+          <p v-if="protectionContext.source === 'core'">권한 제외 업무: {{ protectionContext.withheldTools.join(' · ') || '없음' }}</p>
           <small>Agent Effective Permission ⊆ Employee Authority</small>
         </details>
       </aside>
