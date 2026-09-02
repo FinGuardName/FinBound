@@ -1,0 +1,40 @@
+name: Service container images
+
+on:
+  pull_request:
+    paths:
+      - "backend/agent/**"
+      - "backend/mock-finance/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle/**"
+      - "gradlew"
+      - "naver-checkstyle.xml"
+      - "naver-checkstyle-suppressions.xml"
+      - "infrastructure/tests/service-container-smoke.sh"
+      - ".github/workflows/service-containers.yml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/agent/**"
+      - "backend/mock-finance/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle/**"
+      - "gradlew"
+      - "naver-checkstyle.xml"
+      - "naver-checkstyle-suppressions.xml"
+      - "infrastructure/tests/service-container-smoke.sh"
+      - ".github/workflows/service-containers.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify Agent and Mock Finance images
+        run: bash infrastructure/tests/service-container-smoke.sh
