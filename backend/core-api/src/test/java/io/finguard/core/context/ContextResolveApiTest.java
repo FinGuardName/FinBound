@@ -26,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import io.finguard.core.risk.PromptRiskModel;
 import io.finguard.core.security.InternalCredentialFilter;
 
 /** {@code POST /internal/v1/context/resolve} 계약 및 오류 경계 테스트. */
@@ -145,7 +146,8 @@ class ContextResolveApiTest {
         assertThat(row.get("scope_customer_scope")).isEqualTo("VIOLATION");
         assertThat(row.get("scope_tool_scope")).isEqualTo("OK");
         assertThat(row.get("prompt_risk_evaluation_status")).isEqualTo("NOT_EVALUATED");
-        assertThat(row.get("prompt_model_version")).isEqualTo("prompt-guard-1");
+        // 리터럴로 박으면 모델을 재학습해 버전을 올릴 때마다 이 줄만 조용히 어긋난다.
+        assertThat(row.get("prompt_model_version")).isEqualTo(PromptRiskModel.CURRENT_VERSION);
 
         assertThat(
                         jdbcTemplate.queryForObject(
