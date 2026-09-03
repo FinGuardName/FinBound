@@ -73,8 +73,9 @@ class AgentAttackScenarioIntegrationTest {
     void forwardsNormalToolCalls(String scenario, String tool, String data, String resultField, int value)
             throws Exception {
         STUB.set(new StubResponse(200, """
-                {"requestId":"REQ-060","decision":"ALLOW","result":{"%s":%d}}
-                """.formatted(resultField, value)));
+                {"requestId":"REQ-060","decision":"ALLOW",
+                 "result":{"tool":"%s","consumerId":"CUST-1001","%s":%d}}
+                """.formatted(tool, resultField, value)));
 
         simulate(scenario).expectStatus().isOk().expectBody()
                 .jsonPath("$.scenario").isEqualTo(scenario)
@@ -95,20 +96,56 @@ class AgentAttackScenarioIntegrationTest {
             String scenario, String tool, String data, String consumer, String reason) throws Exception {
         // Configure a server response explicitly: scenario labels are not authorization inputs.
         STUB.set(new StubResponse(403, """
-                {"requestId":"REQ-060","decision":"BLOCK","reasonCodes":["%s","DATA_SCOPE_VIOLATION"]}
+                {"requestId":"REQ-060","decision":"BLOCK","reasonCodes":["%s"]}
                 """.formatted(reason)));
 
         simulate(scenario).expectStatus().isOk().expectBody()
                 .jsonPath("$.scenario").isEqualTo(scenario)
                 .jsonPath("$.gatewayResponse.requestId").isEqualTo("REQ-060")
                 .jsonPath("$.gatewayResponse.decision").isEqualTo("BLOCK")
-                .jsonPath("$.gatewayResponse.reasonCodes.length()").isEqualTo(2)
+                .jsonPath("$.gatewayResponse.reasonCodes.length()").isEqualTo(1)
                 .jsonPath("$.gatewayResponse.reasonCodes[0]").isEqualTo(reason)
-                .jsonPath("$.gatewayResponse.reasonCodes[1]").isEqualTo("DATA_SCOPE_VIOLATION")
                 .jsonPath("$.gatewayResponse.result").doesNotExist()
                 .jsonPath("$.errorCode").doesNotExist();
 
         assertRequest(tool, data, consumer);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "DATA_SCOPE_VIOLATION|MANDATE_SCOPE_VIOLATION|TOOL_SCOPE_VIOLATION",
+        "MANDATE_SCOPE_VIOLATION|DATA_SCOPE_VIOLATION|MANDATE_SCOPE_VIOLATION",
+        "MANDATE_SCOPE_VIOLATION|TASK_PASSPORT_INACTIVE"
+    })
+    void preservesCompositeReasonsWithoutSortingOrDeduplication(String reasons) throws Exception {
+        // Transport fixtures, not evidence that Core produces these scope combinations.
+        ObjectMapper mapper = new ObjectMapper();
+        String[] expected = reasons.split("\\|");
+        STUB.set(new StubResponse(403, """
+                {"requestId":"REQ-060","decision":"BLOCK","reasonCodes":%s}
+                """.formatted(mapper.writeValueAsString(expected))));
+
+        byte[] responseBody = simulate("MANDATE_SCOPE_ATTACK").expectStatus().isOk().expectBody()
+                .jsonPath("$.gatewayResponse.decision").isEqualTo("BLOCK")
+                .jsonPath("$.errorCode").doesNotExist()
+                .returnResult().getResponseBody();
+        assertThat(mapper.readTree(responseBody).path("gatewayResponse").path("reasonCodes"))
+                .isEqualTo(mapper.valueToTree(expected));
+        assertRequest("DEBT_READ", "DEBT", "CUST-1001");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "NORMAL_INCOME", "NORMAL_DEBT", "TOOL_SCOPE_ATTACK", "DATA_SCOPE_ATTACK", "MANDATE_SCOPE_ATTACK"
+    })
+    void gatewaySchemaRejectionIsAnErrorNotAScopeBlock(String scenario) {
+        STUB.set(new StubResponse(400, "{\"errorCode\":\"INVALID_TOOL_REQUEST\"}"));
+
+        simulate(scenario).expectStatus().isEqualTo(502).expectBody()
+                .jsonPath("$.errorCode").isEqualTo("GATEWAY_REQUEST_FAILED")
+                .jsonPath("$.gatewayResponse").doesNotExist()
+                .jsonPath("$.decision").doesNotExist();
+        assertThat(CALLS.get()).isEqualTo(1);
     }
 
     private void assertRequest(String tool, String data, String consumer) throws Exception {
