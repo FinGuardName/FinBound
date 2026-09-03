@@ -84,9 +84,9 @@ Storage에 넣지 않는다. `real` 모드에서는 화면의 업무 세션 입�
 | `promptRiskEvaluationStatus` | `promptEvaluationStatus` |
 | `behaviorFeatureVersion` | `featureVersion` |
 
-현재 Core Dashboard 계약은 `severity`와 `riskOnly` 서버 필터를 제공하지 않는다. 실제 모드에서는
-두 필터를 비활성화하여 적용되지 않은 조건을 적용된 것처럼 표시하지 않는다. AgentRun 생성 후
-Core가 Agent를 호출하며, Vue는 내부 Agent Simulator를 직접 호출하지 않고 아래 Public API를
+Core Dashboard 계약은 OPA가 판정한 `severity`와 `riskFlagged`를 저장하며 `severity`와
+`riskOnly` 서버 필터를 제공한다. AgentRun 생성 후 Core가 Agent를 호출하며, Vue는 내부 Agent
+Simulator를 직접 호출하지 않고 아래 Public API를
 짧게 Polling하여 실행 상태와 결과를 조회한다.
 
 | Frontend 작업 | Spring Contract |

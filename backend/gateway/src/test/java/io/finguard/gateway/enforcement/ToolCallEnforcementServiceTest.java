@@ -88,6 +88,8 @@ class ToolCallEnforcementServiceTest {
 
         AuditOutcome outcome = captureOutcome("REQ-2");
         assertThat(outcome.decision()).isEqualTo(PolicyDecision.BLOCK);
+        assertThat(outcome.severity()).isEqualTo("CRITICAL");
+        assertThat(outcome.riskFlagged()).isTrue();
         assertThat(outcome.systemOutcome()).isEqualTo("COMPLETED");
         assertThat(outcome.success()).isNull();
         assertThat(outcome.errorLocation()).isNull();
@@ -112,6 +114,8 @@ class ToolCallEnforcementServiceTest {
         assertThat(outcome.systemOutcome()).isEqualTo("ERROR");
         assertThat(outcome.success()).isFalse();
         assertThat(outcome.errorLocation()).isEqualTo("OPA");
+        assertThat(outcome.severity()).isNull();
+        assertThat(outcome.riskFlagged()).isNull();
         assertThat(outcome.downstreamReached()).isFalse();
         assertThat(outcome.responseReleased()).isFalse();
     }
@@ -198,6 +202,8 @@ class ToolCallEnforcementServiceTest {
 
         AuditOutcome outcome = captureOutcome("REQ-6");
         assertThat(outcome.decision()).isEqualTo(PolicyDecision.ALLOW);
+        assertThat(outcome.severity()).isEqualTo("LOW");
+        assertThat(outcome.riskFlagged()).isFalse();
         assertThat(outcome.systemOutcome()).isEqualTo("ERROR");
         assertThat(outcome.downstreamReached()).isTrue();
     }

@@ -9,5 +9,7 @@
   "recordsRead": 0,
   "latencyMs": 95,
   "errorLocation": "DOWNSTREAM",
+  "severity": "LOW",
+  "riskFlagged": false,
   "completedAt": "2026-08-17T21:34:11+09:00"
 }

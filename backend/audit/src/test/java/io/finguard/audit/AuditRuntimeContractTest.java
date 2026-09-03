@@ -138,6 +138,11 @@ class AuditRuntimeContractTest {
                 "execution-outcome.block-with-error.invalid.json"
             ),
             Arguments.of(
+                "정책 판정의 severity와 riskFlagged 누락 차단",
+                "execution-outcome.schema.json",
+                "execution-outcome.policy-risk.invalid.json"
+            ),
+            Arguments.of(
                 "Business Audit의 민감 원문 차단",
                 "audit-event.schema.json",
                 "audit-event.sensitive-data.invalid.json"

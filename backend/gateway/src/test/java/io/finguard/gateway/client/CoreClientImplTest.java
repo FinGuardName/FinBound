@@ -3,6 +3,8 @@ package io.finguard.gateway.client;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
+import static com.github.tomakehurst.wiremock.client.WireMock.patchRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,6 +87,7 @@ class CoreClientImplTest {
                       "promptRiskSnapshot": {
                         "evaluationStatus": "NOT_EVALUATED",
                         "promptRisk": 0.00,
+                        "riskLevel": "LOW",
                         "detected": false,
                         "inputHash": "sha256:pending",
                         "modelVersion": "prompt-guard-1"
@@ -97,6 +100,7 @@ class CoreClientImplTest {
 
         assertThat(context.references().caseId()).isEqualTo("LOAN-2026-001");
         assertThat(context.scopeStatus().customerScope()).isEqualTo("OK");
+        assertThat(context.promptRiskSnapshot().riskLevel()).isEqualTo("LOW");
         assertThat(context.promptRiskSnapshot().detected()).isFalse();
     }
 
@@ -184,11 +188,16 @@ class CoreClientImplTest {
             null,
             null,
             null,
+            "CRITICAL",
+            true,
             "policy-1",
             Instant.now());
 
         client.updateAuditOutcome(identity, "REQ-1", outcome, "trace");
 
         assertThat(server.getAllServeEvents()).hasSize(1);
+        server.verify(patchRequestedFor(urlEqualTo("/internal/v1/audits/REQ-1/outcome"))
+            .withRequestBody(matchingJsonPath("$.severity", equalTo("CRITICAL")))
+            .withRequestBody(matchingJsonPath("$.riskFlagged", equalTo("true"))));
     }
 }

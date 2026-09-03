@@ -75,6 +75,13 @@ class DomainEnumContractTest {
     }
 
     @Test
+    void promptRiskLevelMatchesConvention() {
+        assertThat(PromptRiskLevel.values())
+                .extracting(Enum::name)
+                .containsExactly("LOW", "ALERT", "CRITICAL");
+    }
+
+    @Test
     void agentSimulationScenarioMatchesTheAgentModuleVocabulary() {
         // docs/04 §3.1이 값 일곱 개를 정의하지만 한 자리에 모아 두지 않았다 — 표에는 새 다섯 개만
         // 있고 나머지 둘은 앞 문단에 있다. 그래서 순서의 근거는 Agent 모듈의 같은 이름 enum이다.

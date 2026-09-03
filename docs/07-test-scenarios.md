@@ -209,6 +209,17 @@ Prompt Detector 추가 호출 = 0회
 Behavior Risk는 각 Tool Call마다 새 계산
 ```
 
+### 10.1 AI-primary Prompt 등급
+
+- Rule만 일치하고 모델 증거가 낮으면 `ALERT`, `detected=false`, OPA `ALLOW + riskFlagged=true`다.
+- Rule이 없어도 모델이 고신뢰면 `CRITICAL`, `detected=true`, OPA `PROMPT_INJECTION BLOCK`이다.
+- 모델이 중간신뢰이고 Rule이 함께 일치하면 `CRITICAL`이다.
+- 인용문-only 공격 문구는 `matchedRules=[]`여도 전체 텍스트 모델 판단으로 `ALERT` 또는
+  `CRITICAL`이 될 수 있다.
+- `promptInjectionDetected`와 `promptRiskLevel`이 불일치하면 OPA는 fail-closed한다.
+- Core Prompt Risk가 `NOT_EVALUATED`면 Gateway는 Behavior/OPA 호출 전에
+  `PROMPT_RISK_UNAVAILABLE`로 fail-closed한다.
+
 ---
 
 ## 11. 새 Prompt / Document 재검사
@@ -468,6 +479,9 @@ ServiceAccount의 불필요한 Kubernetes API 접근도 거부한다.
 - [ ] Gateway DB 직접 접근 없음
 - [ ] 새 Prompt/Document Prompt Detector 실행
 - [ ] 동일 입력 Tool Call에서 Snapshot 재사용
+- [ ] Rule-only Prompt Alert → ALLOW + riskFlagged
+- [ ] Rule miss + AI 고신뢰 Prompt → PROMPT_INJECTION BLOCK
+- [ ] 인용문-only 입력을 전체 텍스트 AI가 평가
 - [ ] Prompt Detector Miss에서도 Case Rule BLOCK
 - [ ] Behavior Alert
 - [ ] Behavior Critical AI-only BLOCK

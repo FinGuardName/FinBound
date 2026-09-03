@@ -8,5 +8,7 @@
   "success": true,
   "recordsRead": 1,
   "latencyMs": 120,
+  "severity": "LOW",
+  "riskFlagged": false,
   "completedAt": "2026-08-17T21:32:11+09:00"
 }

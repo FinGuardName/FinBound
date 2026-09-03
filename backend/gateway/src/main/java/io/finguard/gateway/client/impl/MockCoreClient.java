@@ -39,7 +39,9 @@ public class MockCoreClient implements CoreClient {
             requestUuid(requestId),
             new ResolvedContext.References("EMP-101", "LOAN-2026-001", request.passportId()),
             scopeStatus,
-            new PromptRiskSnapshot("EVALUATED", BigDecimal.valueOf(0.05), false, "sha256:mock-evaluated", "prompt-guard-1")
+            new PromptRiskSnapshot(
+                "EVALUATED", BigDecimal.valueOf(0.05), "LOW", false,
+                "sha256:mock-evaluated", "prompt-guard-1")
         );
     }
 

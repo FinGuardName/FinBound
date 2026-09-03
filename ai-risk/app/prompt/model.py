@@ -34,12 +34,14 @@ class PromptDetectorConfig:
     tokenizer_path: str
     injection_label_id: int
     max_tokens: int
-    rule_risk: float
+    rule_alert_risk: float
     pretrained_score_threshold: float
     domain_adapter_artifact_path: str
     domain_adapter_artifact_sha256: str
     domain_adapter_score_threshold: float
-    hybrid_evidence_threshold: float
+    model_support_threshold: float
+    model_high_threshold: float
+    prompt_alert_threshold: float
     prompt_block_threshold: float
     dataset_version: str
     approved_dataset_sha256: str
@@ -59,12 +61,14 @@ class PromptDetectorConfig:
                 tokenizer_path=payload["tokenizerPath"],
                 injection_label_id=payload["injectionLabelId"],
                 max_tokens=payload["maxTokens"],
-                rule_risk=payload["ruleRisk"],
+                rule_alert_risk=payload["ruleAlertRisk"],
                 pretrained_score_threshold=payload["pretrainedScoreThreshold"],
                 domain_adapter_artifact_path=payload["domainAdapterArtifactPath"],
                 domain_adapter_artifact_sha256=payload["domainAdapterArtifactSha256"],
                 domain_adapter_score_threshold=payload["domainAdapterScoreThreshold"],
-                hybrid_evidence_threshold=payload["hybridEvidenceThreshold"],
+                model_support_threshold=payload["modelSupportThreshold"],
+                model_high_threshold=payload["modelHighThreshold"],
+                prompt_alert_threshold=payload["promptAlertThreshold"],
                 prompt_block_threshold=payload["promptBlockThreshold"],
                 dataset_version=payload["datasetVersion"],
                 approved_dataset_sha256=payload["approvedDatasetSha256"],
@@ -77,8 +81,8 @@ class PromptDetectorConfig:
             raise PromptModelError("Prompt detector injection label is invalid")
         if not 1 <= config.max_tokens <= 512:
             raise PromptModelError("Prompt detector maxTokens is invalid")
-        if not 0 <= config.rule_risk <= 1:
-            raise PromptModelError("Prompt detector ruleRisk is invalid")
+        if not 0 <= config.rule_alert_risk <= 1:
+            raise PromptModelError("Prompt detector ruleAlertRisk is invalid")
         if not 0 < config.pretrained_score_threshold <= 1:
             raise PromptModelError("Prompt detector pretrainedScoreThreshold is invalid")
         if not config.domain_adapter_artifact_path:
@@ -87,10 +91,16 @@ class PromptDetectorConfig:
             raise PromptModelError("Prompt detector domain adapter digest is invalid")
         if not 0 < config.domain_adapter_score_threshold <= 1:
             raise PromptModelError("Prompt detector domainAdapterScoreThreshold is invalid")
-        if config.hybrid_evidence_threshold != 1:
-            raise PromptModelError("Prompt detector hybridEvidenceThreshold must be 1")
-        if not 0 < config.prompt_block_threshold <= 1:
-            raise PromptModelError("Prompt detector threshold is invalid")
+        if not 0 < config.model_support_threshold < config.model_high_threshold <= 1:
+            raise PromptModelError("Prompt detector model evidence thresholds are invalid")
+        if not 0 < config.prompt_alert_threshold < config.prompt_block_threshold <= 1:
+            raise PromptModelError("Prompt detector risk thresholds are invalid")
+        if (
+            not config.prompt_alert_threshold
+            <= config.rule_alert_risk
+            < config.prompt_block_threshold
+        ):
+            raise PromptModelError("Prompt detector ruleAlertRisk must remain in ALERT range")
         if len(config.model_artifact_sha256) != 64:
             raise PromptModelError("Prompt detector artifact digest is invalid")
         return config

@@ -27,6 +27,7 @@ class MockCoreClientTest {
         ResolvedContext context = client.resolveContext(identity, request, "REQ-001", null);
         assertThat(context.scopeStatus().customerScope()).isEqualTo("OK");
         assertThat(context.promptRiskSnapshot().evaluationStatus()).isEqualTo("EVALUATED");
+        assertThat(context.promptRiskSnapshot().riskLevel()).isEqualTo("LOW");
     }
 
     @Test
