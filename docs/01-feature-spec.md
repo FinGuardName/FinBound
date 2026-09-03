@@ -507,7 +507,7 @@ Tool Call 발생
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
   "inputHash": "sha256:...",
-  "modelVersion": "prompt-guard-1"
+  "modelVersion": "prompt-guard-5"
 }
 ```
 

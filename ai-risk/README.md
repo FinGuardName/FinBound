@@ -19,17 +19,37 @@ uv run uvicorn app.main:app --reload --port 8000
 uv run pytest
 ```
 
-Behavior Independent Mock artifact는 고정 Seed의 합성 데이터로 재현할 수 있습니다.
+Prompt Runtime은 고정 리비전의 다국어 사전학습 모델, 한국어·영어 Rule, FinBound Development
+Set으로 학습한 소형 문자 n-gram Domain Adapter를 결합합니다. Adapter는 권한 결정을 만들지 않고
+사전학습 모델의 한국어 금융 문맥 부족을 보정하는 risk signal만 제공합니다.
 
 ```bash
 cd ai-risk
-uv run python -m train.train_behavior
+uv sync --extra prompt --extra dev
+uv run python -m models.download_prompt_model
+uv run python -m train.train_prompt_adapter
+uv run python -m evaluate.prompt_runtime --mode validation --output evaluate/prompt_runtime_validation.json
+uv run python -m evaluate.prompt_runtime --mode held-out --output evaluate/prompt_runtime_held_out.json
 ```
 
 Runtime Endpoint:
 
 ```http
+POST /internal/v1/risk/prompt
 POST /internal/v1/risk/behavior
+```
+
+Prompt 모델은 `models/prompt_detector.json`에서 Model ID·Revision·Artifact SHA-256과 모든
+Threshold를 단일 관리합니다. 큰 사전학습 ONNX Artifact는 Git에 넣지 않고 다운로드 스크립트가
+고정 Revision과 SHA-256을 검증합니다. Domain Adapter는 승인 데이터 SHA-256을 Bundle 안에서도
+검증합니다. 경로를 바꿀 때는 `FINGUARD_PROMPT_MODEL_DIR`과
+`FINGUARD_PROMPT_DOMAIN_ADAPTER_PATH`를 사용합니다.
+
+Behavior Independent Mock artifact는 고정 Seed의 합성 데이터로 재현할 수 있습니다.
+
+```bash
+cd ai-risk
+uv run python -m train.train_behavior
 ```
 
 운영 Probe는 프로세스 생존 확인용 `GET /health`와 모델 Artifact 및 내부 Credential 설정을
@@ -93,3 +113,12 @@ Scaler, Calibration, Threshold 및 평가 JSON의 의미적 동일성으로 검�
 원문 Prompt를 로그나 DB에 저장하지 않으며 모델/Feature 오류를 낮은 Risk로 대체하지 않습니다.
 
 Prompt Detector는 새 Prompt, Document 또는 외부 비신뢰 입력이 생성·변경될 때 호출합니다. 동일 입력의 Tool Call은 `inputHash`에 연결된 `PromptRiskSnapshot`을 재사용하며, Behavior Risk는 행동 이력이 변하므로 Tool Call마다 계산합니다.
+
+Prompt 평가 데이터의 공개 Source Revision, License, 한국어·영어·혼합어 자체 Seed와 Held-out
+정책은 [`datasets/prompt/README.md`](datasets/prompt/README.md)에서 관리합니다.
+`reviewStatus=DRAFT`인 문장은 최종 성능 수치에 사용하지 않습니다. 기본은 서로 다른 팀원 2명의
+Blind Review이며, 팀이 명시적으로 합의한 P0 예외에서는 AI 전수 검수와 Dataset Owner 승인을
+Manifest에 투명하게 기록한 `APPROVED` Set만 최종 평가에 사용합니다.
+
+Prompt Detector의 후보 비교, 고정 Threshold, 최종 Held-out 지표와 한계는
+[`models/prompt_detector_model_card.md`](models/prompt_detector_model_card.md)에 기록합니다.

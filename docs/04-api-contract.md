@@ -244,7 +244,7 @@ Audit Reason Code가 아니다. Simulator는 이를 `ALLOW` 또는 `BLOCK`으로
   "promptRisk": 0.05,
   "attackType": null,
   "matchedRules": [],
-  "modelVersion": "prompt-guard-1",
+  "modelVersion": "prompt-guard-5",
   "evaluatedAt": "2026-08-17T21:30:01+09:00"
 }
 ```
@@ -400,7 +400,7 @@ POST /internal/v1/context/resolve
     "promptRisk": 0.05,
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-1"
+    "modelVersion": "prompt-guard-5"
   }
 }
 ```
@@ -446,6 +446,10 @@ POST /internal/v1/risk/prompt
 }
 ```
 
+`contentLanguage`는 `ko`, `en`, `mixed` 중 하나이며 선택 사항이다. Core가 언어를
+판별하지 않았다면 생략하거나 `null`로 전달한다. 현재 Detector는 언어별 Threshold를
+사용하지 않으므로 이 값이 없어도 동일하게 평가하며, AI가 임의로 `mixed`를 저장하지 않는다.
+
 ### Response
 
 ```json
@@ -455,12 +459,14 @@ POST /internal/v1/risk/prompt
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
   "inputHash": "sha256:...",
-  "modelVersion": "prompt-guard-1",
+  "modelVersion": "prompt-guard-5",
   "evaluatedAt": "2026-08-17T21:32:00+09:00"
 }
 ```
 
 Core가 결과를 PromptRiskSnapshot으로 저장한다. FastAPI는 원문을 저장하거나 로깅하지 않는다.
+Request Schema 검증 실패는 거부된 값이나 원문을 반사하지 않고
+`422 {"detail":"REQUEST_VALIDATION_FAILED"}`로 응답한다.
 
 ---
 
