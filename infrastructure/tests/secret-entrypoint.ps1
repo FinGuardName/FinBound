@@ -17,7 +17,8 @@ $cases = @(
         Setup = "printf $validCredential > /run/secrets/FINGUARD_API_VIEWERCREDENTIAL; printf $validCredential > /run/secrets/FINGUARD_API_OPERATORCREDENTIAL"; Exit = 64 }
 )
 foreach ($case in $cases) {
-    $command = 'mkdir -p /run/secrets; ' + $case.Setup + "; /bin/sh /opt/finguard/with-secrets.sh sh -c 'test \"`$TEST_CREDENTIAL\" = $validCredential && echo DOWNSTREAM_REACHED'"
+    $downstreamCommand = 'test "$TEST_CREDENTIAL" = "' + $validCredential + '" && echo DOWNSTREAM_REACHED'
+    $command = 'mkdir -p /run/secrets; ' + $case.Setup + "; /bin/sh /opt/finguard/with-secrets.sh sh -c '$downstreamCommand'"
     $arguments = @('run', '--rm', '--network', 'none', '--entrypoint', 'sh',
         '--env', "FINGUARD_REQUIRED_SECRETS=$($case.Required)",
         '--mount', "type=bind,source=$RepositoryRoot/infrastructure/docker/with-secrets.sh,target=/opt/finguard/with-secrets.sh,readonly",
