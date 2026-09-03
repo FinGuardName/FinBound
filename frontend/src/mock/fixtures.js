@@ -199,6 +199,7 @@ function createAuditEvent({
   behaviorRiskLevel = 'LOW',
   behaviorAnomalyDetected = false,
   riskFlagged = decision === 'BLOCK',
+  errorLocation = null,
 }) {
   return {
     auditEventId,
@@ -227,6 +228,7 @@ function createAuditEvent({
     featureVersion: 'behavior-features-1',
     behaviorModelVersion: 'iforest-1',
     policyVersion: 'loan-review-policy-1',
+    errorLocation,
     hardRequestLimitExceeded: false,
     downstreamReached: decision === 'ALLOW',
     responseReleased: decision === 'ALLOW' && auditStatus === 'COMPLETED',
@@ -241,7 +243,7 @@ export const auditEventsFixture = [
   createAuditEvent({ auditEventId: 'AUD-006', requestId: '00000000-0000-4000-8000-000000006006', requestedAt: '2026-08-25T18:02:31+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['MANDATE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, mandate: 'VIOLATION' } }),
   createAuditEvent({ auditEventId: 'AUD-005', requestId: '00000000-0000-4000-8000-000000005005', requestedAt: '2026-08-25T17:58:14+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'MEDIUM', promptRisk: 0.03, behaviorRisk: 0.16 }),
   createAuditEvent({ auditEventId: 'AUD-004', requestId: '00000000-0000-4000-8000-000000004004', requestedAt: '2026-08-25T17:53:10+09:00', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2099', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
-  createAuditEvent({ auditEventId: 'AUD-003', requestId: '00000000-0000-4000-8000-000000003003', requestedAt: '2026-08-25T17:48:22+09:00', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2001', requestedTool: 'INCOME_READ', decision: 'ALLOW', auditStatus: 'ERROR', severity: 'HIGH', reasonCodes: ['DOWNSTREAM_TIMEOUT'], promptRisk: 0.04, behaviorRisk: 0.18, riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-003', requestId: '00000000-0000-4000-8000-000000003003', requestedAt: '2026-08-25T17:48:22+09:00', caseId: 'LOAN-2026-014', targetConsumerId: 'CUST-2001', requestedTool: 'INCOME_READ', decision: 'ALLOW', auditStatus: 'ERROR', severity: 'HIGH', reasonCodes: ['DOWNSTREAM_TIMEOUT'], promptRisk: 0.04, behaviorRisk: 0.18, riskFlagged: true, errorLocation: 'DOWNSTREAM' }),
   createAuditEvent({ auditEventId: 'AUD-002', requestId: '00000000-0000-4000-8000-000000002002', requestedAt: '2026-08-25T17:44:06+09:00', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-9999', requestedTool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['CASE_SCOPE_VIOLATION'], promptRisk: 0.12, behaviorRisk: 0.31, scopeStatus: { ...okScope, customerScope: 'VIOLATION' } }),
   createAuditEvent({ auditEventId: 'AUD-001', requestId: '00000000-0000-4000-8000-000000001001', requestedAt: '2026-08-25T17:39:41+09:00', caseId: 'LOAN-2026-001', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'ALLOW', severity: 'LOW', promptRisk: 0, promptEvaluationStatus: 'NOT_EVALUATED', promptModelVersion: null }),
 ]
