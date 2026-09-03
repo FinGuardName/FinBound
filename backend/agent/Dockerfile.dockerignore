@@ -1,0 +1,21 @@
+**
+!gradlew
+!settings.gradle.kts
+!build.gradle.kts
+!gradle/
+!gradle/**
+!naver-checkstyle.xml
+!naver-checkstyle-suppressions.xml
+!backend/
+!backend/agent/
+!backend/agent/build.gradle.kts
+!backend/agent/src/
+!backend/agent/src/main/
+!backend/agent/src/main/**
+
+# Keep local secrets out even when placed under application resources.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/gradle.properties
