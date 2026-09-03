@@ -183,6 +183,52 @@ NORMAL_CREDIT_SCORE → CREDIT_SCORE_READ(CUST-1001)
 CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 ```
 
+### #60 Scenario 확장 — PR #79 소비자 리뷰 반영
+
+기존 두 Scenario와 아래 다섯 Scenario를 합친 7개 이름을 소비자 구현 기준으로 사용한다.
+PR #79에서 Backend 1이 이 목록에 맞춰 Core Enum을 확장하기로 했으며,
+실제 Core 지원 완료 여부는 #74 / PR #75에서 확인한다. Fixture 구현 완료를 뜻하지 않는다.
+Gateway Body에는 Scenario나 권한 근거를 추가하지 않는다. Tool/Data는
+`docs/06-common-conventions.md` §16·17의 기존 Enum만 사용한다.
+
+| Scenario | targetConsumerId | tool | requestedData | 기대 결과 (서버 Context 조건 충족 시) |
+|---|---|---|---|---|
+| `NORMAL_INCOME` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | ALLOW |
+| `NORMAL_DEBT` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | ALLOW |
+| `TOOL_SCOPE_ATTACK` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | BLOCK / `TOOL_SCOPE_VIOLATION` |
+| `DATA_SCOPE_ATTACK` | `CUST-1001` | `CREDIT_SCORE_READ` | `[CREDIT_SCORE, INCOME]` | BLOCK / `DATA_SCOPE_VIOLATION` |
+| `MANDATE_SCOPE_ATTACK` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | BLOCK / `MANDATE_SCOPE_VIOLATION` |
+
+필수 서버 Fixture 조건:
+
+- 정상: 유효한 Case/Passport, 요청 Tool/Data를 허용하는 Authority·Template·Passport·Mandate,
+  낮은 Risk 및 제한 미초과.
+- Tool 공격: Passport가 `INCOME_READ`를 허용하지 않는다. 단일 Tool 위반을 확인하려면
+  Authority/Template은 해당 Tool을, Passport/Mandate는 `INCOME`을 허용한다.
+- Data 공격: Passport가 `CREDIT_SCORE_READ`와 `CREDIT_SCORE`는 허용하지만 `INCOME`은
+  허용하지 않는다. 다른 Authority/Template/Mandate는 요청 Data를 허용한다.
+- Mandate 공격의 기준 Fixture: 발급 전 ACTIVE Mandate의 Data를 `[CREDIT_SCORE, INCOME]`으로
+  제한하고 Core에서 새 Passport를 발급한다. Authority/Template은 세 Tool/Data를 모두 허용한다.
+  현재 Calculator는 DEBT뿐 아니라 DEBT_READ도 Passport에서 제외하므로 기대 전체 코드는
+  `[DATA_SCOPE_VIOLATION, MANDATE_SCOPE_VIOLATION, TOOL_SCOPE_VIOLATION]`이다.
+  Source Version은 일치하고 다른 Scope/Risk/Limit은 정상이어야 한다.
+- 발급 후 Mandate에서 DEBT를 제거하고 버전을 올리는 별도 Fixture는 기존 Passport의
+  DEBT/DEBT_READ를 유지한다. 현재 Resolver/Rego 기준 기대 전체 코드는
+  `[MANDATE_SCOPE_VIOLATION, TASK_PASSPORT_INACTIVE]`이다.
+  현재 `passportStatus=VIOLATION`은 만료와 버전 불일치를 구분하지 못하며
+  `TASK_PASSPORT_STALE`을 반환하지 않는다. 세분화는 별도 Core/Policy 계약 변경 범위다.
+
+Scenario는 요청 생성만 결정한다. 모든 권한을 허용하는 기본 Seed에서는 공격 이름이어도
+ALLOW일 수 있다. Agent는 Scope를 계산하거나 기대 Reason Code를 생성·추가·정렬하지 않는다.
+전용 Fixture의 발급/관리는 Core·통합 테스트 담당 범위이며, Agent가 DB나 Passport를 수정하지 않는다.
+정상 INCOME과 Tool 공격, 정상 DEBT와 Mandate 공격은 요청 내용이 같고 서버 Context가 다르다.
+
+병합/활성화 순서는 **#77 → #75 → #79**이며, #79는 **#78 병합 내용도 반영**해야 한다.
+#77 이전 Gateway는 CREDIT_SCORE_READ/CREDIT_SCORE만 역직렬화하므로 새 Scenario 5개가
+정책 평가 전에 HTTP 400으로 거부된다. Agent는 이를 Scope BLOCK이 아닌 실행 오류로 취급한다.
+Core의 7개 Scenario 지원과 실제 Core Resolver 연결을 확인한 뒤 확장 Scenario를 활성화한다.
+기본 MockCoreClient의 고정 OK 응답으로 공격 차단을 검증해서는 안 된다.
+
 Simulator는 Scenario를 §5의 Gateway Tool Call로 변환한다. Gateway 응답의 `ALLOW/BLOCK`은
 정책 결과로 그대로 반환하며, Timeout·5xx·본문 누락은 성공이나 `ALLOW`로 바꾸지 않는다.
 Agent는 `requestId`와 `decision`, ALLOW의 `result.tool`·`result.consumerId`가 요청과

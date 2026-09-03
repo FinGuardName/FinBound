@@ -38,7 +38,47 @@ test_case_scope_violation_is_blocked if {
     })
     result := authorization.decision with input as request
     result.decision == "BLOCK"
-    "CASE_SCOPE_VIOLATION" in result.reasonCodes
+    result.reasonCodes == ["CASE_SCOPE_VIOLATION"]
+}
+
+# ScopeStatus consumption only: these tests do not calculate permissions or simulate Core fixtures.
+test_tool_scope_violation_has_only_tool_reason if {
+    request := request_with_scope_status(object.union(base_input.scopeStatus, {"toolScope": "VIOLATION"}))
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["TOOL_SCOPE_VIOLATION"]
+}
+
+test_data_scope_violation_has_only_data_reason if {
+    request := request_with_scope_status(object.union(base_input.scopeStatus, {"dataScope": "VIOLATION"}))
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["DATA_SCOPE_VIOLATION"]
+}
+
+test_mandate_scope_violation_has_only_mandate_reason if {
+    request := request_with_scope_status(object.union(base_input.scopeStatus, {"mandate": "VIOLATION"}))
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["MANDATE_SCOPE_VIOLATION"]
+}
+
+test_restricted_mandate_scope_combination_preserves_all_reasons if {
+    request := request_with_scope_status(object.union(base_input.scopeStatus, {
+        "mandate": "VIOLATION", "toolScope": "VIOLATION", "dataScope": "VIOLATION",
+    }))
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["DATA_SCOPE_VIOLATION", "MANDATE_SCOPE_VIOLATION", "TOOL_SCOPE_VIOLATION"]
+}
+
+test_changed_mandate_and_passport_status_use_current_reason_contract if {
+    request := request_with_scope_status(object.union(base_input.scopeStatus, {
+        "mandate": "VIOLATION", "passportStatus": "VIOLATION",
+    }))
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["MANDATE_SCOPE_VIOLATION", "TASK_PASSPORT_INACTIVE"]
 }
 
 test_employee_authority_violation_is_blocked if {
