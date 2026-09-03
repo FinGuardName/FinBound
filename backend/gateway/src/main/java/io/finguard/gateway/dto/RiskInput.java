@@ -5,20 +5,7 @@ public record RiskInput(
     String promptRiskLevel,             // LOW / ALERT / CRITICAL
     boolean promptInjectionDetected,    // 하위 호환 필드: CRITICAL과 정확히 같은 뜻
     double behaviorRisk,                // 행동 이상 점수
-    String behaviorRiskLevel,           // LOW / ALERT / CRITICAL
+    String behaviorRiskLevel,           // LOW / MEDIUM / HIGH
     boolean behaviorAnomalyDetected     // 이상행동 감지됐나
 ) {
-    public static RiskInput combine(
-        PromptRiskInput prompt,
-        BehaviorRiskInput behavior
-    ) {
-        return new RiskInput(
-            prompt.promptRisk(),
-            prompt.promptRiskLevel(),
-            prompt.promptInjectionDetected(),
-            behavior.behaviorRisk(),
-            behavior.behaviorRiskLevel(),
-            behavior.behaviorAnomalyDetected()
-        );
-    }
 }

@@ -32,7 +32,13 @@ uv run python -m models.download_prompt_model
 uv run python -m train.train_prompt_adapter
 uv run python -m evaluate.prompt_runtime --mode validation --output evaluate/prompt_runtime_validation.json
 uv run python -m evaluate.prompt_runtime --mode held-out --output evaluate/prompt_runtime_held_out.json
+uv run python -m datasets.prompt.fetch_public hf-deepset-prompt-injections test
+uv run python -m evaluate.prompt_external_blind
 ```
+
+마지막 두 명령은 모델과 Threshold를 고정한 뒤 별도로 실행하는 외부 영어 Post-freeze 평가입니다.
+고정 Revision·Parquet SHA를 검증하며 결과에는 원문 대신 불투명 Sample ID만 기록합니다. 공개
+일반 도메인 자료이므로 FinBound 한국어 금융 도메인의 성능 지표로 해석하지 않습니다.
 
 Runtime Endpoint:
 

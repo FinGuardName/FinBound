@@ -178,8 +178,10 @@ Threshold 선정
 ### Held-out Test Set
 
 최종 모델/Threshold 확정 후 평가하는 별도 Set이다. 현재 Set은 이전 평가에서 반복 관측됐으므로
-회귀 진단에만 사용하고 모델 선택과 Threshold 조정에는 사용하지 않는다. 다음 성능 확정에는 신규
-Blind Set을 사전에 고정한다.
+회귀 진단에만 사용하고 모델 선택과 Threshold 조정에는 사용하지 않는다. 이번 정책 확정 후에는
+고정된 `deepset/prompt-injections` 외부 Test Split을 Post-freeze 평가하되 결과를 보고 Threshold를
+다시 조정하지 않는다. 이 자료는 공개 영어 일반 도메인이며 사전학습 데이터 중복 가능성도 있어,
+한국어 금융 도메인 성능 확정에는 별도의 신규 Blind Set을 사전에 고정한다.
 
 AI 독립 기여는 다음 네 가지를 분리해서 보고한다.
 

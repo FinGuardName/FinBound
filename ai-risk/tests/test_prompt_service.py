@@ -128,6 +128,14 @@ def test_model_failure_is_not_replaced_with_low_risk() -> None:
         service.evaluate(_request("현재 고객의 신용점수를 조회해줘."))
 
 
+@pytest.mark.parametrize("score", [float("nan"), float("inf"), float("-inf"), -0.01, 1.01])
+def test_invalid_classifier_score_fails_closed(score: float) -> None:
+    service = PromptRiskService(classifier=FakeClassifier(score))
+
+    with pytest.raises(PromptModelError, match="finite and between zero and one"):
+        service.evaluate(_request("현재 고객의 신용점수를 조회해줘."))
+
+
 def test_invalid_config_is_fail_closed(tmp_path: Path) -> None:
     config = tmp_path / "prompt.json"
     config.write_text("{}", encoding="utf-8")

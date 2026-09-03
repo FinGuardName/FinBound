@@ -19,7 +19,8 @@
 - Rule 단독은 `ALERT`, AI 고신뢰 또는 AI 중간신뢰+Rule만 `CRITICAL`
 
 사전학습 Artifact와 Domain Adapter는 시작 시 SHA-256을 검증합니다. 모델 또는 Feature 추론이
-실패하면 낮은 Risk로 대체하지 않고 `PROMPT_RISK_UNAVAILABLE`로 fail-closed 처리합니다.
+실패하거나 Classifier가 유한하지 않거나 0~1 범위를 벗어난 점수를 반환하면 낮은 Risk로
+대체하지 않고 `PROMPT_RISK_UNAVAILABLE`로 fail-closed 처리합니다.
 
 이 구조를 선택한 이유는 기존 `max(ruleRisk, modelRisk)`가 어휘 Rule 하나만으로 AI 판단을
 우회해 즉시 차단할 수 있었기 때문입니다. 금융 권한·Scope·Hard Limit은 계속 결정적 정책으로
@@ -78,8 +79,25 @@ Unauthorized tool 1.00, Unknown prompt attack 0.90입니다. 상세 지표와 Wi
 `evaluate/prompt_runtime_held_out.json`에 저장합니다.
 
 이번 반복 Held-out에서는 기존 OR과 AI-primary gated의 수치가 우연히 같습니다. 이는 성능 향상을
-주장할 근거가 아니며, Rule 단독 차단을 제거하고 AI 증거를 필수화한 정책 의미의 변경입니다. 다음
-성능 주장은 사전에 고정한 신규 Blind Set으로 검증해야 합니다.
+주장할 근거가 아니며, Rule 단독 차단을 제거하고 AI 증거를 필수화한 정책 의미의 변경입니다.
+
+## 외부 Post-freeze 평가
+
+모델·Adapter·Threshold를 변경하지 않은 상태에서, 이전 FinBound 평가 Set과 분리된
+`deepset/prompt-injections` 고정 Test Split 116건을 한 번 평가했습니다. Source와 Parquet Revision,
+Artifact SHA-256 및 평가 JSONL SHA-256은 `evaluate/prompt_external_blind_deepset.json`에 기록합니다.
+평가 결과를 보고 Threshold를 다시 선택하지 않습니다.
+
+| 판정 경계 | Precision | Recall | F1 | FPR |
+|---|---:|---:|---:|---:|
+| `CRITICAL` 정책 차단 | 0.6818 | 0.2500 | 0.3659 | 0.1250 |
+| `ALERT` 이상 위험 신호 | 0.5172 | 1.0000 | 0.6818 | 1.0000 |
+
+이 공개 자료는 영어 일반 도메인의 넓은 Prompt Injection 정의를 사용하여 FinBound의 금융 업무
+정책과 Label 경계가 다릅니다. 또한 사전학습 모델의 학습 데이터와 겹쳤을 가능성을 배제할 수
+없습니다. 따라서 독립된 Post-freeze 외부 회귀 결과로만 해석하며 한국어 금융 성능을 주장하는
+근거로 사용하지 않습니다. 특히 외부 정상문장 전부가 최소 `ALERT`였고 `CRITICAL` FPR도 12.5%라,
+현재 모델을 운영 자동 차단 품질로 주장할 수 없다는 한계를 확인했습니다.
 
 ### 인용문-only 경계
 
@@ -93,8 +111,8 @@ Unauthorized tool 1.00, Unknown prompt attack 0.90입니다. 상세 지표와 Wi
 - AI 서비스가 권한 결정을 직접 만들지는 않지만 OPA가 `riskLevel=CRITICAL`을 차단 조건으로 사용합니다.
 - Held-out 결합 F1 0.8596/Recall 0.8167은 P0 탐지 가능성을 보여주지만, 전체 FPR 8.33%, 한국어
   Hard Negative FPR 20%와 영어 Recall 50%는 운영 자동 차단 품질로 충분하지 않습니다.
-- MVP에서는 `ALERT`를 감사·표시하고 `CRITICAL`만 차단합니다. 운영 전에는 신규 Blind Set과 실제
-  트래픽으로 False Block과 공격 Recall을 재검증해야 합니다.
+- MVP에서는 `ALERT`를 감사·표시하고 `CRITICAL`만 차단합니다. 운영 전에는 별도의 한국어 금융
+  도메인 Blind Set과 실제 트래픽으로 False Block과 공격 Recall을 재검증해야 합니다.
 
 ## 한계와 해석
 
@@ -104,7 +122,7 @@ Unauthorized tool 1.00, Unknown prompt attack 0.90입니다. 상세 지표와 Wi
 - 데이터는 216건의 가상·자체 작성 문장이라 실제 금융 환경 일반화 성능을 뜻하지 않습니다.
 - 동일 Held-out의 이전 평가 이력이 있습니다. 최종 Adapter와 Threshold 계산에는 Held-out 원문이나
   Sample별 결과를 사용하지 않았지만, 엄격한 단일 시도 프로토콜의 독립 최종 성능으로 주장하지
-  않습니다. 운영 전 별도 외부 Blind Set이 필요합니다.
+  않습니다. 별도 외부 Post-freeze 평가는 일반 영어 도메인이라 이를 대체하지 않습니다.
 - 공격 미탐은 Financial Context Resolver와 Hard Limit로 추가 방어합니다. 이 결정적 제약은 AI의
   역할을 대체하지 않고 권한 경계를 보장합니다. Prompt Rule은 단독 차단하지 않습니다.
 - 운영 배포 전 실제 트래픽과 별도 외부 Benchmark에서 Drift와 FPR을 다시 검증해야 합니다.
@@ -117,6 +135,8 @@ Unauthorized tool 1.00, Unknown prompt attack 0.90입니다. 상세 지표와 Wi
   `151fa3a17cc4c11a5fa86173c9d5cf63846c74389e528ed420f28cc203cd9aaa`
 - Domain Adapter SHA-256:
   `cf82500ce5c0bfd9929416a7c82c827f61da6eb627ff313164b2840a182ef85f`
+- 외부 Post-freeze 평가 Set SHA-256:
+  `de0996d15cabd838d50a4925a8493062ba70c29f845601cd6a17412236614486`
 - 학습 Random Seed: `42`
 - Threshold와 Artifact 경로: `models/prompt_detector.json`
 - 의존성: `requirements.lock`

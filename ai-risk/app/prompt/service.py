@@ -1,4 +1,5 @@
 import hashlib
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -48,6 +49,10 @@ class PromptRiskService:
 
         matches = detect_rule_matches(normalized)
         model_score = self._classifier.predict_attack_score(normalized)
+        if not math.isfinite(model_score) or not 0.0 <= model_score <= 1.0:
+            raise PromptModelError(
+                "Prompt classifier score must be finite and between zero and one"
+            )
         decision = decide_prompt_risk(model_score, matches, self._config)
         attack_type = (
             matches[0].attack_type

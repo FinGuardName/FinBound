@@ -24,11 +24,10 @@ class MockCoreClientTest {
         ToolCallRequest request = new ToolCallRequest(
             "RUN-001", "PASS-001", FinancialTool.CREDIT_SCORE_READ, "CUST-1001",
             List.of(FinancialDataType.CREDIT_SCORE), FinancialAction.READ);
-        ResolvedContext resolved = client.resolveContext(identity, request, "REQ-001");
-        assertThat(resolved.scopeStatus().customerScope()).isEqualTo("OK");
-        assertThat(resolved.promptRisk().evaluationStatus()).isEqualTo("EVALUATED");
-        assertThat(resolved.promptRisk().promptRiskLevel()).isEqualTo("LOW");
-        assertThat(resolved.promptRisk().promptInjectionDetected()).isFalse();
+        ResolvedContext context = client.resolveContext(identity, request, "REQ-001", null);
+        assertThat(context.scopeStatus().customerScope()).isEqualTo("OK");
+        assertThat(context.promptRiskSnapshot().evaluationStatus()).isEqualTo("EVALUATED");
+        assertThat(context.promptRiskSnapshot().riskLevel()).isEqualTo("LOW");
     }
 
     @Test
@@ -36,13 +35,13 @@ class MockCoreClientTest {
         ToolCallRequest request = new ToolCallRequest(
             "RUN-001", "PASS-001", FinancialTool.CREDIT_SCORE_READ, "CUST-9999",
             List.of(FinancialDataType.CREDIT_SCORE), FinancialAction.READ);
-        ResolvedContext resolved = client.resolveContext(identity, request, "REQ-002");
-        assertThat(resolved.scopeStatus().customerScope()).isEqualTo("VIOLATION");
-        assertThat(resolved.scopeStatus().employeeAuthority()).isEqualTo("OK");
+        ResolvedContext context = client.resolveContext(identity, request, "REQ-002", null);
+        assertThat(context.scopeStatus().customerScope()).isEqualTo("VIOLATION");
+        assertThat(context.scopeStatus().employeeAuthority()).isEqualTo("OK");
     }
 
     @Test
     void recordAuthFailureIsSafe() {
-        client.recordAuthFailure("REQ-X01", "AGENT_AUTHENTICATION_FAILED");
+        client.recordAuthFailure("REQ-X01", null, "AGENT_AUTHENTICATION_FAILED");
     }
 }

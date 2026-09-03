@@ -1,0 +1,11 @@
+{
+  "requestId": "REQ-006",
+  "decision": "BLOCK",
+  "systemOutcome": "ERROR",
+  "reasonCodes": ["POLICY_ENGINE_UNAVAILABLE"],
+  "downstreamReached": false,
+  "responseReleased": false,
+  "success": false,
+  "errorLocation": "OPA",
+  "completedAt": "2026-08-17T21:37:11+09:00"
+}

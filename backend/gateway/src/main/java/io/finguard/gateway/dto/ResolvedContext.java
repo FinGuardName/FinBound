@@ -1,7 +1,13 @@
 package io.finguard.gateway.dto;
 
-/** Core가 조립한 Scope Status와 저장된 Prompt Risk Snapshot의 정책용 투영. */
+import java.util.UUID;
+
 public record ResolvedContext(
+    UUID requestId,
+    References references,
     ScopeStatus scopeStatus,
-    PromptRiskInput promptRisk
-) { }
+    PromptRiskSnapshot promptRiskSnapshot
+) {
+    public record References(String employeeId, String caseId, String passportId) {
+    }
+}
