@@ -7,6 +7,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.net.ServerSocket;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
@@ -68,16 +69,32 @@ class MockFinanceClientImplTest {
     }
 
     @Test
-    void serverFailureIsMappedToDownstreamUnavailable() {
+    void httpErrorResponseReportsReached() {
         server.stubFor(post(urlEqualTo("/internal/v1/finance/tool-calls"))
             .willReturn(aResponse().withStatus(503)));
 
         assertThatThrownBy(() -> client.execute(request, "REQ-1", "trace"))
-            .isInstanceOf(DownstreamUnavailableException.class);
+            .isInstanceOfSatisfying(DownstreamUnavailableException.class,
+                e -> assertThat(e.downstreamReached()).isTrue());
     }
 
     @Test
-    void timeoutIsMappedToDownstreamTimeout() {
+    void connectionRefusedReportsNotReached() throws Exception {
+        // WireMock을 죽여 놓고 별도 포트로 클라이언트를 붙여 실제 connection refused를 만든다.
+        int freePort;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            freePort = socket.getLocalPort();
+        }
+        MockFinanceClientImpl offline = new MockFinanceClientImpl(
+            "http://127.0.0.1:" + freePort, "internal-secret", 500);
+
+        assertThatThrownBy(() -> offline.execute(request, "REQ-1", "trace"))
+            .isInstanceOfSatisfying(DownstreamUnavailableException.class,
+                e -> assertThat(e.downstreamReached()).isFalse());
+    }
+
+    @Test
+    void readTimeoutIsMappedToDownstreamTimeout() {
         server.stubFor(post(urlEqualTo("/internal/v1/finance/tool-calls"))
             .willReturn(aResponse()
                 .withFixedDelay(500)

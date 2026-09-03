@@ -4,8 +4,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.finguard.gateway.contract.PolicyDecision;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuditOutcome(
     PolicyDecision decision,
     String systemOutcome,

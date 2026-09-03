@@ -36,7 +36,11 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Runtime Tool Call의 실제 집행. Audit 선저장 → Authorization → Downstream → Outcome PATCH
- * 순으로 진행하며 어느 단계 실패든 fail-closed BLOCK으로 매핑한다.
+ * 순으로 진행하며 어느 단계 실패든 fail-closed 처리한다.
+ *
+ * <p>정책 판정에 닿기 전 시스템 장애로 차단된 경우는 정책 BLOCK이 아니라 systemOutcome=ERROR로만 기록한다.
+ * decision을 함께 보내면 contracts/audit/execution-outcome.schema.json의 BLOCK 절과 ERROR 절이 충돌한다
+ * (BLOCK은 success/recordsRead/latencyMs가 없어야 하지만 ERROR는 success=false를 필수로 요구).
  */
 @Slf4j
 @Service
@@ -45,6 +49,7 @@ public class ToolCallEnforcementService {
     private static final Set<String> SYSTEM_FAILURE_REASONS = Set.of(
         "CONTEXT_SERVICE_UNAVAILABLE",
         "BEHAVIOR_HISTORY_UNAVAILABLE",
+        "PROMPT_RISK_UNAVAILABLE",
         "BEHAVIOR_RISK_UNAVAILABLE",
         "POLICY_ENGINE_UNAVAILABLE");
 
@@ -135,11 +140,15 @@ public class ToolCallEnforcementService {
             completedResponses.put(requestId, result);
             return result;
         } catch (DownstreamUnavailableException e) {
-            log.warn("Downstream failed requestId={}", requestId, e);
-            return recordDownstreamError(identity, requestId, traceparent, outcome, requestedAt, "DOWNSTREAM_ERROR");
+            log.warn("Downstream failed requestId={} reached={}", requestId, e.downstreamReached(), e);
+            return recordDownstreamError(
+                identity, requestId, traceparent, outcome, requestedAt,
+                "DOWNSTREAM_ERROR", e.downstreamReached(), HttpStatus.BAD_GATEWAY);
         } catch (DownstreamTimeoutException e) {
             log.warn("Downstream timed out requestId={}", requestId, e);
-            return recordDownstreamError(identity, requestId, traceparent, outcome, requestedAt, "DOWNSTREAM_TIMEOUT");
+            return recordDownstreamError(
+                identity, requestId, traceparent, outcome, requestedAt,
+                "DOWNSTREAM_TIMEOUT", true, HttpStatus.GATEWAY_TIMEOUT);
         }
     }
 
@@ -148,10 +157,14 @@ public class ToolCallEnforcementService {
                                                     String traceparent,
                                                     AuthorizationOutcome outcome,
                                                     Instant requestedAt,
-                                                    String reasonCode) {
+                                                    String reasonCode,
+                                                    boolean downstreamReached,
+                                                    HttpStatus status) {
         safeUpdateOutcome(identity, requestId, traceparent,
-            downstreamErrorOutcome(outcome, requestedAt, reasonCode));
-        EnforcementResult result = block(requestId, reasonCode);
+            downstreamErrorOutcome(outcome, requestedAt, reasonCode, downstreamReached));
+        EnforcementResult result = new EnforcementResult(
+            status,
+            ToolCallResponse.systemError(requestId, reasonCode, List.of(reasonCode)));
         completedResponses.put(requestId, result);
         return result;
     }
@@ -175,16 +188,20 @@ public class ToolCallEnforcementService {
 
     private AuditOutcome blockOutcome(AuthorizationOutcome outcome, Instant completedAt) {
         List<String> reasonCodes = outcome.reasonCodes();
+        boolean systemFailure = hasSystemFailure(reasonCodes);
+        // systemOutcome=ERROR와 decision=BLOCK은 execution-outcome 스키마에서 상호 배타적이다.
+        // BLOCK 절은 success/recordsRead/latencyMs가 없어야 하지만 ERROR 절은 success=false를 요구한다.
+        // 판정에 닿지 못한 fail-closed는 decision을 비워 systemOutcome=ERROR 단일 기록으로 남긴다.
         return new AuditOutcome(
-            PolicyDecision.BLOCK,
-            systemOutcome(reasonCodes),
+            systemFailure ? null : PolicyDecision.BLOCK,
+            systemFailure ? "ERROR" : "COMPLETED",
             Set.copyOf(reasonCodes),
             false,
             false,
-            blockSuccess(reasonCodes),
+            systemFailure ? Boolean.FALSE : null,
             null,
             null,
-            errorLocation(reasonCodes),
+            systemFailure ? errorLocation(reasonCodes) : null,
             behaviorRisk(outcome),
             outcome.policyVersion(),
             completedAt);
@@ -208,12 +225,13 @@ public class ToolCallEnforcementService {
 
     private AuditOutcome downstreamErrorOutcome(AuthorizationOutcome outcome,
                                                 Instant completedAt,
-                                                String reasonCode) {
+                                                String reasonCode,
+                                                boolean downstreamReached) {
         return new AuditOutcome(
             PolicyDecision.ALLOW,
             "ERROR",
             Set.of(reasonCode),
-            true,
+            downstreamReached,
             false,
             false,
             null,
@@ -255,22 +273,10 @@ public class ToolCallEnforcementService {
         return reasonCodes.stream().anyMatch(SYSTEM_FAILURE_REASONS::contains);
     }
 
-    private String systemOutcome(List<String> reasonCodes) {
-        return hasSystemFailure(reasonCodes) ? "ERROR" : "COMPLETED";
-    }
-
-    /**
-     * BLOCK 상황의 success 필드 의미:
-     *   - 시스템 장애로 BLOCK된 경우: 명시적으로 false (실행 자체가 실패했음)
-     *   - 정책 위반으로 BLOCK된 경우: null (실행되지 않았으므로 성공 여부 자체가 없음)
-     */
-    private Boolean blockSuccess(List<String> reasonCodes) {
-        return hasSystemFailure(reasonCodes) ? Boolean.FALSE : null;
-    }
-
     private String errorLocation(List<String> reasonCodes) {
         if (reasonCodes.contains("CONTEXT_SERVICE_UNAVAILABLE")
-                || reasonCodes.contains("BEHAVIOR_HISTORY_UNAVAILABLE")) {
+                || reasonCodes.contains("BEHAVIOR_HISTORY_UNAVAILABLE")
+                || reasonCodes.contains("PROMPT_RISK_UNAVAILABLE")) {
             return "CORE";
         }
         if (reasonCodes.contains("BEHAVIOR_RISK_UNAVAILABLE")) {

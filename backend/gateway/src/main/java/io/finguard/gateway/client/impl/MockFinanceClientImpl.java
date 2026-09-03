@@ -1,6 +1,8 @@
 package io.finguard.gateway.client.impl;
 
+import java.net.ConnectException;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.util.Map;
 
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import io.finguard.gateway.client.DownstreamClient;
 import io.finguard.gateway.dto.DownstreamToolResult;
@@ -58,23 +61,42 @@ public class MockFinanceClientImpl implements DownstreamClient {
                 .retrieve()
                 .body(DownstreamToolResult.class);
             if (response == null || response.result() == null) {
-                throw new DownstreamUnavailableException("Mock finance response is incomplete");
+                throw new DownstreamUnavailableException("Mock finance response is incomplete", true);
             }
             return response;
         } catch (ResourceAccessException e) {
-            if (isTimeout(e)) {
+            if (isReadTimeout(e)) {
                 throw new DownstreamTimeoutException("Mock finance API timed out", e);
             }
-            throw new DownstreamUnavailableException("Mock finance API call failed", e);
+            if (isConnectFailure(e)) {
+                throw new DownstreamUnavailableException("Mock finance API connection failed", e, false);
+            }
+            throw new DownstreamUnavailableException("Mock finance API call failed", e, false);
+        } catch (RestClientResponseException e) {
+            throw new DownstreamUnavailableException("Mock finance API returned error status", e, true);
         } catch (RestClientException e) {
-            throw new DownstreamUnavailableException("Mock finance API call failed", e);
+            throw new DownstreamUnavailableException("Mock finance API call failed", e, false);
         }
     }
 
-    private boolean isTimeout(Throwable throwable) {
+    private boolean isReadTimeout(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
+            if (current instanceof HttpConnectTimeoutException) {
+                return false;
+            }
             if (current instanceof java.net.SocketTimeoutException || current instanceof HttpTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isConnectFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof ConnectException || current instanceof HttpConnectTimeoutException) {
                 return true;
             }
             current = current.getCause();

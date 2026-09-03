@@ -18,6 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import io.finguard.gateway.authorization.AuthorizationOutcome;
 import io.finguard.gateway.authorization.AuthorizationService;
@@ -34,6 +35,7 @@ import io.finguard.gateway.dto.DownstreamToolResult;
 import io.finguard.gateway.dto.ToolCallRequest;
 import io.finguard.gateway.exception.AuditWriteException;
 import io.finguard.gateway.exception.DownstreamTimeoutException;
+import io.finguard.gateway.exception.DownstreamUnavailableException;
 import io.finguard.gateway.exception.DuplicateRequestException;
 import io.finguard.gateway.identity.VerifiedAgentIdentity;
 
@@ -70,7 +72,7 @@ class ToolCallEnforcementServiceTest {
     }
 
     @Test
-    void blockDoesNotCallDownstreamAndCompletesAudit() {
+    void policyBlockCompletesAuditAsBlockAndReturns403() {
         when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
             new AuthorizationOutcome(
                 new PolicyDecisionResult(PolicyDecision.BLOCK, "CRITICAL", true,
@@ -80,9 +82,51 @@ class ToolCallEnforcementServiceTest {
         EnforcementResult result = service.enforce(identity, request, "REQ-2", "trace");
 
         assertThat(result.status().value()).isEqualTo(403);
+        assertThat(result.body().decision()).isEqualTo(PolicyDecision.BLOCK);
         assertThat(result.body().reasonCodes()).containsExactly("CASE_SCOPE_VIOLATION");
         verify(downstreamClient, never()).execute(any(), any(), any());
-        verify(coreClient).updateAuditOutcome(eq(identity), eq("REQ-2"), any(AuditOutcome.class), eq("trace"));
+
+        AuditOutcome outcome = captureOutcome("REQ-2");
+        assertThat(outcome.decision()).isEqualTo(PolicyDecision.BLOCK);
+        assertThat(outcome.systemOutcome()).isEqualTo("COMPLETED");
+        assertThat(outcome.success()).isNull();
+        assertThat(outcome.errorLocation()).isNull();
+    }
+
+    @Test
+    void authorizationSystemFailureOmitsDecisionInAudit() {
+        when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
+            AuthorizationOutcome.failClosed("POLICY_ENGINE_UNAVAILABLE"));
+
+        EnforcementResult result = service.enforce(identity, request, "REQ-2b", "trace");
+
+        // HTTP 응답은 fail-closed BLOCK 유지 — Agent 인가 실패 경로의 계약.
+        assertThat(result.status().value()).isEqualTo(403);
+        assertThat(result.body().decision()).isEqualTo(PolicyDecision.BLOCK);
+        assertThat(result.body().reasonCodes()).containsExactly("POLICY_ENGINE_UNAVAILABLE");
+
+        // Audit 레코드는 decision을 비우고 ERROR로만 기록 —
+        // execution-outcome.schema.json의 BLOCK 절과 ERROR 절이 상호 배타적이기 때문.
+        AuditOutcome outcome = captureOutcome("REQ-2b");
+        assertThat(outcome.decision()).isNull();
+        assertThat(outcome.systemOutcome()).isEqualTo("ERROR");
+        assertThat(outcome.success()).isFalse();
+        assertThat(outcome.errorLocation()).isEqualTo("OPA");
+        assertThat(outcome.downstreamReached()).isFalse();
+        assertThat(outcome.responseReleased()).isFalse();
+    }
+
+    @Test
+    void promptRiskUnavailableIsRecordedAsCoreErrorLocation() {
+        when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
+            AuthorizationOutcome.failClosed("PROMPT_RISK_UNAVAILABLE"));
+
+        service.enforce(identity, request, "REQ-2c", "trace");
+
+        AuditOutcome outcome = captureOutcome("REQ-2c");
+        assertThat(outcome.decision()).isNull();
+        assertThat(outcome.systemOutcome()).isEqualTo("ERROR");
+        assertThat(outcome.errorLocation()).isEqualTo("CORE");
     }
 
     @Test
@@ -140,16 +184,62 @@ class ToolCallEnforcementServiceTest {
     }
 
     @Test
-    void downstreamTimeoutCompletesAuditAsTimeoutError() {
+    void downstreamTimeoutReturnsGatewayTimeoutWithoutPolicyBlock() {
         when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(allowOutcome());
         org.mockito.Mockito.doThrow(new DownstreamTimeoutException("timeout", new RuntimeException()))
             .when(downstreamClient).execute(any(), any(), any());
 
         EnforcementResult result = service.enforce(identity, request, "REQ-6", "trace");
 
-        assertThat(result.status().value()).isEqualTo(403);
+        assertThat(result.status().value()).isEqualTo(504);
+        assertThat(result.body().decision()).isNull();
+        assertThat(result.body().error()).isEqualTo("DOWNSTREAM_TIMEOUT");
         assertThat(result.body().reasonCodes()).containsExactly("DOWNSTREAM_TIMEOUT");
-        verify(coreClient).updateAuditOutcome(eq(identity), eq("REQ-6"), any(AuditOutcome.class), eq("trace"));
+
+        AuditOutcome outcome = captureOutcome("REQ-6");
+        assertThat(outcome.decision()).isEqualTo(PolicyDecision.ALLOW);
+        assertThat(outcome.systemOutcome()).isEqualTo("ERROR");
+        assertThat(outcome.downstreamReached()).isTrue();
+    }
+
+    @Test
+    void downstreamHttpErrorReportsReachedAsBadGateway() {
+        when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(allowOutcome());
+        org.mockito.Mockito.doThrow(new DownstreamUnavailableException("http 503", true))
+            .when(downstreamClient).execute(any(), any(), any());
+
+        EnforcementResult result = service.enforce(identity, request, "REQ-7", "trace");
+
+        assertThat(result.status().value()).isEqualTo(502);
+        assertThat(result.body().decision()).isNull();
+        assertThat(result.body().error()).isEqualTo("DOWNSTREAM_ERROR");
+
+        AuditOutcome outcome = captureOutcome("REQ-7");
+        assertThat(outcome.decision()).isEqualTo(PolicyDecision.ALLOW);
+        assertThat(outcome.systemOutcome()).isEqualTo("ERROR");
+        assertThat(outcome.downstreamReached()).isTrue();
+    }
+
+    @Test
+    void downstreamConnectionFailureReportsNotReached() {
+        when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(allowOutcome());
+        org.mockito.Mockito.doThrow(new DownstreamUnavailableException("connection refused", false))
+            .when(downstreamClient).execute(any(), any(), any());
+
+        EnforcementResult result = service.enforce(identity, request, "REQ-8", "trace");
+
+        assertThat(result.status().value()).isEqualTo(502);
+        assertThat(result.body().decision()).isNull();
+
+        AuditOutcome outcome = captureOutcome("REQ-8");
+        assertThat(outcome.systemOutcome()).isEqualTo("ERROR");
+        assertThat(outcome.downstreamReached()).isFalse();
+    }
+
+    private AuditOutcome captureOutcome(String requestId) {
+        ArgumentCaptor<AuditOutcome> captor = ArgumentCaptor.forClass(AuditOutcome.class);
+        verify(coreClient).updateAuditOutcome(eq(identity), eq(requestId), captor.capture(), eq("trace"));
+        return captor.getValue();
     }
 
     private AuthorizationOutcome allowOutcome() {

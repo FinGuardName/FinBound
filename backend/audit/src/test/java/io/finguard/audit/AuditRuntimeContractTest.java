@@ -68,6 +68,11 @@ class AuditRuntimeContractTest {
                 "execution-outcome.error.valid.json"
             ),
             Arguments.of(
+                "정책 판정 전 fail-closed는 decision을 생략하고 ERROR로만 기록",
+                "execution-outcome.schema.json",
+                "execution-outcome.fail-closed.valid.json"
+            ),
+            Arguments.of(
                 "인증 성공 직후 PROCESSING Business Audit 생성",
                 "audit-event.schema.json",
                 "audit-event.processing.valid.json"
@@ -126,6 +131,11 @@ class AuditRuntimeContractTest {
                 "BLOCK ExecutionOutcome의 latencyMs 차단",
                 "execution-outcome.schema.json",
                 "execution-outcome.block-latency.invalid.json"
+            ),
+            Arguments.of(
+                "BLOCK과 ERROR systemOutcome의 동시 기록 차단",
+                "execution-outcome.schema.json",
+                "execution-outcome.block-with-error.invalid.json"
             ),
             Arguments.of(
                 "Business Audit의 민감 원문 차단",
