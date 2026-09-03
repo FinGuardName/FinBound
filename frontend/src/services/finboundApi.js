@@ -245,11 +245,17 @@ function validateExecution(execution, agentRunId) {
  *
  * ERROR 가 decision 을 가질 수도 있다. Downstream 실패는 ALLOW + ERROR 다
  * (execution-outcome.error.valid.json). 그래서 부재를 허용하되 값이 오면 검사한다.
+ *
+ * 다만 BLOCK + ERROR 는 받지 않는다. 스키마가 표현할 수 없는 상태다 —
+ * ERROR 절은 success 를 필수로 요구하고 BLOCK 절은 success 의 존재 자체를 금지한다
+ * (execution-outcome.schema.json 의 두 조건부 절). 어느 값을 넣어도 통과하지 못한다.
  */
 function isContractualAttempt(attempt) {
   if (!['COMPLETED', 'ERROR'].includes(attempt?.systemOutcome)) return false
-  if (attempt.systemOutcome === 'ERROR' && attempt.decision === undefined) return true
-  return ['ALLOW', 'BLOCK'].includes(attempt?.decision)
+  if (attempt.systemOutcome === 'ERROR') {
+    return attempt.decision === undefined || attempt.decision === 'ALLOW'
+  }
+  return ['ALLOW', 'BLOCK'].includes(attempt.decision)
 }
 
 async function getAgentExecution(agentRunId) {

@@ -346,6 +346,34 @@ describe('real Core API adapter', () => {
     expect(execution.attempts[0].reasonCodes).toContain('CONTEXT_SERVICE_UNAVAILABLE')
   })
 
+  it('rejects a BLOCK attempt that claims a system error', async () => {
+    // BLOCK + ERROR 는 execution-outcome.schema.json 이 표현할 수 없는 상태다. ERROR 절은
+    // success 를 필수로 요구하고 BLOCK 절은 success 의 존재 자체를 금지한다. 서버가 이 조합을
+    // 보냈다면 계약을 어긴 것이고, 조용히 받으면 mapAgentExecution 이 차단과 오류로 이중 계수한다.
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-BLOCKERROR', status: 'RUNNING' }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: { allowedTools: [], allowedData: [] },
+        withheldTools: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-BLOCKERROR',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: '00000000-0000-4000-8000-00000000f003',
+          requestedTool: 'CREDIT_SCORE_READ',
+          decision: 'BLOCK',
+          systemOutcome: 'ERROR',
+          reasonCodes: ['POLICY_ENGINE_UNAVAILABLE'],
+        }],
+      }))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
+      code: 'CORE_API_INVALID_RESPONSE',
+    })
+  })
+
   it('still rejects a completed attempt that omits its policy decision', async () => {
     // 부재를 허용하는 것은 ERROR 뿐이다. COMPLETED 는 판정이 끝났다는 뜻이므로
     // decision 이 없으면 계약 위반이다.
