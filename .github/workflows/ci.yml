@@ -81,6 +81,44 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      - name: Build Frontend production image
+        run: docker build --tag finbound-frontend:ci .
+      - name: Smoke test Frontend container and Core Public API allowlist
+        run: |
+          docker network create finbound-frontend-ci
+          docker run --detach --network finbound-frontend-ci --name core-api nginx:1.29-alpine
+          docker exec core-api sh -c 'mkdir -p /usr/share/nginx/html/api/v1 /usr/share/nginx/html/internal/v1 /usr/share/nginx/html/actuator'
+          docker exec core-api sh -c 'printf public-api-ok > /usr/share/nginx/html/api/v1/probe'
+          docker exec core-api sh -c 'printf internal-api-reached > /usr/share/nginx/html/internal/v1/probe'
+          docker exec core-api sh -c 'printf actuator-reached > /usr/share/nginx/html/actuator/health'
+          docker run --detach \
+            --network finbound-frontend-ci \
+            --name finbound-frontend \
+            --publish 127.0.0.1:18088:8080 \
+            --env CORE_API_UPSTREAM=http://core-api:80 \
+            finbound-frontend:ci
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18088/health > /dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker logs finbound-frontend
+              exit 1
+            fi
+            sleep 1
+          done
+
+          test "$(curl --fail --silent http://127.0.0.1:18088/core-api/api/v1/probe)" = "public-api-ok"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18088/core-api/internal/v1/probe)" = "404"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18088/core-api/actuator/health)" = "404"
+          test "$(docker exec finbound-frontend id -u)" = "101"
+          curl --fail --silent http://127.0.0.1:18088/loan-review | grep --quiet '<div id="app"></div>'
+      - name: Clean up Frontend smoke containers
+        if: always()
+        run: |
+          docker rm --force finbound-frontend core-api 2>/dev/null || true
+          docker network rm finbound-frontend-ci 2>/dev/null || true
 
   policy:
     runs-on: ubuntu-latest
