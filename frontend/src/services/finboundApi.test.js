@@ -311,6 +311,66 @@ describe('real Core API adapter', () => {
     })
   })
 
+  it('keeps a fail-closed attempt that carries no policy decision', async () => {
+    // 정책 판정에 닿기 전 시스템 장애로 차단된 실행은 decision 을 생략한다.
+    // contracts/audit/fixtures/execution-outcome.fail-closed.valid.json 이 그 모양이고,
+    // execution-outcome.schema.json 은 systemOutcome=COMPLETED 일 때만 decision 을 요구한다.
+    // 여기서 거부하면 Core·AI 장애로 막힌 실행이 화면에서 통째로 사라진다.
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-FAILCLOSED', status: 'RUNNING' }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: { allowedTools: [], allowedData: [] },
+        withheldTools: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-FAILCLOSED',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: '00000000-0000-4000-8000-00000000f001',
+          requestedTool: 'CREDIT_SCORE_READ',
+          systemOutcome: 'ERROR',
+          reasonCodes: ['CONTEXT_SERVICE_UNAVAILABLE'],
+          downstreamReached: false,
+          responseReleased: false,
+          success: false,
+          errorLocation: 'CORE',
+        }],
+      }))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    const execution = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
+
+    expect(execution.attempts).toHaveLength(1)
+    expect(execution.attempts[0].systemOutcome).toBe('ERROR')
+    expect(execution.attempts[0].decision).toBeUndefined()
+    expect(execution.attempts[0].reasonCodes).toContain('CONTEXT_SERVICE_UNAVAILABLE')
+  })
+
+  it('still rejects a completed attempt that omits its policy decision', async () => {
+    // 부재를 허용하는 것은 ERROR 뿐이다. COMPLETED 는 판정이 끝났다는 뜻이므로
+    // decision 이 없으면 계약 위반이다.
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-NODECISION', status: 'RUNNING' }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: { allowedTools: [], allowedData: [] },
+        withheldTools: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-NODECISION',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: '00000000-0000-4000-8000-00000000f002',
+          requestedTool: 'CREDIT_SCORE_READ',
+          systemOutcome: 'COMPLETED',
+        }],
+      }))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
+      code: 'CORE_API_INVALID_RESPONSE',
+    })
+  })
+
   it('keeps unavailable reachability facts unknown', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-UNKNOWN', status: 'RUNNING' }))
