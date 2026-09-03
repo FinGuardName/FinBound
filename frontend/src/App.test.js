@@ -147,6 +147,11 @@ describe('FinBound P0 application', () => {
     await wrapper.get('.agent-task-form').trigger('submit')
     await flushPromises()
 
+    const reviewSteps = wrapper.findAll('.review-status span')
+    expect(reviewSteps[1].classes()).toContain('complete')
+    expect(reviewSteps[1].text()).toContain('자료 확인완료')
+    expect(reviewSteps[2].classes()).toContain('current')
+    expect(reviewSteps[2].text()).toContain('심사 의견진행 중')
     expect(wrapper.text()).toContain('신규 대출 심사자료 확인이 완료되었습니다')
     expect(wrapper.text()).toContain('3건 확인 · 0건 차단')
     expect(wrapper.text()).toContain('차단 사유 없음')

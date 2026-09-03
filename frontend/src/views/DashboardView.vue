@@ -174,27 +174,30 @@ watch(page, () => {
 
 <template>
   <section class="dashboard-page" aria-labelledby="dashboard-heading">
-    <div class="dashboard-intro">
-      <div>
-        <p class="section-kicker">최근 AI 업무 기록</p>
-        <h2 id="dashboard-heading">AI 업무 안전 현황</h2>
-        <p>직원이 요청한 업무가 정상 처리되었는지, 보호 설정이 필요한 순간에 작동했는지 확인합니다.</p>
+    <section class="panel dashboard-overview">
+      <div class="dashboard-intro">
+        <div>
+          <p class="section-kicker">최근 AI 업무 기록</p>
+          <h2 id="dashboard-heading">AI 업무 보호 결과</h2>
+          <p>직원이 요청한 업무가 정상 처리되었는지, 보호 설정이 필요한 순간에 작동했는지 확인합니다.</p>
+        </div>
+        <span class="dashboard-update"><i></i>방금 업데이트됨</span>
       </div>
-      <span class="dashboard-update"><i></i>방금 업데이트됨</span>
-    </div>
 
-    <div class="metric-grid">
-      <article><span>전체 업무</span><strong>{{ summaryMetric('total') }}</strong><small>{{ summaryLoading ? '요약 불러오는 중' : '최근 수집 기록' }}</small></article>
-      <article><span>정상 처리</span><strong class="metric-allow">{{ summaryMetric('allow') }}</strong><small>업무 범위 안에서 완료</small></article>
-      <article><span>안전 차단</span><strong class="metric-block">{{ summaryMetric('block') }}</strong><small>금융시스템 조회 전 중단</small></article>
-      <article><span>처리 오류</span><strong class="metric-error">{{ summaryMetric('error') }}</strong><small>확인 또는 재처리 필요</small></article>
-    </div>
+      <div class="metric-grid">
+        <article class="metric-total"><span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" /></svg></span><div><span>전체 업무</span><strong>{{ summaryMetric('total') }}</strong><small>{{ summaryLoading ? '요약 불러오는 중' : '최근 수집 기록' }}</small></div></article>
+        <article class="metric-success"><span class="metric-icon" aria-hidden="true"><svg class="soft-shield-icon" viewBox="0 0 24 24"><path class="shield-fill" d="M12 2.7c2.35 1.45 4.75 2.35 7.2 2.9v5.15c0 4.75-2.8 8.4-7.2 10.55-4.4-2.15-7.2-5.8-7.2-10.55V5.6c2.45-.55 4.85-1.45 7.2-2.9Z" /><path class="shield-symbol" d="m8.5 12 2.25 2.25 4.8-5" /></svg></span><div><span>정상 처리</span><strong class="metric-allow">{{ summaryMetric('allow') }}</strong><small>업무 범위 안에서 완료</small></div></article>
+        <article class="metric-protected"><span class="metric-icon" aria-hidden="true"><svg class="soft-shield-icon" viewBox="0 0 24 24"><path class="shield-fill" d="M12 2.7c2.35 1.45 4.75 2.35 7.2 2.9v5.15c0 4.75-2.8 8.4-7.2 10.55-4.4-2.15-7.2-5.8-7.2-10.55V5.6c2.45-.55 4.85-1.45 7.2-2.9Z" /><path class="shield-symbol" d="M9 9l6 6M15 9l-6 6" /></svg></span><div><span>안전 차단</span><strong class="metric-block">{{ summaryMetric('block') }}</strong><small>금융시스템 조회 전 중단</small></div></article>
+        <article class="metric-warning"><span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 21 20H3L12 3Z" /><path d="M12 9v5M12 17h.01" /></svg></span><div><span>처리 오류</span><strong class="metric-error">{{ summaryMetric('error') }}</strong><small>확인 또는 재처리 필요</small></div></article>
+      </div>
 
-    <div v-if="summaryError" class="dashboard-error" role="alert">
-      <span>{{ summaryError }}</span><button type="button" @click="loadSummary">요약 다시 시도</button>
-    </div>
+      <div v-if="summaryError" class="dashboard-error" role="alert">
+        <span>{{ summaryError }}</span><button type="button" @click="loadSummary">요약 다시 시도</button>
+      </div>
+    </section>
 
     <section class="panel dashboard-filters" aria-label="업무 기록 검색 조건">
+      <div class="filter-heading"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" /></svg></span><div><strong>업무 기록 검색</strong><small>기간과 처리 결과를 기준으로 기록을 확인합니다.</small></div></div>
       <div class="filter-bar primary-filters">
         <label>
           조회 기간
@@ -234,6 +237,7 @@ watch(page, () => {
 
     <div class="dashboard-grid">
       <div class="panel event-list-panel">
+        <div class="event-list-heading"><div><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" /></svg></span><div><strong>AI 업무 처리 내역</strong><small>선택한 기록의 보호 결과를 오른쪽에서 확인할 수 있습니다.</small></div></div><em>{{ events.length }}건 표시</em></div>
         <div class="event-table" role="table" aria-label="AI 업무 처리 내역">
           <div class="table-head" role="row"><span>시간</span><span>고객 / 확인 업무</span><span>처리 결과</span></div>
           <button v-for="event in events" :key="event.auditEventId" :class="['event-row', { selected: selectedId === event.auditEventId }]" type="button" role="row" @click="selectEvent(event.auditEventId)">
@@ -253,7 +257,7 @@ watch(page, () => {
 
       <aside v-if="selectedEvent" class="panel event-detail">
         <div class="panel-heading">
-          <div><p class="section-kicker">선택한 업무 내역</p><h2>업무 내역 {{ selectedEvent.auditEventId.slice(-3) }}</h2></div>
+          <div class="detail-title-group"><span class="detail-heading-icon" aria-hidden="true"><svg class="soft-shield-icon" viewBox="0 0 24 24"><path class="shield-fill" d="M12 2.7c2.35 1.45 4.75 2.35 7.2 2.9v5.15c0 4.75-2.8 8.4-7.2 10.55-4.4-2.15-7.2-5.8-7.2-10.55V5.6c2.45-.55 4.85-1.45 7.2-2.9Z" /><path class="shield-symbol" d="m8.5 12 2.25 2.25 4.8-5" /></svg></span><div><p class="section-kicker">선택한 업무 내역</p><h2>업무 내역 {{ selectedEvent.auditEventId.slice(-3) }}</h2></div></div>
           <StatusBadge :value="selectedEvent.severity" :label="severityLabels[selectedEvent.severity] || '미제공'" />
         </div>
         <RiskMeter
