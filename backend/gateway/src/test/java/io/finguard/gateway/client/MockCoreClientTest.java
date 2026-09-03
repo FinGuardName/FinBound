@@ -26,7 +26,7 @@ class MockCoreClientTest {
             List.of(FinancialDataType.CREDIT_SCORE), FinancialAction.READ);
         ResolvedContext context = client.resolveContext(identity, request, "REQ-001", null);
         assertThat(context.scopeStatus().customerScope()).isEqualTo("OK");
-        assertThat(context.promptRiskSnapshot().evaluationStatus()).isEqualTo("NOT_EVALUATED");
+        assertThat(context.promptRiskSnapshot().evaluationStatus()).isEqualTo("EVALUATED");
     }
 
     @Test

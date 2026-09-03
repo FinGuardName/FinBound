@@ -1,5 +1,6 @@
 package io.finguard.gateway.client.impl;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import org.springframework.context.annotation.Profile;
@@ -38,7 +39,7 @@ public class MockCoreClient implements CoreClient {
             requestUuid(requestId),
             new ResolvedContext.References("EMP-101", "LOAN-2026-001", request.passportId()),
             scopeStatus,
-            PromptRiskSnapshot.notEvaluated()
+            new PromptRiskSnapshot("EVALUATED", BigDecimal.valueOf(0.05), false, "sha256:mock-evaluated", "prompt-guard-1")
         );
     }
 

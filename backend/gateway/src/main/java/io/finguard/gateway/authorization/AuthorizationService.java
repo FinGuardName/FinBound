@@ -72,6 +72,9 @@ public class AuthorizationService {
         if (promptRisk == null || promptRisk.promptRisk() == null) {
             throw new PromptRiskUnavailableException("Prompt risk snapshot is incomplete");
         }
+        if (!"EVALUATED".equals(promptRisk.evaluationStatus())) {
+            throw new PromptRiskUnavailableException("Prompt risk was not evaluated");
+        }
         return new RiskInput(
             promptRisk.promptRisk().doubleValue(),
             promptRisk.detected(),

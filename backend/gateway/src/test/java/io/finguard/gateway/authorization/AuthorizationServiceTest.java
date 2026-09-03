@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -97,6 +98,22 @@ class AuthorizationServiceTest {
     }
 
     @Test
+    void notEvaluatedPromptRiskYieldsPromptRiskUnavailable() {
+        when(core.resolveContext(any(), any(), any(), any())).thenReturn(
+            new ResolvedContext(UUID.randomUUID(),
+                new ResolvedContext.References("EMP-101", "LOAN-2026-001", "PASS-001"),
+                ScopeStatus.allOk(),
+                PromptRiskSnapshot.notEvaluated()));
+        when(core.behaviorHistory(any(), any(), any(), any()))
+            .thenReturn(new BehaviorHistory("LOAN-AGENT-01", "5m", List.of()));
+        when(ai.evaluateBehavior(any(), any(), any(), any(), any(), any(), any())).thenReturn(behaviorLow());
+
+        AuthorizationOutcome outcome = service.decide(identity, request, "REQ-2N", null, Instant.now());
+
+        assertThat(outcome.reasonCodes()).containsExactly("PROMPT_RISK_UNAVAILABLE");
+    }
+
+    @Test
     void opaFailureYieldsPolicyEngineUnavailable() {
         when(core.resolveContext(any(), any(), any(), any())).thenReturn(resolvedContext());
         when(core.behaviorHistory(any(), any(), any(), any()))
@@ -130,7 +147,7 @@ class AuthorizationServiceTest {
             UUID.randomUUID(),
             new ResolvedContext.References("EMP-101", "LOAN-2026-001", "PASS-001"),
             ScopeStatus.allOk(),
-            PromptRiskSnapshot.notEvaluated());
+            new PromptRiskSnapshot("EVALUATED", BigDecimal.valueOf(0.05), false, "sha256:evaluated", "prompt-guard-1"));
     }
 
     private BehaviorRiskResult behaviorLow() {
