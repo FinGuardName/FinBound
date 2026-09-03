@@ -30,6 +30,28 @@ import reactor.core.publisher.Mono;
 class GatewayToolClientTest {
     @ParameterizedTest
     @ValueSource(strings = {
+        "{\"tool\":\"CREDIT_SCORE_READ\"}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\"}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":null}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":\"812\"}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":true}",
+        "{\"tool\":\"INCOME_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":812}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-9999\",\"creditScore\":812}",
+        "{\"consumerId\":\"CUST-1001\",\"creditScore\":812}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"creditScore\":812}"
+    })
+    void rejectsIncompleteOrMismatchedFinancialResult(String result) {
+        GatewayToolClient client = client(request -> jsonResponse(HttpStatus.OK,
+                "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\",\"result\":" + result + "}"),
+                Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> client.execute(toolRequest()).block())
+                .isInstanceOf(GatewayCallException.class)
+                .hasMessage("GATEWAY_RESPONSE_INVALID");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
         "{\"decision\":\"ALLOW\",\"result\":{\"creditScore\":812}}",
         "{\"requestId\":\" \",\"decision\":\"ALLOW\",\"result\":{\"creditScore\":812}}",
         "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\"}",
@@ -84,7 +106,8 @@ class GatewayToolClientTest {
                     return jsonResponse(
                             HttpStatus.OK,
                             "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\","
-                                    + "\"result\":{\"creditScore\":812}}"
+                                    + "\"result\":{\"tool\":\"CREDIT_SCORE_READ\","
+                                    + "\"consumerId\":\"CUST-1001\",\"creditScore\":812}}"
                     );
                 },
                 Duration.ofSeconds(1)

@@ -140,6 +140,7 @@ PR #75의 커밋 후 비동기 실행과 선택적 `scenario` 필드는 해당 P
 
 생성 실패로 Simulator를 호출하지 않은 요청은 Gateway로 진행하지 않는다.
 Simulator 호출 이후 Timeout은 이미 시작된 금융 실행의 취소나 미도달을 보장하지 않는다.
+
 ---
 
 ## 3.1 Agent Simulator — P0 Runtime Contract
@@ -175,8 +176,10 @@ CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 
 Simulator는 Scenario를 §5의 Gateway Tool Call로 변환한다. Gateway 응답의 `ALLOW/BLOCK`은
 정책 결과로 그대로 반환하며, Timeout·5xx·본문 누락은 성공이나 `ALLOW`로 바꾸지 않는다.
-Agent는 `requestId`와 `decision`, ALLOW의 비어 있지 않은 객체 `result`, BLOCK의 비어 있지
-않은 `reasonCodes`를 검증한다. `403 + ALLOW` 또는 금융 결과가 포함된 BLOCK처럼 서로
+Agent는 `requestId`와 `decision`, ALLOW의 `result.tool`·`result.consumerId`가 요청과
+일치하는지와 Tool별 숫자 결과(`creditScore`, `annualIncome`, `totalDebt`)를 검증한다.
+이는 응답 계약 검사이며 Scope 비교나 발급 여부 증명이 아니다. BLOCK은 비어 있지 않은
+`reasonCodes`를 요구한다. `403 + ALLOW` 또는 금융 결과가 포함된 BLOCK처럼 서로
 모순되는 응답과 잘못된 JSON은 `GATEWAY_RESPONSE_INVALID`로 처리한다.
 
 Agent Simulator 오류 Code:
@@ -191,6 +194,61 @@ GATEWAY_UNAVAILABLE
 
 위 값은 Agent Simulator 호출자에게 반환하는 실행 오류 Code이며 Policy Decision이나
 Audit Reason Code가 아니다. Simulator는 이를 `ALLOW` 또는 `BLOCK`으로 변환하지 않는다.
+
+### Response
+
+정상 처리된 정책 결과는 ALLOW와 BLOCK 모두 HTTP 200이며 `decision`은 최상위가 아니라
+`gatewayResponse` 안에 있다. 최상위 `scenario`는 요청 값을 그대로 반환한다.
+
+ALLOW:
+
+```json
+{
+  "scenario": "NORMAL_CREDIT_SCORE",
+  "gatewayResponse": {
+    "requestId": "550e8400-e29b-41d4-a716-446655440000",
+    "decision": "ALLOW",
+    "result": {"tool": "CREDIT_SCORE_READ", "consumerId": "CUST-1001", "creditScore": 812},
+    "reasonCodes": []
+  }
+}
+```
+
+BLOCK (Gateway의 HTTP 403 정책 결과를 전달):
+
+```json
+{
+  "scenario": "CASE_SCOPE_ATTACK",
+  "gatewayResponse": {
+    "requestId": "550e8400-e29b-41d4-a716-446655440000",
+    "decision": "BLOCK",
+    "result": null,
+    "reasonCodes": ["CASE_SCOPE_VIOLATION"]
+  }
+}
+```
+
+실행 오류 (HTTP 502, Gateway Timeout 예시):
+
+```json
+{
+  "errorCode": "GATEWAY_TIMEOUT",
+  "message": "The Gateway call could not be completed"
+}
+```
+
+오류 응답에는 `scenario`, `gatewayResponse`, `decision`을 만들지 않는다.
+요청 필드 누락은 HTTP 400 `INVALID_AGENT_SIMULATION_REQUEST`, 내부 Credential 거부는
+HTTP 401 `INTERNAL_CREDENTIAL_INVALID`이며 두 경우 Gateway를 호출하지 않는다.
+
+### 참조 신뢰 경계
+
+Agent의 non-blank 검사는 필수 참조의 존재만 확인한다. 공유 내부 Credential은 호출자가
+Core임을 독점적으로 증명하거나 Run/Passport의 실제 발급·결합을 보장하지 않는다.
+이 검증은 Gateway 인증 후 실제 Core Context Resolver에서 수행하며 Agent가 중복하지 않는다.
+미발급/잘못 결합된 참조는 이 경계에서 거부되고 금융 downstream에 도달하지 않아야 한다.
+기본 `MockCoreClient`는 이 보장을 제공하지 않으므로 보안 검증 및 실제 데이터 실행에 사용할 수 없다.
+실제 Core 연동을 기본 fail-closed 경로로 만드는 변경과 그 E2E는 #77의 통합 리뷰 대상이다.
 
 ---
 

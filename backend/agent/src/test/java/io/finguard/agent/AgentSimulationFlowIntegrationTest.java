@@ -45,7 +45,8 @@ class AgentSimulationFlowIntegrationTest {
         GATEWAY_STATUS.set(200);
         GATEWAY_DELAY.set(Duration.ZERO);
         GATEWAY_BODY.set("""
-                {"requestId":"REQ-001","decision":"ALLOW","result":{"creditScore":812}}
+                {"requestId":"REQ-001","decision":"ALLOW",
+                 "result":{"tool":"CREDIT_SCORE_READ","consumerId":"CUST-1001","creditScore":812}}
                 """);
     }
 
@@ -132,13 +133,42 @@ class AgentSimulationFlowIntegrationTest {
         "{\"agentRunId\":\" \",\"passportId\":\"PASS-CORE-001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
         "{\"agentRunId\":\"RUN-CORE-001\",\"passportId\":\" \",\"scenario\":\"NORMAL_CREDIT_SCORE\"}"
     })
-    void invalidCoreReferencesNeverReachGateway(String body) {
+    void missingOrBlankReferencesNeverReachGateway(String body) {
         simulate(body).expectStatus().isBadRequest()
                 .expectBody().jsonPath("$.errorCode")
                 .isEqualTo("INVALID_AGENT_SIMULATION_REQUEST");
 
         assertThat(GATEWAY_CALLS.get()).isZero();
         assertThat(CAPTURED_REQUEST.get()).isNull();
+    }
+
+    @Test
+    void forwardsUnknownReferencesAndPreservesGatewayRejection() {
+        // This stub models a real Core rejection. It does not prove that MockCoreClient checks issuance.
+        GATEWAY_STATUS.set(403);
+        GATEWAY_BODY.set("""
+                {"requestId":"REQ-001","decision":"BLOCK","reasonCodes":["CONTEXT_NOT_FOUND"]}
+                """);
+
+        simulate("""
+                {"agentRunId":"RUN-NOT-ISSUED","passportId":"PASS-NOT-ISSUED",
+                 "scenario":"NORMAL_CREDIT_SCORE"}
+                """).expectStatus().isOk().expectBody()
+                .jsonPath("$.gatewayResponse.decision").isEqualTo("BLOCK")
+                .jsonPath("$.gatewayResponse.reasonCodes[0]").isEqualTo("CONTEXT_NOT_FOUND")
+                .jsonPath("$.gatewayResponse.result").doesNotExist();
+
+        assertThat(GATEWAY_CALLS.get()).isEqualTo(1);
+        assertThat(CAPTURED_REQUEST.get().body()).contains("RUN-NOT-ISSUED", "PASS-NOT-ISSUED");
+    }
+
+    @Test
+    void rejectsStubAcknowledgementWithoutFinancialData() {
+        GATEWAY_BODY.set("""
+                {"requestId":"REQ-001","decision":"ALLOW","result":{"tool":"CREDIT_SCORE_READ"}}
+                """);
+
+        assertGatewayError("GATEWAY_RESPONSE_INVALID");
     }
 
     @Test

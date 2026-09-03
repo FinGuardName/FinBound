@@ -36,7 +36,9 @@ Content-Type: application/json
 | `NORMAL_CREDIT_SCORE` | `CUST-1001` | 정상 ALLOW 흐름 |
 | `CASE_SCOPE_ATTACK` | `CUST-9999` | 현재 Case 밖 고객 조회 시도 |
 
-Simulator는 두 Scenario 모두 다음 Gateway Contract로 변환합니다.
+Simulator는 지원 Scenario를 다음 Gateway Contract로 변환합니다.
+현재 #59는 위 두 값을 지원하며, #60 / PR #79에서 정상 INCOME/DEBT 및 Tool/Data/Mandate
+공격을 추가합니다. 이 PR에 #60의 Scenario 구현을 중복해서 넣지는 않습니다.
 
 ```http
 POST /gateway/v1/tool-calls
@@ -87,6 +89,12 @@ P0 Simulator는 Core가 발급한 `agentRunId`와
 `passportId`를 요청으로 받습니다. Agent는 이 참조를 로컬에서 생성하거나 저장하지 않고,
 AgentRun 상태를 전환하거나 입력 원문을 보관하지 않습니다.
 
+다만 Agent는 참조가 비어 있지 않은지만 검사하며, 실제 발급 여부나 Run/Passport 결합을
+증명하지 않습니다. 공유 내부 Credential도 Core만의 신원 증명은 아닙니다. non-blank 미발급
+참조는 Gateway로 전달될 수 있고, Gateway 인증 후 실제 Core Resolver에서 거부해야 합니다.
+현재 Gateway의 기본 MockCoreClient는 이를 보장하지 않으므로 보안 검증이나 실제 데이터 실행에
+사용하면 안 됩니다. #77의 실제 Core 연동 및 기본 fail-closed 설정은 별도 통합 전제입니다.
+
 실행 흐름:
 
 ```text
@@ -110,6 +118,13 @@ Case/Input Reference는 Core의 AgentRun에 연결되어 있으며 P0 Simulator 
 Gateway의 필수 응답 필드 누락, 잘못된 JSON, `403 + ALLOW`, 금융 결과가 포함된 BLOCK은
 `GATEWAY_RESPONSE_INVALID`로 실패합니다. Gateway 시스템 오류는 HTTP 502와 실행 오류 코드로
 반환하고 `ALLOW/BLOCK`으로 바꾸지 않으며, 원본 오류 본문을 노출하지 않습니다.
+ALLOW에는 요청과 같은 `result.tool`, `result.consumerId`, Tool별 숫자 결과가 필요합니다.
+`{"tool":"CREDIT_SCORE_READ"}`만 있는 stub 응답은 성공으로 받지 않습니다.
+요청과 응답을 대조하는 이 검사는 Scope 판단이나 참조 출처 검증을 대신하지 않습니다.
+
+Simulator의 ALLOW/BLOCK 응답은 HTTP 200 `{scenario, gatewayResponse}`이며 정책 결과는
+`gatewayResponse.decision`에 있습니다. 실행 오류는 HTTP 502 `{errorCode, message}`입니다.
+전체 응답 예시는 `docs/04-api-contract.md` §3.1을 참조하세요.
 
 ## 검증
 
@@ -117,7 +132,7 @@ Gateway의 필수 응답 필드 누락, 잘못된 JSON, `403 + ALLOW`, 금융 �
 ./gradlew :backend:agent:check
 ```
 
-테스트는 Core 발급 참조의 정확한 전달, 필수 참조 누락 시 Gateway 미호출,
+테스트는 전달받은 참조의 변경 없는 전달, 필수 참조 누락 시 Gateway 미호출,
 정상/공격 Scenario 변환, 내부 Credential 거부, Gateway Header와 최소 Runtime Body,
 `ALLOW/BLOCK` 구분, Timeout/5xx/잘못된 응답의 명시적 실패를 검증합니다.
 
@@ -128,6 +143,8 @@ Core 생성 실패·트랜잭션 Timeout의 Simulator 미호출 및 AgentRun 상
 
 현재 Compose 기본 파일의 Agent 서비스는 아직 주석 상태입니다. 위 테스트는 실제 Agent와
 HTTP Mock Gateway 사이의 통합 검증이며 전체 Core–Gateway–Mock Finance E2E를 대신하지 않습니다.
+미발급 참조에 대한 테스트도 Mock이 반환한 거부 결과의 전달을 검증할 뿐, 실제 Core 조회나
+기본 Gateway 프로파일의 보안을 입증하지 않습니다.
 
 ## PR 통합 검토 요청
 
@@ -138,3 +155,6 @@ HTTP Mock Gateway 사이의 통합 검증이며 전체 Core–Gateway–Mock Fin
   `requestId`·`decision`·ALLOW `result`·BLOCK `reasonCodes` 계약을 만족하는지 확인해 주세요.
 - 통합 후 Core 발급 → Agent → Gateway → 금융 API의 ALLOW/BLOCK/ERROR E2E를 별도로 검증합니다.
 - 관련 기능/인수 조건: `F06`, `F07`, `AC-01`, `AC-14`.
+- #79를 나중에 병합할 때 README의 7개 Scenario 표/Fixture 조건과 이 문서의 Core → Agent
+  방향·참조 신뢰 경계를 모두 보존해야 합니다. 과거 Agent → Core Client 설명을 복원하지 않습니다.
+- #79의 정상 HTTP Fixture에도 `result.tool`·`consumerId`·금융 값을 포함해야 합니다.
