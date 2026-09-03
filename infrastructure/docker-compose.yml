@@ -42,6 +42,10 @@ services:
       # PostgreSQL 볼륨이 영속이라 한 번 들어간 시드는 프로파일을 나중에 꺼도 남는다.
       # 되돌릴 수 없는 쪽을 기본값으로 두지 않는다. 시드가 필요하면 docker-compose.demo.yml.
       SPRING_PROFILES_ACTIVE: ${CORE_API_PROFILES:-}
+      # docs/04 §3.1 — Agent는 8082다. agent 서비스가 아직 주석 상태라(이슈 #61·#62)
+      # 지금은 이 주소로 붙지 못하고 AgentRun이 FAILED로 남는다. 기본값 localhost 로 두면
+      # Core 컨테이너가 자기 자신을 가리켜 원인이 더 안 보인다.
+      AGENT_URL: http://agent:8082
     # ports가 아니라 expose다. 호스트에 열지 않는다 — /internal/** 의 방어가 공유 자격 증명 하나뿐이라
     # 1차 방어선인 네트워크 격리를 포기하지 않는다. 브라우저에서 접근이 필요하면
     # docker-compose.expose.yml 을 함께 지정한다. README 참조.
