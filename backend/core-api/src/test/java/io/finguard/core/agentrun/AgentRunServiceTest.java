@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -223,5 +225,29 @@ class AgentRunServiceTest {
         assertThat(published.agentRunId()).isEqualTo(started.agentRunId());
         assertThat(published.passportId()).isEqualTo(started.passportId());
         assertThat(published.scenario()).isEqualTo(AgentSimulationScenario.CASE_SCOPE_ATTACK);
+    }
+
+    /**
+     * 계약이 정의한 7개가 전부 Agent까지 실려 가는지 본다. 값을 하나 늘려 놓고 전달 경로를 빠뜨리면
+     * 그 시나리오는 조용히 {@code NORMAL_CREDIT_SCORE}로 도는데, 그러면 <strong>공격 시연이
+     * 정상 조회가 된다.</strong> 이름만 고정하는 {@code DomainEnumContractTest}로는 못 잡는다.
+     */
+    @ParameterizedTest
+    @EnumSource(AgentSimulationScenario.class)
+    void carriesEveryContractScenarioThroughToTheAgent(
+            AgentSimulationScenario scenario, ApplicationEvents events) {
+        AgentRunStarted started =
+                service.start(
+                        "EMP-101",
+                        "CUST-1001",
+                        TaskType.LOAN_REVIEW,
+                        "CUST-1001의 대출심사를 진행해줘.",
+                        scenario);
+
+        AgentRunCreated published =
+                events.stream(AgentRunCreated.class).findFirst().orElseThrow();
+
+        assertThat(published.agentRunId()).isEqualTo(started.agentRunId());
+        assertThat(published.scenario()).isEqualTo(scenario);
     }
 }

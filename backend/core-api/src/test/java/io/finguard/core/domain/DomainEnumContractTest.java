@@ -73,4 +73,21 @@ class DomainEnumContractTest {
                 .extracting(Enum::name)
                 .containsExactly("EVALUATED", "NOT_EVALUATED");
     }
+
+    @Test
+    void agentSimulationScenarioMatchesTheContractTable() {
+        // docs/04 §3.1 — 정상 3개, 공격 4개. Agent 모듈에 같은 이름 enum이 따로 있고 타입은
+        // 공유하지 않으므로, 어휘가 갈라지면 Core가 보낸 값을 Agent가 역직렬화하지 못한다.
+        // 컴파일러가 못 잡는 종류라 여기서 고정한다.
+        assertThat(AgentSimulationScenario.values())
+                .extracting(Enum::name)
+                .containsExactly(
+                        "NORMAL_CREDIT_SCORE",
+                        "NORMAL_INCOME",
+                        "NORMAL_DEBT",
+                        "CASE_SCOPE_ATTACK",
+                        "TOOL_SCOPE_ATTACK",
+                        "DATA_SCOPE_ATTACK",
+                        "MANDATE_SCOPE_ATTACK");
+    }
 }
