@@ -88,7 +88,8 @@ const executionStateLabel = computed(() => {
 const isReviewReady = computed(() => Boolean(
   execution.value
   && !executionError.value
-  && execution.value.status !== 'ERROR'
+  && execution.value.status === 'COMPLETED'
+  && errorAttempts.value.length === 0
   && !loading.value,
 ))
 
@@ -283,7 +284,7 @@ async function runAgentTask() {
                       <div><dt>요청 번호</dt><dd>{{ attempt.requestId }}</dd></div>
                       <div><dt>요청 고객</dt><dd>{{ attempt.targetConsumerId }}</dd></div>
                       <div><dt>업무 범위</dt><dd><StatusBadge :value="attempt.scopeStatus.customerScope" /></dd></div>
-                      <div><dt>처리 사유</dt><dd class="reason-code">{{ attempt.reasonCodes[0] || (attempt.decision === 'ALLOW' && attempt.systemOutcome === 'COMPLETED' ? '차단 사유 없음' : '처리 사유 미제공') }}</dd></div>
+                      <div><dt>처리 사유</dt><dd class="reason-code">{{ attempt.reasonCodes.length ? attempt.reasonCodes.join(' · ') : (attempt.decision === 'ALLOW' && attempt.systemOutcome === 'COMPLETED' ? '차단 사유 없음' : '처리 사유 미제공') }}</dd></div>
                       <div><dt>금융시스템 요청</dt><dd>{{ booleanStatusLabel(attempt.downstreamReached, '전달됨', '전달 안 됨') }}</dd></div>
                       <div><dt>결과 제공</dt><dd>{{ booleanStatusLabel(attempt.responseReleased, '제공함', '제공 안 함') }}</dd></div>
                       <div><dt>도구</dt><dd>{{ attempt.tool }}</dd></div>

@@ -151,6 +151,7 @@ export function mapAuditEvent(raw) {
     auditStatus: raw.status,
     systemOutcome: raw.systemOutcome ?? (raw.status === 'PROCESSING' ? null : raw.status),
     promptEvaluationStatus: raw.promptRiskEvaluationStatus ?? 'NOT_EVALUATED',
+    promptRiskLevel: raw.promptRiskLevel ?? null,
     featureVersion: raw.behaviorFeatureVersion ?? null,
     behaviorRiskLevel: raw.behaviorRiskLevel ?? 'UNKNOWN',
     severity: raw.severity ?? 'UNKNOWN',
