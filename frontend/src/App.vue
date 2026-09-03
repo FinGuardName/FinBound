@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 
+import brandLogoDark from './assets/finbound-logo-dark.png'
 import AgentRunView from './views/AgentRunView.vue'
 import DashboardView from './views/DashboardView.vue'
 import { finboundApi } from './services/finboundApi'
@@ -36,7 +37,7 @@ function endSession() {
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="#main-content" aria-label="FinBound 홈">
-        <span class="brand-mark" aria-hidden="true">F</span>
+        <span class="brand-mark" aria-hidden="true"><img :src="brandLogoDark" alt="" /></span>
         <span>FinBound</span>
       </a>
       <nav aria-label="업무 메뉴">
