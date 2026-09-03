@@ -80,6 +80,29 @@ public class AgentRun {
         this.startedAt = startedAt;
     }
 
+    /**
+     * 실행이 정상적으로 끝났다.
+     *
+     * <p>끝난 실행은 다시 바뀌지 않는다. 결론이 나중에 뒤집히면 그 사이에 내려진 판단들이 무엇을
+     * 근거로 했는지 설명할 수 없게 된다 — {@link TaskPassport}가 발급 시점에 박혀 다시 안 바뀌는 것과
+     * 같은 이유다.
+     */
+    public void complete() {
+        transitionFromRunning(AgentRunStatus.COMPLETED);
+    }
+
+    /** 실행이 실패했다. 부르지 못한 경우도 포함한다 — 조용히 {@code RUNNING}으로 두지 않는다. */
+    public void fail() {
+        transitionFromRunning(AgentRunStatus.FAILED);
+    }
+
+    private void transitionFromRunning(AgentRunStatus next) {
+        if (status != AgentRunStatus.RUNNING) {
+            throw new IllegalStateException("AgentRun is no longer running: " + status);
+        }
+        this.status = next;
+    }
+
     public String getAgentRunId() {
         return agentRunId;
     }

@@ -100,9 +100,18 @@ POST /api/v1/agent-runs
   "employeeId": "EMP-101",
   "consumerId": "CUST-1001",
   "taskType": "LOAN_REVIEW",
-  "inputText": "CUST-1001의 대출심사를 진행해줘."
+  "inputText": "CUST-1001의 대출심사를 진행해줘.",
+  "scenario": "NORMAL_CREDIT_SCORE"
 }
 ```
+
+> **제안 — 팀 확정 필요.** `scenario`는 이번 PR에서 추가한 필드다. `docs/05` §15에 따라 Contract 파일은
+> 합의 후 지정 편집자가 수정하므로, 여기서는 구현과 문서가 어긋나지 않도록 함께 올리고 리뷰에서 확정한다.
+
+`scenario`는 §3.1 Agent Simulator에 그대로 전달하는 값이며 **선택**이다. 생략하면
+`NORMAL_CREDIT_SCORE`로 처리한다 — 지정하지 않은 요청이 공격 경로를 실행해서는 안 된다.
+Core는 이 값으로 권한을 판단하지 않는다. 어느 고객을 노리는지는 Agent가 정하고, Scope 위반 여부는
+Financial Context Resolver와 OPA가 판정한다.
 
 이 Endpoint는 `OPERATOR_CREDENTIAL`만 호출할 수 있다. Core는 Credential에 연결된 Employee ID와
 Request의 `employeeId`가 같은지 확인하며, 다르면 `403 EMPLOYEE_IDENTITY_MISMATCH`로 거부한다.
@@ -125,6 +134,21 @@ Employee Authority / Permission Template / Mandate 조회
 ```
 
 새 Document가 AgentRun에 추가될 때도 동일한 입력 등록/Prompt Risk 절차를 수행한다.
+
+### P0 Agent 실행 책임 — #59 / #74
+
+Core가 Agent 실행 오케스트레이션을 소유한다. Agent가 Core 생성 API를 호출하는 흐름이 아니다.
+#59는 Core가 전달한 `agentRunId`, `passportId`, `scenario`를 받는 Simulator와
+Gateway 요청 생성·응답 검증을 담당한다. Case/Input Reference는 Core의 AgentRun에 연결하며,
+Agent는 식별자를 발급·저장하거나 입력 원문·Operator Credential을 보유하지 않는다.
+
+Core의 생성 트랜잭션 이후 호출, 실행 상태 갱신 및 오류 처리는 #74 / PR #75의 담당 범위다.
+PR #75의 커밋 후 비동기 실행과 선택적 `scenario` 필드는 해당 PR에서 검토한다.
+#59는 동기/비동기 실행 방식, Core API의 실행 오류 응답 코드 및 완료 상태 계약을 별도로
+확정하지 않는다. Agent의 입력/응답 계약은 §3.1을 따른다.
+
+생성 실패로 Simulator를 호출하지 않은 요청은 Gateway로 진행하지 않는다.
+Simulator 호출 이후 Timeout은 이미 시작된 금융 실행의 취소나 미도달을 보장하지 않는다.
 
 ---
 
@@ -159,8 +183,59 @@ NORMAL_CREDIT_SCORE → CREDIT_SCORE_READ(CUST-1001)
 CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 ```
 
+### #60 Scenario 확장 — PR #79 소비자 리뷰 반영
+
+기존 두 Scenario와 아래 다섯 Scenario를 합친 7개 이름을 소비자 구현 기준으로 사용한다.
+PR #79에서 Backend 1이 이 목록에 맞춰 Core Enum을 확장하기로 했으며,
+실제 Core 지원 완료 여부는 #74 / PR #75에서 확인한다. Fixture 구현 완료를 뜻하지 않는다.
+Gateway Body에는 Scenario나 권한 근거를 추가하지 않는다. Tool/Data는
+`docs/06-common-conventions.md` §16·17의 기존 Enum만 사용한다.
+
+| Scenario | targetConsumerId | tool | requestedData | 기대 결과 (서버 Context 조건 충족 시) |
+|---|---|---|---|---|
+| `NORMAL_INCOME` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | ALLOW |
+| `NORMAL_DEBT` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | ALLOW |
+| `TOOL_SCOPE_ATTACK` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | BLOCK / `TOOL_SCOPE_VIOLATION` |
+| `DATA_SCOPE_ATTACK` | `CUST-1001` | `CREDIT_SCORE_READ` | `[CREDIT_SCORE, INCOME]` | BLOCK / `DATA_SCOPE_VIOLATION` |
+| `MANDATE_SCOPE_ATTACK` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | BLOCK / `MANDATE_SCOPE_VIOLATION` |
+
+필수 서버 Fixture 조건:
+
+- 정상: 유효한 Case/Passport, 요청 Tool/Data를 허용하는 Authority·Template·Passport·Mandate,
+  낮은 Risk 및 제한 미초과.
+- Tool 공격: Passport가 `INCOME_READ`를 허용하지 않는다. 단일 Tool 위반을 확인하려면
+  Authority/Template은 해당 Tool을, Passport/Mandate는 `INCOME`을 허용한다.
+- Data 공격: Passport가 `CREDIT_SCORE_READ`와 `CREDIT_SCORE`는 허용하지만 `INCOME`은
+  허용하지 않는다. 다른 Authority/Template/Mandate는 요청 Data를 허용한다.
+- Mandate 공격의 기준 Fixture: 발급 전 ACTIVE Mandate의 Data를 `[CREDIT_SCORE, INCOME]`으로
+  제한하고 Core에서 새 Passport를 발급한다. Authority/Template은 세 Tool/Data를 모두 허용한다.
+  현재 Calculator는 DEBT뿐 아니라 DEBT_READ도 Passport에서 제외하므로 기대 전체 코드는
+  `[DATA_SCOPE_VIOLATION, MANDATE_SCOPE_VIOLATION, TOOL_SCOPE_VIOLATION]`이다.
+  Source Version은 일치하고 다른 Scope/Risk/Limit은 정상이어야 한다.
+- 발급 후 Mandate에서 DEBT를 제거하고 버전을 올리는 별도 Fixture는 기존 Passport의
+  DEBT/DEBT_READ를 유지한다. 현재 Resolver/Rego 기준 기대 전체 코드는
+  `[MANDATE_SCOPE_VIOLATION, TASK_PASSPORT_INACTIVE]`이다.
+  현재 `passportStatus=VIOLATION`은 만료와 버전 불일치를 구분하지 못하며
+  `TASK_PASSPORT_STALE`을 반환하지 않는다. 세분화는 별도 Core/Policy 계약 변경 범위다.
+
+Scenario는 요청 생성만 결정한다. 모든 권한을 허용하는 기본 Seed에서는 공격 이름이어도
+ALLOW일 수 있다. Agent는 Scope를 계산하거나 기대 Reason Code를 생성·추가·정렬하지 않는다.
+전용 Fixture의 발급/관리는 Core·통합 테스트 담당 범위이며, Agent가 DB나 Passport를 수정하지 않는다.
+정상 INCOME과 Tool 공격, 정상 DEBT와 Mandate 공격은 요청 내용이 같고 서버 Context가 다르다.
+
+병합/활성화 순서는 **#77 → #75 → #79**이며, #79는 **#78 병합 내용도 반영**해야 한다.
+#77 이전 Gateway는 CREDIT_SCORE_READ/CREDIT_SCORE만 역직렬화하므로 새 Scenario 5개가
+정책 평가 전에 HTTP 400으로 거부된다. Agent는 이를 Scope BLOCK이 아닌 실행 오류로 취급한다.
+Core의 7개 Scenario 지원과 실제 Core Resolver 연결을 확인한 뒤 확장 Scenario를 활성화한다.
+기본 MockCoreClient의 고정 OK 응답으로 공격 차단을 검증해서는 안 된다.
+
 Simulator는 Scenario를 §5의 Gateway Tool Call로 변환한다. Gateway 응답의 `ALLOW/BLOCK`은
 정책 결과로 그대로 반환하며, Timeout·5xx·본문 누락은 성공이나 `ALLOW`로 바꾸지 않는다.
+Agent는 `requestId`와 `decision`, ALLOW의 `result.tool`·`result.consumerId`가 요청과
+일치하는지와 Tool별 숫자 결과(`creditScore`, `annualIncome`, `totalDebt`)를 검증한다.
+이는 응답 계약 검사이며 Scope 비교나 발급 여부 증명이 아니다. BLOCK은 비어 있지 않은
+`reasonCodes`를 요구한다. `403 + ALLOW` 또는 금융 결과가 포함된 BLOCK처럼 서로
+모순되는 응답과 잘못된 JSON은 `GATEWAY_RESPONSE_INVALID`로 처리한다.
 
 Agent Simulator 오류 Code:
 
@@ -174,6 +249,61 @@ GATEWAY_UNAVAILABLE
 
 위 값은 Agent Simulator 호출자에게 반환하는 실행 오류 Code이며 Policy Decision이나
 Audit Reason Code가 아니다. Simulator는 이를 `ALLOW` 또는 `BLOCK`으로 변환하지 않는다.
+
+### Response
+
+정상 처리된 정책 결과는 ALLOW와 BLOCK 모두 HTTP 200이며 `decision`은 최상위가 아니라
+`gatewayResponse` 안에 있다. 최상위 `scenario`는 요청 값을 그대로 반환한다.
+
+ALLOW:
+
+```json
+{
+  "scenario": "NORMAL_CREDIT_SCORE",
+  "gatewayResponse": {
+    "requestId": "550e8400-e29b-41d4-a716-446655440000",
+    "decision": "ALLOW",
+    "result": {"tool": "CREDIT_SCORE_READ", "consumerId": "CUST-1001", "creditScore": 812},
+    "reasonCodes": []
+  }
+}
+```
+
+BLOCK (Gateway의 HTTP 403 정책 결과를 전달):
+
+```json
+{
+  "scenario": "CASE_SCOPE_ATTACK",
+  "gatewayResponse": {
+    "requestId": "550e8400-e29b-41d4-a716-446655440000",
+    "decision": "BLOCK",
+    "result": null,
+    "reasonCodes": ["CASE_SCOPE_VIOLATION"]
+  }
+}
+```
+
+실행 오류 (HTTP 502, Gateway Timeout 예시):
+
+```json
+{
+  "errorCode": "GATEWAY_TIMEOUT",
+  "message": "The Gateway call could not be completed"
+}
+```
+
+오류 응답에는 `scenario`, `gatewayResponse`, `decision`을 만들지 않는다.
+요청 필드 누락은 HTTP 400 `INVALID_AGENT_SIMULATION_REQUEST`, 내부 Credential 거부는
+HTTP 401 `INTERNAL_CREDENTIAL_INVALID`이며 두 경우 Gateway를 호출하지 않는다.
+
+### 참조 신뢰 경계
+
+Agent의 non-blank 검사는 필수 참조의 존재만 확인한다. 공유 내부 Credential은 호출자가
+Core임을 독점적으로 증명하거나 Run/Passport의 실제 발급·결합을 보장하지 않는다.
+이 검증은 Gateway 인증 후 실제 Core Context Resolver에서 수행하며 Agent가 중복하지 않는다.
+미발급/잘못 결합된 참조는 이 경계에서 거부되고 금융 downstream에 도달하지 않아야 한다.
+기본 `MockCoreClient`는 이 보장을 제공하지 않으므로 보안 검증 및 실제 데이터 실행에 사용할 수 없다.
+실제 Core 연동을 기본 fail-closed 경로로 만드는 변경과 그 E2E는 #77의 통합 리뷰 대상이다.
 
 ---
 

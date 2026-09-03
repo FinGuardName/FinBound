@@ -34,7 +34,7 @@ finguard:
   opa:
     base-url: ${OPA_URL:http://localhost:8181}
   mock-finance:
-    base-url: ${MOCK_FINANCE_URL:http://localhost:8082}
+    base-url: ${MOCK_FINANCE_URL:http://localhost:8083}
   timeouts:
     core-ms: 800
     ai-ms: 1500
@@ -43,5 +43,8 @@ finguard:
   rate-limit:
     capacity: 20
     refill-per-second: 10
+  hard-limit:
+    capacity-per-minute: 30
   credentials:
     valid-agent-tokens: valid-agent-token
+    internal-service: ${FINGUARD_INTERNAL_CREDENTIAL:dev-internal-credential}

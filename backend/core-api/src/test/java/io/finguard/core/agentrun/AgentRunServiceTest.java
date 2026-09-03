@@ -11,11 +11,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import io.finguard.core.domain.AgentSimulationScenario;
 import io.finguard.core.domain.TaskType;
 import io.finguard.core.permission.PermissionNotIssuableException;
 import jakarta.persistence.EntityManager;
@@ -40,6 +43,7 @@ import jakarta.persistence.EntityManager;
 @ActiveProfiles("local")
 @Testcontainers
 @Transactional
+@RecordApplicationEvents
 class AgentRunServiceTest {
 
     @Container
@@ -64,7 +68,12 @@ class AgentRunServiceTest {
      */
     private AgentRunStarted start(String consumerId, String inputText) {
         AgentRunStarted started =
-                service.start("EMP-101", consumerId, TaskType.LOAN_REVIEW, inputText);
+                service.start(
+                        "EMP-101",
+                        consumerId,
+                        TaskType.LOAN_REVIEW,
+                        inputText,
+                        AgentSimulationScenario.NORMAL_CREDIT_SCORE);
         entityManager.flush();
         return started;
     }
@@ -185,9 +194,34 @@ class AgentRunServiceTest {
     void refusesWhenTheConsumerGaveNoMandate() {
         // CUST-9999는 실재하지만 LOAN_REVIEW 동의가 없다. 권한이 넓어도 여기서 멈춰야 한다.
         assertThatThrownBy(
-                        () -> service.start("EMP-101", "CUST-9999", TaskType.LOAN_REVIEW, "대출심사 진행"))
+                        () -> service.start(
+                                        "EMP-101",
+                                        "CUST-9999",
+                                        TaskType.LOAN_REVIEW,
+                                        "대출심사 진행",
+                                        AgentSimulationScenario.NORMAL_CREDIT_SCORE))
                 .isInstanceOf(PermissionNotIssuableException.class)
                 .extracting("reasonCode")
                 .isEqualTo("MANDATE_NOT_FOUND");
+    }
+
+    @Test
+    void announcesTheCreatedRunSoTheAgentCanBeStarted(ApplicationEvents events) {
+        AgentRunStarted started =
+                service.start(
+                        "EMP-101",
+                        "CUST-1001",
+                        TaskType.LOAN_REVIEW,
+                        "CUST-1001의 대출심사를 진행해줘.",
+                        AgentSimulationScenario.CASE_SCOPE_ATTACK);
+
+        // 이 이벤트가 없으면 AgentRun 은 만들어지고도 아무도 실행하지 않아 영원히 RUNNING 으로 남는다.
+        // 시나리오를 잃어버리면 공격 시연이 정상 조회가 된다.
+        AgentRunCreated published =
+                events.stream(AgentRunCreated.class).findFirst().orElseThrow();
+
+        assertThat(published.agentRunId()).isEqualTo(started.agentRunId());
+        assertThat(published.passportId()).isEqualTo(started.passportId());
+        assertThat(published.scenario()).isEqualTo(AgentSimulationScenario.CASE_SCOPE_ATTACK);
     }
 }
