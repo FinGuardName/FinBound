@@ -152,9 +152,12 @@ public class ContextResolveService {
 
         // 판정 근거를 감사 기록에 남긴 뒤에 응답한다. 순서가 반대면 근거 없이 인가 근거가 먼저 나간다.
         // 식별자는 요청 본문이 아니라 해석된 Passport에서 가져온다 — 본문 값은 인증수단이 아니다(docs/04 §1.4).
+        // 어느 행에 쓸지는 헤더로 검증된 Agent까지 봐야 정해진다. 본문이 고르는 값만으로는 소유를
+        // 증명하지 못해 남의 감사행에 쓰게 된다.
         auditEvidence.record(
                 request.requestId().toString(),
                 agentRun.getAgentRunId(),
+                trustedVerifiedAgentId,
                 new ResolvedAuditContext(
                         passport.getEmployeeId(),
                         passport.getPassportId(),

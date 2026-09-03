@@ -106,7 +106,9 @@ class ContextResolveApiTest {
     @Test
     void usesTheVerifiedHeaderInsteadOfTheBodyForAgentBinding() {
         RunReferences run = startAgentRun();
-        createAudit(run);
+        // 감사행을 호출자 명의로 만든다. 소유권은 맞고 Passport의 Agent만 다른 상태를 만들어야
+        // "헤더를 쓰는가"만 따로 볼 수 있다. 남의 행에 쓰는 것은 아래 테스트가 따로 막는다.
+        createAudit(run, "SPOOFED-AGENT");
 
         ResponseEntity<JsonNode> response =
                 resolve(
@@ -118,8 +120,45 @@ class ContextResolveApiTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
+        // 본문은 LOAN-AGENT-01이라고 주장하지만 헤더가 SPOOFED-AGENT다. 헤더를 썼다면 위반이다.
         assertThat(response.getBody().get("scopeStatus").get("agentBinding").asText())
                 .isEqualTo("VIOLATION");
+    }
+
+    @Test
+    void refusesToWriteEvidenceOntoAnotherAgentsAuditRow() {
+        RunReferences run = startAgentRun();
+        createAudit(run, "LOAN-AGENT-01");
+
+        // 다른 Agent가 같은 requestId·agentRunId로 근거를 적으려 한다. agentRunId만 대조하면
+        // 통과한다 — 둘 다 요청 본문이 고르는 값이기 때문이다.
+        ResponseEntity<JsonNode> spoofed =
+                resolve(run, "SPOOFED-AGENT", "CUST-1001", "CREDIT_SCORE_READ", "CREDIT_SCORE");
+
+        assertThat(spoofed.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        // 기존 행이 손대지지 않아야 한다. 근거는 set-once라 한 번 적히면 되돌릴 수 없다.
+        Map<String, Object> untouched =
+                jdbcTemplate.queryForMap(
+                        "select agent_id, passport_id, scope_agent_binding"
+                                + " from audit_events where request_id = ?",
+                        REQUEST_ID);
+        assertThat(untouched.get("agent_id")).isEqualTo("LOAN-AGENT-01");
+        assertThat(untouched.get("passport_id")).isNull();
+        assertThat(untouched.get("scope_agent_binding")).isNull();
+
+        // 그리고 원래 주인은 여전히 자기 근거를 남길 수 있어야 한다. 이게 막히면 스푸핑 한 번으로
+        // 남의 실행을 영구히 봉쇄할 수 있다.
+        ResponseEntity<JsonNode> owner =
+                resolve(run, "LOAN-AGENT-01", "CUST-1001", "CREDIT_SCORE_READ", "CREDIT_SCORE");
+
+        assertThat(owner.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(
+                        jdbcTemplate.queryForMap(
+                                        "select passport_id from audit_events where request_id = ?",
+                                        REQUEST_ID)
+                                .get("passport_id"))
+                .isEqualTo(run.passportId());
     }
 
     @Test
@@ -382,10 +421,18 @@ class ContextResolveApiTest {
      * resolve가 뒤에 온다. resolve가 근거를 그 행에 적으므로 성공 경로 테스트에는 이 행이 있어야 한다.
      */
     private void createAudit(RunReferences run) {
+        createAudit(run, "LOAN-AGENT-01");
+    }
+
+    /**
+     * 감사행의 소유 Agent를 정해서 만든다. 저장되는 {@code agent_id}는 본문이 아니라
+     * {@code X-Verified-Agent-Id} 헤더에서 온다({@code AuditService.create}).
+     */
+    private void createAudit(RunReferences run, String owningAgentId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set(InternalCredentialFilter.CREDENTIAL_HEADER, "test-internal-credential");
-        headers.set("X-Verified-Agent-Id", "LOAN-AGENT-01");
+        headers.set("X-Verified-Agent-Id", owningAgentId);
         ResponseEntity<JsonNode> response =
                 restTemplate.exchange(
                         URI.create(base() + "/internal/v1/audits"),

@@ -40,19 +40,37 @@ public class AuditEvidenceRecorder {
      * {@code verifiedAgentId}에 대해 이미 같은 입장이다). 확인하지 않으면 남의 감사행에 내 Passport와
      * Scope를 적을 수 있고, set-once라 원래 주인은 자기 근거를 영영 남기지 못한다.
      *
-     * <p><strong>대조 대상은 {@code agentRunId}이지 Agent가 아니다.</strong> 헤더의 Agent가 감사행과
-     * 다른 것은 거부할 일이 아니라 {@code agentBinding} VIOLATION으로 <em>기록할</em> 일이다. 그걸
-     * 409로 막으면 스푸핑 시도가 아무 흔적도 남기지 않고 사라진다. 실행 단위가 같은지만 본다.
+     * <p><strong>Agent 비교는 두 가지이고 처리도 다르다.</strong> 섞으면 하나를 놓친다.
+     *
+     * <ol>
+     *   <li>호출 Agent ↔ <em>Passport의</em> Agent — 거부하지 않고 {@code agentBinding} VIOLATION으로
+     *       <em>기록한다</em>. 409로 막으면 스푸핑 시도가 아무 흔적도 남기지 않고 사라진다.
+     *   <li>호출 Agent ↔ <em>감사행이 소유한</em> Agent — 거부한다. 남의 행이기 때문이다.
+     * </ol>
+     *
+     * <p>2번을 빼면 이렇게 된다. B가 A의 {@code requestId}를 그대로 넣으면 {@code agentRunId}도
+     * 함께 맞으므로 통과하고, <strong>A의 감사행에 B의 Passport와 Scope가 적힌다.</strong> 근거는
+     * set-once라 A는 자기 근거를 영영 남기지 못한다 — 스푸핑 한 번으로 남의 실행을 영구히 봉쇄한다.
+     * {@code agentRunId}와 {@code requestId} 둘 다 요청 본문이 고르는 값이라 소유를 증명하지 못한다.
+     * 소유를 증명하는 값은 헤더로 검증된 {@code verifiedAgentId} 하나뿐이다({@code docs/04} §1.4).
+     *
+     * <p>1번은 그대로 살아 있다. 자기 명의의 감사행에 Passport 불일치를 VIOLATION으로 적는 경로는
+     * 막히지 않는다 — 소유자와 호출자가 같기 때문이다.
      *
      * <p>불일치를 부재와 같은 409로 돌려준다. 나누면 어떤 requestId가 살아 있는지 되물어 확인하는
      * 통로가 된다({@code docs/06} §26).
      */
     @Transactional
-    public void record(String requestId, String agentRunId, ResolvedAuditContext context) {
+    public void record(
+            String requestId,
+            String agentRunId,
+            String verifiedAgentId,
+            ResolvedAuditContext context) {
         AuditEvent event =
                 auditEvents
                         .findByRequestId(requestId)
                         .filter(candidate -> candidate.getAgentRunId().equals(agentRunId))
+                        .filter(candidate -> candidate.getAgentId().equals(verifiedAgentId))
                         .orElseThrow(() -> new AuditEvidenceRejectedException(requestId));
 
         try {
