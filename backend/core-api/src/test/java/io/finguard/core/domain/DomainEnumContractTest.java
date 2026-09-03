@@ -75,9 +75,10 @@ class DomainEnumContractTest {
     }
 
     @Test
-    void agentSimulationScenarioMatchesTheContractTable() {
-        // docs/04 §3.1 — 정상 3개, 공격 4개. Agent 모듈에 같은 이름 enum이 따로 있고 타입은
-        // 공유하지 않으므로, 어휘가 갈라지면 Core가 보낸 값을 Agent가 역직렬화하지 못한다.
+    void agentSimulationScenarioMatchesTheAgentModuleVocabulary() {
+        // docs/04 §3.1이 값 일곱 개를 정의하지만 한 자리에 모아 두지 않았다 — 표에는 새 다섯 개만
+        // 있고 나머지 둘은 앞 문단에 있다. 그래서 순서의 근거는 Agent 모듈의 같은 이름 enum이다.
+        // 타입을 공유하지 않으므로 어휘가 갈라지면 Core가 보낸 값을 Agent가 역직렬화하지 못한다.
         // 컴파일러가 못 잡는 종류라 여기서 고정한다.
         assertThat(AgentSimulationScenario.values())
                 .extracting(Enum::name)
