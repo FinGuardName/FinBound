@@ -100,6 +100,19 @@ class DashboardApiTest {
         assertThat(body).isNotNull();
         assertThat(body.get("totalItems").asInt()).isEqualTo(1);
         assertThat(body.get("items").get(0).get("auditEventId").asText()).isEqualTo("AUD-002");
+
+        JsonNode severityBody =
+                getAsViewer("/api/v1/audit-events?severity=CRITICAL").getBody();
+        JsonNode riskOnlyBody = getAsViewer("/api/v1/audit-events?riskOnly=true").getBody();
+
+        assertThat(severityBody).isNotNull();
+        assertThat(severityBody.get("totalItems").asInt()).isEqualTo(1);
+        assertThat(severityBody.get("items").get(0).get("auditEventId").asText())
+                .isEqualTo("AUD-002");
+        assertThat(riskOnlyBody).isNotNull();
+        assertThat(riskOnlyBody.get("totalItems").asInt()).isEqualTo(1);
+        assertThat(riskOnlyBody.get("items").get(0).get("auditEventId").asText())
+                .isEqualTo("AUD-002");
     }
 
     @Test
@@ -112,6 +125,8 @@ class DashboardApiTest {
         assertThat(body.get("auditEventId").asText()).isEqualTo("AUD-001");
         assertThat(body.get("decision").asText()).isEqualTo("ALLOW");
         assertThat(body.get("systemOutcome").asText()).isEqualTo("COMPLETED");
+        assertThat(body.get("severity").asText()).isEqualTo("LOW");
+        assertThat(body.get("riskFlagged").asBoolean()).isFalse();
         // 아직 Resolver를 거치지 않은 기록이라 근거가 없다. 스키마의 scopeStatus는 enum이라
         // null을 허용하지 않으므로 키 자체가 없어야 한다. hasNonNull은 "키는 있고 값이 null"을
         // 통과시켜 이 위반을 못 잡는다 — has로 부재를 본다.
@@ -220,14 +235,16 @@ class DashboardApiTest {
                 insert into audit_events (
                     audit_event_id, request_id, trace_id, agent_id, agent_run_id,
                     case_id, target_consumer_id, requested_tool, decision, status,
-                    success, records_read, latency_ms, requested_at, version)
+                    severity, risk_flagged, success, records_read, latency_ms, requested_at, version)
                 values (?, ?, 'trace-1', 'LOAN-AGENT-01', 'RUN-001',
                     'LOAN-2026-001', 'CUST-1001', 'CREDIT_SCORE_READ', ?, 'COMPLETED',
-                    ?, ?, ?, ?, 0)
+                    ?, ?, ?, ?, ?, ?, 0)
                 """,
                 auditEventId,
                 requestId,
                 decision,
+                severityFor(decision),
+                "BLOCK".equals(decision),
                 success,
                 recordsRead,
                 latencyMs,
@@ -259,14 +276,20 @@ class DashboardApiTest {
                 insert into audit_events (
                     audit_event_id, request_id, trace_id, agent_id, agent_run_id,
                     case_id, target_consumer_id, requested_tool, decision, status,
-                    requested_at, version)
+                    severity, risk_flagged, requested_at, version)
                 values (?, ?, 'trace-1', 'LOAN-AGENT-01', 'RUN-001',
-                    'LOAN-2026-001', 'CUST-1001', 'CREDIT_SCORE_READ', ?, ?, ?, 0)
+                    'LOAN-2026-001', 'CUST-1001', 'CREDIT_SCORE_READ', ?, ?, ?, ?, ?, 0)
                 """,
                 auditEventId,
                 requestId,
                 decision,
                 status,
+                severityFor(decision),
+                "BLOCK".equals(decision),
                 java.sql.Timestamp.from(Instant.parse(requestedAt)));
+    }
+
+    private String severityFor(String decision) {
+        return "BLOCK".equals(decision) ? "CRITICAL" : "LOW";
     }
 }

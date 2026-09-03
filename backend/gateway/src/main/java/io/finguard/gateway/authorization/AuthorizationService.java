@@ -45,13 +45,15 @@ public class AuthorizationService {
                                        Instant requestedAt) {
         try {
             ResolvedContext resolvedContext = coreClient.resolveContext(identity, request, requestId, traceparent);
+            PromptRiskSnapshot promptRisk = requireEvaluatedPromptRisk(
+                resolvedContext.promptRiskSnapshot());
             BehaviorHistory history = coreClient.behaviorHistory(identity, "5m", requestId, traceparent);
             BehaviorRiskResult behavior = aiClient.evaluateBehavior(
                 identity, request, resolvedContext, history, requestId, traceparent, requestedAt);
             AuthorizationContext context = new AuthorizationContext(
                 requestId,
                 resolvedContext.scopeStatus(),
-                riskInput(resolvedContext.promptRiskSnapshot(), behavior),
+                riskInput(promptRisk, behavior),
                 new HardLimits(hardLimitService.isExceeded(identity.agentId())));
             PolicyDecisionResult decision = opaClient.decide(context);
             return new AuthorizationOutcome(decision, behavior.behaviorRisk());
@@ -68,15 +70,22 @@ public class AuthorizationService {
         }
     }
 
-    private RiskInput riskInput(PromptRiskSnapshot promptRisk, BehaviorRiskResult behavior) {
-        if (promptRisk == null || promptRisk.promptRisk() == null) {
+    private PromptRiskSnapshot requireEvaluatedPromptRisk(PromptRiskSnapshot promptRisk) {
+        if (promptRisk == null
+                || promptRisk.promptRisk() == null
+                || promptRisk.riskLevel() == null) {
             throw new PromptRiskUnavailableException("Prompt risk snapshot is incomplete");
         }
         if (!"EVALUATED".equals(promptRisk.evaluationStatus())) {
             throw new PromptRiskUnavailableException("Prompt risk was not evaluated");
         }
+        return promptRisk;
+    }
+
+    private RiskInput riskInput(PromptRiskSnapshot promptRisk, BehaviorRiskResult behavior) {
         return new RiskInput(
             promptRisk.promptRisk().doubleValue(),
+            promptRisk.riskLevel(),
             promptRisk.detected(),
             behavior.behaviorRisk(),
             behavior.behaviorRiskLevel(),

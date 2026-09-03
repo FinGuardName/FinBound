@@ -1,0 +1,10 @@
+{
+  "requestId": "REQ-006",
+  "decision": "ALLOW",
+  "systemOutcome": "COMPLETED",
+  "reasonCodes": [],
+  "downstreamReached": true,
+  "responseReleased": true,
+  "success": true,
+  "completedAt": "2026-08-17T21:37:11+09:00"
+}

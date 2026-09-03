@@ -7,6 +7,7 @@ import java.util.Set;
 import io.finguard.core.domain.AuditEvent;
 import io.finguard.core.domain.AuditStatus;
 import io.finguard.core.domain.PolicyDecision;
+import io.finguard.core.domain.Severity;
 
 /** 생성 및 Outcome 갱신 뒤 반환하는 Business Audit 상태. */
 public record AuditResponse(
@@ -24,6 +25,8 @@ public record AuditResponse(
         Long latencyMs,
         String errorLocation,
         BigDecimal behaviorRisk,
+        Severity severity,
+        Boolean riskFlagged,
         String policyVersion,
         AuditStatus status,
         Instant requestedAt,
@@ -49,6 +52,8 @@ public record AuditResponse(
                 event.getLatencyMs(),
                 event.getErrorLocation(),
                 event.getBehaviorRisk(),
+                event.getSeverity(),
+                event.getRiskFlagged(),
                 event.getPolicyVersion(),
                 event.getStatus(),
                 event.getRequestedAt(),

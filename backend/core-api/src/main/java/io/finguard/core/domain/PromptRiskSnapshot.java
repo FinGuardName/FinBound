@@ -62,6 +62,10 @@ public class PromptRiskSnapshot {
     private BigDecimal promptRisk;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "risk_level", nullable = false, length = 16)
+    private PromptRiskLevel riskLevel;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "attack_type", length = 64)
     private PromptAttackType attackType;
 
@@ -92,6 +96,7 @@ public class PromptRiskSnapshot {
         snapshot.evaluationStatus = PromptRiskEvaluationStatus.NOT_EVALUATED;
         snapshot.detected = false;
         snapshot.promptRisk = BigDecimal.ZERO.setScale(4);
+        snapshot.riskLevel = PromptRiskLevel.LOW;
         snapshot.attackType = null;
         snapshot.modelVersion = modelVersion;
         snapshot.evaluatedAt = recordedAt;
@@ -120,6 +125,10 @@ public class PromptRiskSnapshot {
 
     public BigDecimal getPromptRisk() {
         return promptRisk;
+    }
+
+    public PromptRiskLevel getRiskLevel() {
+        return riskLevel;
     }
 
     public PromptAttackType getAttackType() {

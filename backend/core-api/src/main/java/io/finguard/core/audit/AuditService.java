@@ -84,6 +84,8 @@ public class AuditService {
                             request.latencyMs(),
                             request.errorLocation(),
                             request.behaviorRisk(),
+                            request.severity(),
+                            request.riskFlagged(),
                             request.policyVersion(),
                             request.completedAt()));
             return AuditResponse.from(auditEvents.saveAndFlush(event));
