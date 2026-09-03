@@ -23,6 +23,18 @@ const protectionContext = computed(() => {
   const effectivePermission = permission?.agentEffectivePermission
 
   if (!agentRun || !effectivePermission) {
+    if (finboundApi.isRealMode()) {
+      const unavailableLabel = executionError.value ? '확인 불가' : '실행 전'
+      return {
+        agentRunId: agentRun?.agentRunId ?? unavailableLabel,
+        passportId: agentRun?.passportId ?? unavailableLabel,
+        expiresAtLabel: agentRun?.expiresAt ?? unavailableLabel,
+        allowedTools: effectivePermission?.allowedTools ?? null,
+        allowedData: effectivePermission?.allowedData ?? null,
+        withheldTools: permission?.withheldTools ?? null,
+        source: 'core',
+      }
+    }
     return {
       agentRunId: mockPassport.agentRunId,
       passportId: mockPassport.passportId,
@@ -44,6 +56,9 @@ const protectionContext = computed(() => {
     source: 'core',
   }
 })
+const permissionListLabel = (values) => (
+  Array.isArray(values) ? (values.join(' · ') || '없음') : '확인 불가'
+)
 const allowedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'ALLOW' && attempt.systemOutcome !== 'ERROR') ?? [])
 const blockedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'BLOCK' && attempt.systemOutcome !== 'ERROR') ?? [])
 const errorAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.systemOutcome === 'ERROR') ?? [])
@@ -82,7 +97,14 @@ async function runAgentTask() {
   executionError.value = ''
   try {
     execution.value = await finboundApi.executeAgentTask({ workId: selectedWorkId.value })
-  } catch {
+  } catch (error) {
+    if (error?.executionContext) {
+      execution.value = {
+        status: 'ERROR',
+        attempts: [],
+        ...error.executionContext,
+      }
+    }
     executionError.value = '업무 처리 결과를 확인하지 못했습니다. 금융시스템 조회 여부는 업무 기록에서 확인해 주세요.'
   } finally {
     loading.value = false
@@ -194,9 +216,9 @@ async function runAgentTask() {
             <div><dt>권한 확인서</dt><dd>{{ protectionContext.passportId }}</dd></div>
             <div><dt>유효 시간</dt><dd>{{ protectionContext.expiresAtLabel }}</dd></div>
           </dl>
-          <p>허용 업무: {{ protectionContext.allowedTools.join(' · ') || '없음' }}</p>
-          <p>허용 자료: {{ protectionContext.allowedData.join(' · ') || '없음' }}</p>
-          <p v-if="protectionContext.source === 'core'">권한 제외 업무: {{ protectionContext.withheldTools.join(' · ') || '없음' }}</p>
+          <p>허용 업무: {{ permissionListLabel(protectionContext.allowedTools) }}</p>
+          <p>허용 자료: {{ permissionListLabel(protectionContext.allowedData) }}</p>
+          <p v-if="protectionContext.source === 'core'">권한 제외 업무: {{ permissionListLabel(protectionContext.withheldTools) }}</p>
           <small>Agent Effective Permission ⊆ Employee Authority</small>
         </details>
       </aside>
@@ -236,7 +258,7 @@ async function runAgentTask() {
                       <div><dt>요청 고객</dt><dd>{{ attempt.targetConsumerId }}</dd></div>
                       <div><dt>업무 범위</dt><dd><StatusBadge :value="attempt.scopeStatus.customerScope" /></dd></div>
                       <div><dt>처리 사유</dt><dd class="reason-code">{{ attempt.reasonCodes[0] || (attempt.decision === 'ALLOW' && attempt.systemOutcome === 'COMPLETED' ? '차단 사유 없음' : '처리 사유 미제공') }}</dd></div>
-                      <div><dt>금융시스템 조회</dt><dd>{{ booleanStatusLabel(attempt.downstreamReached, '완료 · 1회', '차단 · 0회') }}</dd></div>
+                      <div><dt>금융시스템 요청</dt><dd>{{ booleanStatusLabel(attempt.downstreamReached, '전달됨', '전달 안 됨') }}</dd></div>
                       <div><dt>결과 제공</dt><dd>{{ booleanStatusLabel(attempt.responseReleased, '제공함', '제공 안 함') }}</dd></div>
                       <div><dt>도구</dt><dd>{{ attempt.tool }}</dd></div>
                       <div><dt>자료</dt><dd>{{ attempt.requestedData.join(' · ') }}</dd></div>
