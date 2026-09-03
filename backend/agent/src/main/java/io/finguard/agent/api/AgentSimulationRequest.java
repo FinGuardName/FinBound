@@ -9,4 +9,11 @@ public record AgentSimulationRequest(
         @NotBlank String passportId,
         @NotNull AgentSimulationScenario scenario
 ) {
+    public AgentSimulationRequest {
+        if (agentRunId == null || agentRunId.isBlank()
+                || passportId == null || passportId.isBlank()
+                || scenario == null) {
+            throw new IllegalArgumentException("Core-issued references and scenario are required");
+        }
+    }
 }

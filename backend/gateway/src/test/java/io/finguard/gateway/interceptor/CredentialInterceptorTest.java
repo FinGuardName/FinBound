@@ -46,6 +46,6 @@ class CredentialInterceptorTest {
 
         assertThat(proceed).isFalse();
         assertThat(response.getStatus()).isEqualTo(401);
-        verify(coreClient).recordAuthFailure(eq("REQ-401"), eq("AGENT_AUTHENTICATION_FAILED"));
+        verify(coreClient).recordAuthFailure(eq("REQ-401"), eq(null), eq("AGENT_AUTHENTICATION_FAILED"));
     }
 }

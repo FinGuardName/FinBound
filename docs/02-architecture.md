@@ -226,6 +226,7 @@ Rego에서 raw Customer/Tool/Data 비교를 중복하지 않는다.
 - Financial Case
 - Agent Effective Permission
 - Task Passport
+- AgentRun 발급·저장 및 생성 트랜잭션 커밋 후 Agent Simulator 호출
 - Financial Context Resolver
 - Prompt Risk Snapshot Persistence
 - Business Audit / SecurityAuthEvent Persistence
@@ -250,7 +251,7 @@ Rego에서 raw Customer/Tool/Data 비교를 중복하지 않는다.
 
 ### 7.3 LoanAgent / Mock Finance / Audit Contract — Backend 3
 
-- AgentRun / LoanAgent / Simulator
+- Core 발급 AgentRun 참조를 소비하는 LoanAgent / Simulator (발급·저장은 Core)
 - Tool Call 생성
 - Mock Financial API / Mock 데이터
 - ToolCallAttempt Contract

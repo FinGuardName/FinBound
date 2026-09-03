@@ -18,6 +18,14 @@ finguard:
   internal:
     # 값이 없으면 기동에 실패한다. 인증이 사실상 꺼진 Internal API가 떠 있는 상태를 만들지 않는다.
     credential: ${FINGUARD_INTERNAL_CREDENTIAL:}
+  agent:
+    # docs/04 §3.1 — Agent는 8082에서 실행하고 Compose 주소는 http://agent:8082 다.
+    base-url: ${AGENT_URL:http://localhost:8082}
+    # Agent의 /internal/** 도 같은 공유 자격 증명으로 보호된다. 값이 하나뿐인 것은 P0의 전제다.
+    internal-credential: ${finguard.internal.credential}
+    connect-timeout-ms: ${AGENT_CONNECT_TIMEOUT_MS:1000}
+    # Agent는 Gateway와 Mock Finance를 거쳐 오므로 한 Tool Call보다 넉넉해야 한다.
+    read-timeout-ms: ${AGENT_READ_TIMEOUT_MS:10000}
 
 management:
   endpoints:

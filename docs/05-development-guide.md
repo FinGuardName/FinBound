@@ -109,6 +109,7 @@ finguard/
 - Permission Template
 - Financial Case
 - Effective Permission / Task Passport
+- AgentRun 발급·저장 / Core → Agent Simulator 실행 오케스트레이션
 - Context Resolver / Scope Status
 - Prompt Risk Snapshot Persistence
 - Business Audit / SecurityAuthEvent Persistence
@@ -132,7 +133,7 @@ finguard/
 
 ### Backend 3 — Agent / Mock Finance / Audit Contract
 
-- AgentRun / LoanAgent / Simulator
+- Core 발급 AgentRun 참조를 사용하는 LoanAgent / Simulator
 - Mock Financial API / Mock 금융데이터
 - ToolCallAttempt / ExecutionOutcome Contract
 - AuditEvent Contract 설계 지원
