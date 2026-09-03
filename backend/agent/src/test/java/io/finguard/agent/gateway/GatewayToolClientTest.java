@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,6 +28,75 @@ import io.finguard.agent.domain.PolicyDecision;
 import reactor.core.publisher.Mono;
 
 class GatewayToolClientTest {
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "{\"tool\":\"CREDIT_SCORE_READ\"}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\"}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":null}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":\"812\"}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":true}",
+        "{\"tool\":\"INCOME_READ\",\"consumerId\":\"CUST-1001\",\"creditScore\":812}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"consumerId\":\"CUST-9999\",\"creditScore\":812}",
+        "{\"consumerId\":\"CUST-1001\",\"creditScore\":812}",
+        "{\"tool\":\"CREDIT_SCORE_READ\",\"creditScore\":812}"
+    })
+    void rejectsIncompleteOrMismatchedFinancialResult(String result) {
+        GatewayToolClient client = client(request -> jsonResponse(HttpStatus.OK,
+                "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\",\"result\":" + result + "}"),
+                Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> client.execute(toolRequest()).block())
+                .isInstanceOf(GatewayCallException.class)
+                .hasMessage("GATEWAY_RESPONSE_INVALID");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "{\"decision\":\"ALLOW\",\"result\":{\"creditScore\":812}}",
+        "{\"requestId\":\" \",\"decision\":\"ALLOW\",\"result\":{\"creditScore\":812}}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\"}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\",\"result\":null}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\",\"result\":{}}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\",\"result\":[]}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"BLOCK\"}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"BLOCK\",\"reasonCodes\":[\" \"]}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"BLOCK\",\"reasonCodes\":[null]}",
+        "{\"requestId\":\"REQ-001\",\"decision\":\"ERROR\"}",
+        "{broken-json",
+        "null"
+    })
+    void rejectsMalformedPolicyResponses(String body) {
+        GatewayToolClient client = client(
+                request -> jsonResponse(HttpStatus.OK, body), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> client.execute(toolRequest()).block())
+                .isInstanceOf(GatewayCallException.class)
+                .hasMessage("GATEWAY_RESPONSE_INVALID");
+    }
+
+    @Test
+    void rejectsForbiddenResponseClaimingAllow() {
+        GatewayToolClient client = client(request -> jsonResponse(HttpStatus.FORBIDDEN, """
+                {"requestId":"REQ-001","decision":"ALLOW","result":{"creditScore":812}}
+                """), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> client.execute(toolRequest()).block())
+                .isInstanceOf(GatewayCallException.class)
+                .hasMessage("GATEWAY_RESPONSE_INVALID");
+    }
+
+    @Test
+    void rejectsBlockResponseContainingFinancialResult() {
+        GatewayToolClient client = client(request -> jsonResponse(HttpStatus.FORBIDDEN, """
+                {"requestId":"REQ-001","decision":"BLOCK","result":{"creditScore":812},
+                 "reasonCodes":["CASE_SCOPE_VIOLATION"]}
+                """), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> client.execute(toolRequest()).block())
+                .isInstanceOf(GatewayCallException.class)
+                .hasMessage("GATEWAY_RESPONSE_INVALID");
+    }
+
     @Test
     void sendsCredentialRequestIdAndTraceparent() {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
@@ -35,7 +106,8 @@ class GatewayToolClientTest {
                     return jsonResponse(
                             HttpStatus.OK,
                             "{\"requestId\":\"REQ-001\",\"decision\":\"ALLOW\","
-                                    + "\"result\":{\"creditScore\":812}}"
+                                    + "\"result\":{\"tool\":\"CREDIT_SCORE_READ\","
+                                    + "\"consumerId\":\"CUST-1001\",\"creditScore\":812}}"
                     );
                 },
                 Duration.ofSeconds(1)
@@ -133,6 +205,7 @@ class GatewayToolClientTest {
     void serializesOnlyGatewayContractFields() throws Exception {
         String json = new ObjectMapper().writeValueAsString(toolRequest());
 
+        assertThat(new ObjectMapper().readTree(json).size()).isEqualTo(6);
         assertThat(json).contains(
                 "\"agentRunId\":\"RUN-001\"",
                 "\"passportId\":\"PASS-001\"",
