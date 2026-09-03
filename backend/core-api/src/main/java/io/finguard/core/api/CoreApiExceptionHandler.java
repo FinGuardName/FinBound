@@ -10,8 +10,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import io.finguard.core.audit.AuditEvidenceRejectedException;
 import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
+import io.finguard.core.dashboard.AuditEventNotFoundException;
+import io.finguard.core.dashboard.PermissionComparisonNotFoundException;
+import io.finguard.core.dashboard.UnsupportedPeriodException;
 import io.finguard.core.history.InvalidBehaviorHistoryWindowException;
 import io.finguard.core.permission.PermissionNotIssuableException;
 import io.finguard.core.security.CoreApiAccessDeniedException;
@@ -106,6 +110,41 @@ public class CoreApiExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ProblemDetail> handleUnreadableBody(HttpMessageNotReadableException exception) {
         return problem(HttpStatus.BAD_REQUEST, "INVALID_TOOL_REQUEST", "요청 본문을 해석할 수 없습니다.");
+    }
+
+    /**
+     * Dashboard 조회 대상이 없다. {@code reasonCode}를 붙이지 않는다 — {@code docs/06} §20의 Reason Code는
+     * Runtime 집행의 거부 사유를 정의하며 읽기 조회 실패에 해당하는 값이 없다. 억지로 가장 비슷한 값을
+     * 넣으면 대시보드가 집행 사유를 표시하게 되고, 그건 사실이 아니다.
+     */
+    @ExceptionHandler({AuditEventNotFoundException.class, PermissionComparisonNotFoundException.class})
+    ResponseEntity<ProblemDetail> handleDashboardLookup(RuntimeException exception) {
+        ProblemDetail body = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        body.setDetail("요청한 기록을 찾을 수 없습니다.");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    /**
+     * 근거를 적을 감사행이 없거나, 이미 다른 근거가 적혀 있다. 호출 순서 위반이라 409다.
+     *
+     * <p>{@code reasonCode}를 붙이지 않는다. {@code docs/06} §20의 목록은 Runtime 집행의 거부 사유를
+     * 정의하며 "호출 순서 위반"에 해당하는 값이 없다. 전용 Code는 별도 계약 결정으로 분리했다 —
+     * PR #56 리뷰에서 합의한 범위다.
+     */
+    @ExceptionHandler(AuditEvidenceRejectedException.class)
+    ResponseEntity<ProblemDetail> handleAuditEvidenceRejected(
+            AuditEvidenceRejectedException exception) {
+        ProblemDetail body = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        body.setDetail("이 요청의 감사 기록이 근거를 받을 수 있는 상태가 아닙니다.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    /** 조회 조건이 정의되지 않은 값이다. 위와 같은 이유로 {@code reasonCode}를 붙이지 않는다. */
+    @ExceptionHandler(UnsupportedPeriodException.class)
+    ResponseEntity<ProblemDetail> handleUnsupportedPeriod(UnsupportedPeriodException exception) {
+        ProblemDetail body = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        body.setDetail("조회 기간 값이 올바르지 않습니다.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     private ResponseEntity<ProblemDetail> problem(HttpStatus status, String reasonCode, String detail) {
