@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!requirements.lock
+!app/
+!app/**
+!models/
+!models/behavior_iforest.joblib
+!models/download_prompt_model.py
+!models/prompt_detector.json
+!models/prompt_domain_adapter.joblib
+
+# The large Prompt model must always come from the pinned, verified build stage.
+models/prompt_guard_onnx/

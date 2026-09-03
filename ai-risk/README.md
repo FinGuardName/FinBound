@@ -47,10 +47,48 @@ POST /internal/v1/risk/prompt
 POST /internal/v1/risk/behavior
 ```
 
-Prompt 모델은 `models/prompt_detector.json`에서 Model ID·Revision·Artifact SHA-256과 모든
-Threshold를 단일 관리합니다. 큰 사전학습 ONNX Artifact는 Git에 넣지 않고 다운로드 스크립트가
-고정 Revision과 SHA-256을 검증합니다. Domain Adapter는 승인 데이터 SHA-256을 Bundle 안에서도
-검증합니다. 경로를 바꿀 때는 `FINGUARD_PROMPT_MODEL_DIR`과
+## 컨테이너 실행
+
+이미지는 Python 3.12와 `requirements.lock`을 사용하며, 고정 Hugging Face Revision에서 Prompt
+ONNX Bundle을 빌드할 때 내려받습니다. ONNX뿐 아니라 Tokenizer·설정 파일 전체의 SHA-256을
+`models/prompt_detector.json`과 대조하므로 검증되지 않은 Bundle은 Runtime 이미지에 들어가지
+않습니다. 개발자 PC의 `models/prompt_guard_onnx`는 Build Context에서 제외됩니다.
+
+```bash
+cd ai-risk
+docker build -t finbound-ai-risk:local .
+docker run --rm \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --security-opt no-new-privileges:true \
+  --cap-drop=ALL \
+  -p 8000:8000 \
+  -e FINGUARD_INTERNAL_CREDENTIAL='<runtime-secret>' \
+  finbound-ai-risk:local
+```
+
+Runtime은 UID/GID `10001`로 실행되고 `/app/app`, `/app/models`, `/opt/venv`는 root 소유의 읽기
+전용 영역입니다. 임시 쓰기가 필요하면 위 예시처럼 `/tmp`만 제한된 `tmpfs`로 제공합니다. 내부
+Credential은 Build Argument나 Image ENV가 아니라 실행 시 Secret/환경변수로만 주입합니다.
+Credential이 없거나 Behavior·Prompt 모델 또는 Tokenizer 검증/로드가 실패하면 `/ready`는 `503`을
+반환합니다.
+
+ONNX Runtime Session과 Domain Adapter는 SHA-256을 계산한 바로 그 메모리 바이트에서 생성하여
+검사 후 경로를 다시 여는 TOCTOU를 피합니다. Hugging Face Tokenizer는 경로 기반 API를 사용하므로
+Manifest로 모든 구성 파일을 검증한 직후 로드하며, 배포 컨테이너의 root 소유·읽기 전용 파일
+경계를 함께 적용합니다.
+
+컨테이너 전용 CI는 깨끗한 Context에서 이미지를 빌드하고 다음을 검증합니다.
+
+- UID/GID 10001, root 소유 코드·모델, read-only Root Filesystem
+- Credential 누락 시 `/ready` fail-closed
+- 실제 Prompt ONNX/Domain Adapter와 Behavior 모델의 API Smoke Test
+- 응답이 Risk Signal만 포함하고 원문 Prompt·Credential이 로그에 남지 않는지 확인
+
+Prompt 모델은 `models/prompt_detector.json`에서 Model ID·Revision·ONNX 및 Tokenizer Artifact
+SHA-256과 모든 Threshold를 단일 관리합니다. 큰 사전학습 ONNX Artifact는 Git에 넣지 않고
+다운로드 스크립트가 고정 Revision과 전체 Bundle의 SHA-256을 검증합니다. Domain Adapter는 승인
+데이터 SHA-256을 Bundle 안에서도 검증합니다. 경로를 바꿀 때는 `FINGUARD_PROMPT_MODEL_DIR`과
 `FINGUARD_PROMPT_DOMAIN_ADAPTER_PATH`를 사용합니다.
 
 Behavior Independent Mock artifact는 고정 Seed의 합성 데이터로 재현할 수 있습니다.

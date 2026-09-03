@@ -1,8 +1,12 @@
 import argparse
-import hashlib
 from pathlib import Path
 
-from app.prompt.model import DEFAULT_MODEL_DIR, PromptDetectorConfig
+from app.prompt.model import (
+    DEFAULT_MODEL_DIR,
+    PromptDetectorConfig,
+    PromptModelError,
+    read_verified_artifact,
+)
 
 
 def download(target: Path = DEFAULT_MODEL_DIR) -> Path:
@@ -19,9 +23,20 @@ def download(target: Path = DEFAULT_MODEL_DIR) -> Path:
         local_dir=target,
     )
     artifact = target / config.model_artifact_path
-    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    if digest != config.model_artifact_sha256:
-        raise RuntimeError("Downloaded prompt model artifact digest does not match")
+    try:
+        read_verified_artifact(
+            artifact,
+            config.model_artifact_sha256,
+            "Downloaded prompt model artifact",
+        )
+        for artifact_path, artifact_sha256 in config.tokenizer_artifacts:
+            read_verified_artifact(
+                target / artifact_path,
+                artifact_sha256,
+                "Downloaded prompt tokenizer artifact",
+            )
+    except PromptModelError as error:
+        raise RuntimeError("Downloaded prompt model bundle integrity check failed") from error
     return artifact
 
 

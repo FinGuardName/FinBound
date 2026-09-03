@@ -5,6 +5,15 @@
   "modelArtifactPath": "onnx/int8/model_quantized.onnx",
   "modelArtifactSha256": "151fa3a17cc4c11a5fa86173c9d5cf63846c74389e528ed420f28cc203cd9aaa",
   "tokenizerPath": "onnx/int8",
+  "tokenizerArtifactSha256": {
+    "onnx/int8/added_tokens.json": "fb697283833d25e2c711f1bc37730ecd8b20f4bd5f015db1d84aefe0adc9155a",
+    "onnx/int8/config.json": "97c6763d722d746443d9d071e1f63c8d89176cbf8f81ba7bdeb2ccc527932382",
+    "onnx/int8/ort_config.json": "2012e7b3f7d4d5d9a8b18682b3e5ec647fe60f15e0ccd1ed62eb247f3b8b8cf7",
+    "onnx/int8/special_tokens_map.json": "b2f1b2f15f29a6b6d9d6ea4eca1675d2c231a71477f151d48f79cc83a625ba21",
+    "onnx/int8/spm.model": "13c8d666d62a7bc4ac8f040aab68e942c861f93303156cc28f5c7e885d86d6e3",
+    "onnx/int8/tokenizer.json": "9ddbe35b768b22d6cd0d61a0a88ea3a188b7c00bbb7b825f9f247cf0b79c2365",
+    "onnx/int8/tokenizer_config.json": "6571a0a748f2d95da6a289f63946a2f56a234b33ad14952f309d51b0da1a6414"
+  },
   "injectionLabelId": 1,
   "maxTokens": 512,
   "ruleAlertRisk": 0.5,
