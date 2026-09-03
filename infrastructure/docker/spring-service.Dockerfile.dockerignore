@@ -1,0 +1,17 @@
+**
+!gradlew
+!settings.gradle.kts
+!build.gradle.kts
+!gradle/
+!gradle/**
+!naver-checkstyle.xml
+!naver-checkstyle-suppressions.xml
+!backend/
+!backend/*/
+!backend/*/build.gradle.kts
+!backend/core-api/src/
+!backend/core-api/src/main/
+!backend/core-api/src/main/**
+!backend/gateway/src/
+!backend/gateway/src/main/
+!backend/gateway/src/main/**
