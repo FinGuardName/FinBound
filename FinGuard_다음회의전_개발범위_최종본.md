@@ -262,7 +262,7 @@ Context Resolver 예시 출력:
     "promptRisk": 0.00,
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-1"
+    "modelVersion": "prompt-guard-5"
   }
 }
 ```
@@ -795,7 +795,7 @@ POST /internal/v1/context/resolve
     "promptRisk": 0.00,
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-1"
+    "modelVersion": "prompt-guard-5"
   }
 }
 ```

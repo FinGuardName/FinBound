@@ -26,11 +26,12 @@ const runtime = {
 }
 
 export class FinboundApiError extends Error {
-  constructor(message, { code = 'FRONTEND_API_ERROR', status = 0, cause } = {}) {
+  constructor(message, { code = 'FRONTEND_API_ERROR', status = 0, cause, executionContext = null } = {}) {
     super(message, { cause })
     this.name = 'FinboundApiError'
     this.code = code
     this.status = status
+    this.executionContext = executionContext
   }
 }
 
@@ -347,19 +348,31 @@ const realApi = {
     const work = bankWorkCatalogFixture.find((candidate) => candidate.id === workId)
     if (!work) throw new FinboundApiError('Unsupported Agent task', { code: 'AGENT_TASK_UNSUPPORTED' })
 
-    const agentRun = await coreRequest('/api/v1/agent-runs', {
-      method: 'POST',
-      body: {
-        employeeId: work.employee.id,
-        consumerId: work.case.consumerId,
-        taskType: work.case.taskLabel,
-        inputText: work.employeeRequest.title,
-      },
-    })
-    const permission = await coreRequest(`/api/v1/agent-runs/${encodeURIComponent(agentRun.agentRunId)}/permission-comparison`)
-    const execution = await waitForAgentExecution(agentRun.agentRunId)
+    let agentRun = null
+    let permission = null
+    try {
+      agentRun = await coreRequest('/api/v1/agent-runs', {
+        method: 'POST',
+        body: {
+          employeeId: work.employee.id,
+          consumerId: work.case.consumerId,
+          taskType: work.case.taskLabel,
+          inputText: work.employeeRequest.title,
+        },
+      })
+      permission = await coreRequest(`/api/v1/agent-runs/${encodeURIComponent(agentRun.agentRunId)}/permission-comparison`)
+      const execution = await waitForAgentExecution(agentRun.agentRunId)
 
-    return mapAgentExecution(agentRun, permission, execution)
+      return mapAgentExecution(agentRun, permission, execution)
+    } catch (error) {
+      if (!agentRun) throw error
+      throw new FinboundApiError(error.message, {
+        code: error.code,
+        status: error.status,
+        cause: error,
+        executionContext: { agentRun, permission },
+      })
+    }
   },
   async getAuditEvents(options = {}) {
     const page = await coreRequest(`/api/v1/audit-events?${queryString(options)}`)

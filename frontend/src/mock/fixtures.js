@@ -194,7 +194,7 @@ function createAuditEvent({
   promptRisk = 0.05,
   promptEvaluationStatus = 'EVALUATED',
   promptInjectionDetected = false,
-  promptModelVersion = 'prompt-guard-1',
+  promptModelVersion = 'prompt-guard-5',
   behaviorRisk = 0.21,
   behaviorRiskLevel = 'LOW',
   behaviorAnomalyDetected = false,

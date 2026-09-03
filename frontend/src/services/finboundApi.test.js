@@ -89,6 +89,17 @@ describe('real Core API adapter', () => {
       responseReleased: true,
     })
     expect(result.resultItems).toContain('정상 확인 1건')
+    expect(result.agentRun).toMatchObject({
+      agentRunId: 'RUN-REAL-1',
+      passportId: 'PASS-REAL-1',
+    })
+    expect(result.permission).toMatchObject({
+      agentEffectivePermission: {
+        allowedTools: ['CREDIT_SCORE_READ'],
+        allowedData: ['CREDIT_SCORE'],
+      },
+      withheldTools: ['INCOME_READ'],
+    })
   })
 
   it('polls a running Agent execution without calling an internal endpoint', async () => {
@@ -133,6 +144,41 @@ describe('real Core API adapter', () => {
       systemOutcome: 'COMPLETED',
       downstreamReached: false,
       responseReleased: false,
+    })
+  })
+
+  it('preserves verified AgentRun and permission context when execution lookup fails', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-PARTIAL-1',
+        passportId: 'PASS-PARTIAL-1',
+        status: 'RUNNING',
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: {
+          allowedTools: ['CREDIT_SCORE_READ'],
+          allowedData: ['CREDIT_SCORE'],
+        },
+        withheldTools: ['INCOME_READ'],
+      }))
+      .mockRejectedValueOnce(new Error('execution endpoint unavailable'))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
+      code: 'CORE_API_UNAVAILABLE',
+      executionContext: {
+        agentRun: {
+          agentRunId: 'RUN-PARTIAL-1',
+          passportId: 'PASS-PARTIAL-1',
+        },
+        permission: {
+          agentEffectivePermission: {
+            allowedTools: ['CREDIT_SCORE_READ'],
+            allowedData: ['CREDIT_SCORE'],
+          },
+          withheldTools: ['INCOME_READ'],
+        },
+      },
     })
   })
 
