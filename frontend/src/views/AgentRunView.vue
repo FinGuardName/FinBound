@@ -16,8 +16,60 @@ onMounted(async () => {
 })
 
 const workContext = computed(() => workCatalog.value.find((work) => work.id === selectedWorkId.value))
-const allowedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'ALLOW') ?? [])
-const blockedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'BLOCK') ?? [])
+const protectionContext = computed(() => {
+  const mockPassport = workContext.value?.passport ?? {}
+  const agentRun = execution.value?.agentRun
+  const permission = execution.value?.permission
+  const effectivePermission = permission?.agentEffectivePermission
+
+  if (!agentRun || !effectivePermission) {
+    return {
+      agentRunId: mockPassport.agentRunId,
+      passportId: mockPassport.passportId,
+      expiresAtLabel: mockPassport.expiresAtLabel,
+      allowedTools: mockPassport.allowedTools ?? [],
+      allowedData: mockPassport.allowedData ?? [],
+      withheldTools: [],
+      source: 'preview',
+    }
+  }
+
+  return {
+    agentRunId: agentRun.agentRunId ?? '미제공',
+    passportId: agentRun.passportId ?? '미제공',
+    expiresAtLabel: agentRun.expiresAt ?? 'Core 응답 미제공',
+    allowedTools: effectivePermission.allowedTools ?? [],
+    allowedData: effectivePermission.allowedData ?? [],
+    withheldTools: permission.withheldTools ?? [],
+    source: 'core',
+  }
+})
+const allowedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'ALLOW' && attempt.systemOutcome !== 'ERROR') ?? [])
+const blockedAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.decision === 'BLOCK' && attempt.systemOutcome !== 'ERROR') ?? [])
+const errorAttempts = computed(() => execution.value?.attempts.filter((attempt) => attempt.systemOutcome === 'ERROR') ?? [])
+const attemptDisplayOutcome = (attempt) => attempt.systemOutcome === 'ERROR' ? 'ERROR' : (attempt.decision ?? 'UNKNOWN')
+const attemptStatusLabel = (attempt) => {
+  if (attempt.systemOutcome === 'ERROR') return '처리 오류'
+  if (attempt.decision === 'ALLOW') return '확인 완료'
+  if (attempt.decision === 'BLOCK') return '조회 차단'
+  return '결과 미제공'
+}
+const attemptScopeLabel = (attempt) => {
+  if (attempt.systemOutcome === 'ERROR') return '시스템 처리 오류'
+  if (attempt.decision === 'ALLOW') return '현재 업무에 필요'
+  if (attempt.decision === 'BLOCK') return '현재 업무 범위 밖'
+  return '업무 범위 확인 불가'
+}
+const booleanStatusLabel = (value, trueLabel, falseLabel) => {
+  if (value === true) return trueLabel
+  if (value === false) return falseLabel
+  return '확인 불가'
+}
+const executionStateLabel = computed(() => {
+  if (execution.value?.status === 'RUNNING') return '업무 실행 중'
+  if (execution.value?.status === 'ERROR' || errorAttempts.value.length) return '업무 오류'
+  return blockedAttempts.value.length ? `업무 완료 · 보호 ${blockedAttempts.value.length}건` : '업무 완료'
+})
 
 watch(selectedWorkId, () => {
   execution.value = null
@@ -138,12 +190,13 @@ async function runAgentTask() {
           <summary>시스템 정보 보기</summary>
           <dl>
             <div><dt>업무 번호</dt><dd>{{ workContext.case.caseId }}</dd></div>
-            <div><dt>AI 실행 번호</dt><dd>{{ workContext.passport.agentRunId }}</dd></div>
-            <div><dt>권한 확인서</dt><dd>{{ workContext.passport.passportId }}</dd></div>
-            <div><dt>유효 시간</dt><dd>{{ workContext.passport.expiresAtLabel }}</dd></div>
+            <div><dt>AI 실행 번호</dt><dd>{{ protectionContext.agentRunId }}</dd></div>
+            <div><dt>권한 확인서</dt><dd>{{ protectionContext.passportId }}</dd></div>
+            <div><dt>유효 시간</dt><dd>{{ protectionContext.expiresAtLabel }}</dd></div>
           </dl>
-          <p>허용 업무: {{ workContext.passport.allowedTools.join(' · ') }}</p>
-          <p>허용 자료: {{ workContext.passport.allowedData.join(' · ') }}</p>
+          <p>허용 업무: {{ protectionContext.allowedTools.join(' · ') || '없음' }}</p>
+          <p>허용 자료: {{ protectionContext.allowedData.join(' · ') || '없음' }}</p>
+          <p v-if="protectionContext.source === 'core'">권한 제외 업무: {{ protectionContext.withheldTools.join(' · ') || '없음' }}</p>
           <small>Agent Effective Permission ⊆ Employee Authority</small>
         </details>
       </aside>
@@ -162,17 +215,18 @@ async function runAgentTask() {
         <div class="decision-banner protected">
           <div class="decision-icon" aria-hidden="true">✓</div>
           <div><p class="section-kicker">AI 업무 처리 결과</p><h2>{{ execution.title }}</h2><p>{{ execution.message }}</p></div>
-          <span class="plain-decision">{{ blockedAttempts.length ? `업무 완료 · 보호 ${blockedAttempts.length}건` : '업무 완료' }}</span>
+          <span class="plain-decision">{{ executionStateLabel }}</span>
         </div>
 
         <div class="execution-content">
           <div class="work-progress">
-            <div class="attempt-heading"><div><p class="section-kicker">AI가 시도한 작업</p><h3>자료별 접근 결과</h3></div><span>{{ allowedAttempts.length }}건 확인 · {{ blockedAttempts.length }}건 차단</span></div>
+            <div class="attempt-heading"><div><p class="section-kicker">AI가 시도한 작업</p><h3>자료별 접근 결과</h3></div><span>{{ execution.status === 'RUNNING' ? '실행 결과 대기 중' : `${allowedAttempts.length}건 확인 · ${blockedAttempts.length}건 차단 · ${errorAttempts.length}건 오류` }}</span></div>
+            <p v-if="execution.status === 'RUNNING'" class="no-results">AgentRun이 생성되었습니다. Tool Call 결과는 감사 현황에서 확인할 수 있습니다.</p>
             <ol class="attempt-list" aria-label="AI 자료 접근 결과">
-              <li v-for="attempt in execution.attempts" :key="attempt.requestId" :class="attempt.decision.toLowerCase()">
-                <span class="timeline-marker">{{ attempt.decision === 'ALLOW' ? '✓' : '!' }}</span>
+              <li v-for="attempt in execution.attempts" :key="attempt.requestId" :class="attemptDisplayOutcome(attempt).toLowerCase()">
+                <span class="timeline-marker">{{ attempt.decision === 'ALLOW' && attempt.systemOutcome !== 'ERROR' ? '✓' : '!' }}</span>
                 <div class="attempt-copy">
-                  <small>{{ attempt.decision === 'ALLOW' ? '현재 업무에 필요' : '현재 업무 범위 밖' }}</small>
+                  <small>{{ attemptScopeLabel(attempt) }}</small>
                   <strong>{{ attempt.label }}</strong>
                   <p>{{ attempt.description }}</p>
                   <details class="attempt-details">
@@ -181,15 +235,15 @@ async function runAgentTask() {
                       <div><dt>요청 번호</dt><dd>{{ attempt.requestId }}</dd></div>
                       <div><dt>요청 고객</dt><dd>{{ attempt.targetConsumerId }}</dd></div>
                       <div><dt>업무 범위</dt><dd><StatusBadge :value="attempt.scopeStatus.customerScope" /></dd></div>
-                      <div><dt>처리 사유</dt><dd class="reason-code">{{ attempt.reasonCodes[0] || '차단 사유 없음' }}</dd></div>
-                      <div><dt>금융시스템 조회</dt><dd>{{ attempt.downstreamReached ? '완료 · 1회' : '차단 · 0회' }}</dd></div>
-                      <div><dt>결과 제공</dt><dd>{{ attempt.responseReleased ? '제공함' : '제공 안 함' }}</dd></div>
+                      <div><dt>처리 사유</dt><dd class="reason-code">{{ attempt.reasonCodes[0] || (attempt.decision === 'ALLOW' && attempt.systemOutcome === 'COMPLETED' ? '차단 사유 없음' : '처리 사유 미제공') }}</dd></div>
+                      <div><dt>금융시스템 조회</dt><dd>{{ booleanStatusLabel(attempt.downstreamReached, '완료 · 1회', '차단 · 0회') }}</dd></div>
+                      <div><dt>결과 제공</dt><dd>{{ booleanStatusLabel(attempt.responseReleased, '제공함', '제공 안 함') }}</dd></div>
                       <div><dt>도구</dt><dd>{{ attempt.tool }}</dd></div>
                       <div><dt>자료</dt><dd>{{ attempt.requestedData.join(' · ') }}</dd></div>
                     </dl>
                   </details>
                 </div>
-                <span class="attempt-decision">{{ attempt.decision === 'ALLOW' ? '확인 완료' : '조회 차단' }}</span>
+                <span class="attempt-decision">{{ attemptStatusLabel(attempt) }}</span>
               </li>
             </ol>
           </div>
