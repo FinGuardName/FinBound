@@ -22,3 +22,15 @@ def verify_internal_credential(
         credential.encode("utf-8"), expected.encode("utf-8")
     ):
         raise HTTPException(status_code=401, detail="INTERNAL_CREDENTIAL_INVALID")
+
+
+def verify_prompt_internal_credential(
+    credential: Annotated[str | None, Header(alias=INTERNAL_CREDENTIAL_HEADER)] = None,
+) -> None:
+    expected = os.getenv(INTERNAL_CREDENTIAL_ENV)
+    if not internal_credential_is_configured() or expected is None:
+        raise HTTPException(status_code=503, detail="PROMPT_RISK_UNAVAILABLE")
+    if credential is None or not compare_digest(
+        credential.encode("utf-8"), expected.encode("utf-8")
+    ):
+        raise HTTPException(status_code=401, detail="INTERNAL_CREDENTIAL_INVALID")
