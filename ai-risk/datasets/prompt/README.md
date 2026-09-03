@@ -119,6 +119,17 @@ python -m evaluate.prompt_metrics \
   --output evaluate/prompt_metrics.json
 ```
 
+실제 Runtime 결합 평가와 재현 가능한 Adapter 생성은 다음 명령을 사용합니다. Adapter는
+`development`만 학습에 사용하고 Threshold는 `validation`에서 FPR 5% 이하로 고정합니다.
+`held_out_test`는 설정을 고정한 뒤 최종 보고에만 사용합니다.
+
+```bash
+python -m models.download_prompt_model
+python -m train.train_prompt_adapter
+python -m evaluate.prompt_runtime --mode validation --output evaluate/prompt_runtime_validation.json
+python -m evaluate.prompt_runtime --mode held-out --output evaluate/prompt_runtime_held_out.json
+```
+
 Report는 Precision, Recall, F1, False Positive Rate, Wilson 95% 신뢰구간, 언어별 지표,
 공격 유형별 Recall, 한국어 금융 정상/Hard Negative 전용 FPR, False Positive/Negative Sample ID를
 포함합니다. 균형 평가 Set의 Precision은 운영 환경의 실제 공격 비율을 반영한 값으로 해석하지

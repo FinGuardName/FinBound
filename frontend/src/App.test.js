@@ -1,8 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App.vue'
-import { finboundApi } from './services/finboundApi'
+import { configureFinboundApi, finboundApi, mapAuditEvent, resetFinboundApi } from './services/finboundApi'
+
+afterEach(() => {
+  resetFinboundApi()
+  vi.restoreAllMocks()
+})
 
 const getAllAuditEvents = async () => {
   const result = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, pageSize: 100 })
@@ -10,6 +15,112 @@ const getAllAuditEvents = async () => {
 }
 
 describe('FinBound P0 application', () => {
+  it('keeps the real Core credential in memory instead of Web Storage', async () => {
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem')
+    configureFinboundApi({ mode: 'real' })
+    const wrapper = mount(App)
+
+    expect(wrapper.text()).toContain('업무 세션 Credential을 입력해 주세요')
+    expect(wrapper.findAll('.work-card')).toHaveLength(0)
+
+    await wrapper.get('#core-credential').setValue('operator-runtime-only')
+    await wrapper.get('.credential-panel form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.findAll('.work-card')).toHaveLength(3)
+    expect(finboundApi.hasCredential()).toBe(true)
+    expect(storageWrite).not.toHaveBeenCalled()
+    expect(wrapper.html()).not.toContain('operator-runtime-only')
+  })
+
+  it('renders the real AgentRun, Passport, and effective permission in the protection panel', async () => {
+    const jsonResponse = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) })
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-REAL-1',
+        passportId: 'PASS-REAL-1',
+        status: 'RUNNING',
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: {
+          allowedTools: ['CREDIT_SCORE_READ'],
+          allowedData: ['CREDIT_SCORE'],
+        },
+        withheldTools: ['INCOME_READ', 'DEBT_READ'],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-REAL-1',
+        status: 'COMPLETED',
+        attempts: [{
+          requestId: 'REQ-REAL-1',
+          requestedTool: 'CREDIT_SCORE_READ',
+          targetConsumerId: 'CUST-1001',
+          requestedData: ['CREDIT_SCORE'],
+          decision: 'ALLOW',
+          systemOutcome: 'COMPLETED',
+          reasonCodes: [],
+          downstreamReached: true,
+          responseReleased: true,
+          scopeStatus: { customerScope: 'OK' },
+        }],
+      }))
+    configureFinboundApi({ mode: 'real', fetchImpl })
+    const wrapper = mount(App)
+
+    await wrapper.get('#core-credential').setValue('operator-runtime-only')
+    await wrapper.get('.credential-panel form').trigger('submit')
+    await flushPromises()
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    const details = wrapper.get('.security-details').text()
+    expect(details).toContain('RUN-REAL-1')
+    expect(details).toContain('PASS-REAL-1')
+    expect(details).toContain('허용 업무: CREDIT_SCORE_READ')
+    expect(details).toContain('허용 자료: CREDIT_SCORE')
+    expect(details).toContain('권한 제외 업무: INCOME_READ · DEBT_READ')
+    expect(details).not.toContain('RUN-001')
+    expect(details).not.toContain('INCOME · DEBT')
+  })
+
+  it('never falls back to Mock protection details when a real execution lookup fails', async () => {
+    const jsonResponse = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) })
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-REAL-PARTIAL',
+        passportId: 'PASS-REAL-PARTIAL',
+        status: 'RUNNING',
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: {
+          allowedTools: ['CREDIT_SCORE_READ'],
+          allowedData: ['CREDIT_SCORE'],
+        },
+        withheldTools: ['INCOME_READ', 'DEBT_READ'],
+      }))
+      .mockRejectedValueOnce(new Error('execution endpoint unavailable'))
+    configureFinboundApi({ mode: 'real', fetchImpl })
+    const wrapper = mount(App)
+
+    await wrapper.get('#core-credential').setValue('operator-runtime-only')
+    await wrapper.get('.credential-panel form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.get('.security-details').text()).toContain('AI 실행 번호실행 전')
+    expect(wrapper.get('.security-details').text()).not.toContain('RUN-001')
+
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    const details = wrapper.get('.security-details').text()
+    expect(wrapper.text()).toContain('업무 처리 상태를 확인할 수 없습니다')
+    expect(details).toContain('RUN-REAL-PARTIAL')
+    expect(details).toContain('PASS-REAL-PARTIAL')
+    expect(details).toContain('허용 업무: CREDIT_SCORE_READ')
+    expect(details).toContain('허용 자료: CREDIT_SCORE')
+    expect(details).not.toContain('RUN-001')
+    expect(details).not.toContain('PASS-001')
+  })
+
   it('shows bank work instead of asking an employee to configure security', async () => {
     const wrapper = mount(App)
     await flushPromises()
@@ -39,7 +150,7 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).toContain('신규 대출 심사자료 확인이 완료되었습니다')
     expect(wrapper.text()).toContain('3건 확인 · 0건 차단')
     expect(wrapper.text()).toContain('차단 사유 없음')
-    expect(wrapper.text()).toContain('완료 · 1회')
+    expect(wrapper.text()).toContain('전달됨')
     expect(wrapper.text()).toContain('심사 의견을 작성해 주세요')
     expect(wrapper.text()).not.toContain('CASE_SCOPE_VIOLATION')
     expect(wrapper.text()).not.toContain('FinBound 보호 작동')
@@ -61,6 +172,44 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).toContain('업무 처리 상태를 확인할 수 없습니다')
     expect(wrapper.text()).toContain('금융시스템 조회 여부는 업무 기록에서 확인해 주세요')
     expect(wrapper.text()).not.toContain('자료를 조회하지 않았습니다')
+    executeAgentTask.mockRestore()
+  })
+
+  it('does not present an allowed policy decision with a system error as a successful check', async () => {
+    const executeAgentTask = vi.spyOn(finboundApi, 'executeAgentTask').mockResolvedValueOnce({
+      status: 'COMPLETED',
+      title: 'AI 업무 처리 중 오류가 발생했습니다',
+      message: '정상 완료로 처리하지 않았습니다.',
+      resultHeading: 'Agent 실행 결과',
+      resultItems: ['처리 오류 1건'],
+      nextAction: '업무 기록을 확인해 주세요.',
+      attempts: [{
+        requestId: 'REQ-ERROR-1',
+        decision: 'ALLOW',
+        systemOutcome: 'ERROR',
+        label: '신용정보 확인',
+        description: '업무 시스템 처리 중 오류가 발생했습니다.',
+        targetConsumerId: 'CUST-1001',
+        scopeStatus: { customerScope: 'OK' },
+        reasonCodes: ['DOWNSTREAM_ERROR'],
+        downstreamReached: true,
+        responseReleased: false,
+        tool: 'CREDIT_SCORE_READ',
+        requestedData: ['CREDIT_SCORE'],
+      }],
+    })
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('업무 오류')
+    expect(wrapper.text()).toContain('0건 확인 · 0건 차단 · 1건 오류')
+    expect(wrapper.text()).toContain('처리 오류')
+    expect(wrapper.text()).toContain('금융시스템 요청전달됨')
+    expect(wrapper.text()).not.toContain('완료 · 1회')
+    expect(wrapper.text()).not.toContain('1건 확인 · 0건 차단')
     executeAgentTask.mockRestore()
   })
 
@@ -111,7 +260,7 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).toContain('보완 심사자료 확인이 완료되었습니다')
     expect(wrapper.text()).toContain('동의가 만료된 과거 소득자료 조회')
     expect(wrapper.text()).toContain('MANDATE_SCOPE_VIOLATION')
-    expect(wrapper.text()).toContain('차단 · 0회')
+    expect(wrapper.text()).toContain('전달 안 됨')
     expect(wrapper.text()).toContain('FinBound 보호 작동')
   })
 
@@ -124,6 +273,102 @@ describe('FinBound P0 application', () => {
     expect(timeoutEvent.downstreamReached).toBe(true)
     expect(timeoutEvent.responseReleased).toBe(false)
     expect(events.every((event) => ['ALLOW', 'BLOCK'].includes(event.decision))).toBe(true)
+  })
+
+  it('renders a processing audit record without treating a null decision as an error', async () => {
+    const processing = mapAuditEvent({
+      auditEventId: 'AUD-PROCESSING',
+      requestId: 'REQ-PROCESSING',
+      agentId: 'LOAN-AGENT-01',
+      agentRunId: 'RUN-PROCESSING',
+      status: 'PROCESSING',
+      decision: null,
+      behaviorRisk: 0,
+      requestedAt: '2026-09-03T10:00:00+09:00',
+    })
+    vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 0, block: 0, error: 0 })
+    vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
+      items: [processing],
+      page: 1,
+      pageSize: 5,
+      totalItems: 1,
+      totalPages: 1,
+      filterOptions: { agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] },
+    })
+    vi.spyOn(finboundApi, 'getAuditEvent').mockResolvedValue(processing)
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.event-row .status-badge').text()).toBe('처리 중')
+    expect(wrapper.get('.event-row .status-badge').classes()).toContain('status-processing')
+    expect(wrapper.findAll('.scope-list .status-badge').every((badge) => badge.text() === '확인 중')).toBe(true)
+    expect(wrapper.findAll('.risk-meter')[0].text()).toContain('미평가')
+    expect(wrapper.findAll('.risk-meter')[1].text()).toContain('확인 불가')
+    expect(wrapper.get('.execution-state').text()).toContain('금융시스템 요청확인 중')
+    expect(wrapper.get('.execution-state').text()).toContain('결과 제공확인 중')
+    expect(wrapper.get('.event-detail').text()).not.toContain('범위 초과')
+    expect(wrapper.get('.event-detail').text()).not.toContain('점수 0.00')
+    expect(wrapper.get('.event-detail').text()).not.toContain('차단 사유 없음')
+    expect(wrapper.get('.evidence-details').text()).toContain('정책 버전확인 중')
+  })
+
+  it('distinguishes downstream arrival from successful processing after a timeout', async () => {
+    const timeout = mapAuditEvent({
+      auditEventId: 'AUD-TIMEOUT',
+      requestId: 'REQ-TIMEOUT',
+      agentId: 'LOAN-AGENT-01',
+      agentRunId: 'RUN-TIMEOUT',
+      caseId: 'LOAN-2026-001',
+      targetConsumerId: 'CUST-1001',
+      requestedTool: 'CREDIT_SCORE_READ',
+      status: 'ERROR',
+      systemOutcome: 'ERROR',
+      decision: 'ALLOW',
+      reasonCodes: ['DOWNSTREAM_TIMEOUT'],
+      downstreamReached: true,
+      responseReleased: false,
+      promptRiskEvaluationStatus: 'EVALUATED',
+      promptRisk: 0.1,
+      behaviorRisk: 0.2,
+      behaviorRiskLevel: 'LOW',
+      requestedAt: '2026-09-03T10:00:00+09:00',
+    })
+    vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 0, block: 0, error: 1 })
+    vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
+      items: [timeout],
+      page: 1,
+      pageSize: 5,
+      totalItems: 1,
+      totalPages: 1,
+      filterOptions: { agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] },
+    })
+    vi.spyOn(finboundApi, 'getAuditEvent').mockResolvedValue(timeout)
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.execution-state dd').map((node) => node.text())).toEqual([
+      '요청 전달됨',
+      '제공 안 함',
+    ])
+    expect(wrapper.get('.event-detail').text()).toContain('DOWNSTREAM_TIMEOUT')
+    expect(wrapper.get('.event-detail').text()).not.toContain('조회 완료')
+  })
+
+  it('keeps a failed dashboard summary unavailable when the event list succeeds', async () => {
+    vi.spyOn(finboundApi, 'getDashboardSummary').mockRejectedValue(new Error('summary unavailable'))
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('안전 현황 요약을 불러오지 못했습니다')
+    expect(wrapper.findAll('.metric-grid strong').map((node) => node.text())).toEqual(['—', '—', '—', '—'])
+    expect(wrapper.findAll('.event-row').length).toBeGreaterThan(0)
+    expect(wrapper.text()).not.toContain('안전 현황 요약을 불러오지 못했습니다. 연결 상태와 조회 권한을 확인해 주세요.0')
   })
 
   it('blocks an AI behavior anomaly even when all permission scopes are valid', async () => {

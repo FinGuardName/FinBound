@@ -415,7 +415,7 @@ templateVersion
 예:
 
 ```text
-prompt-guard-1
+prompt-guard-5
 iforest-1
 behavior-features-1
 synthetic-agent-log-1
