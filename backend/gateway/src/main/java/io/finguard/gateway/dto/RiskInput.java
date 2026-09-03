@@ -6,4 +6,5 @@ public record RiskInput(
     double behaviorRisk,                // 행동 이상 점수
     String behaviorRiskLevel,           // LOW / MEDIUM / HIGH
     boolean behaviorAnomalyDetected     // 이상행동 감지됐나
-) {}
+) {
+}

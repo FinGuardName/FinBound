@@ -1,0 +1,10 @@
+{
+  "requestId": "REQ-005",
+  "systemOutcome": "ERROR",
+  "reasonCodes": ["CONTEXT_SERVICE_UNAVAILABLE"],
+  "downstreamReached": false,
+  "responseReleased": false,
+  "success": false,
+  "errorLocation": "CORE",
+  "completedAt": "2026-08-17T21:36:11+09:00"
+}

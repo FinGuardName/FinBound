@@ -41,6 +41,78 @@ test_case_scope_violation_is_blocked if {
     "CASE_SCOPE_VIOLATION" in result.reasonCodes
 }
 
+test_employee_authority_violation_is_blocked if {
+    request := object.union(base_input, {
+        "scopeStatus": object.union(base_input.scopeStatus, {"employeeAuthority": "VIOLATION"}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    "EMPLOYEE_AUTHORITY_VIOLATION" in result.reasonCodes
+}
+
+test_tool_scope_violation_is_blocked if {
+    request := object.union(base_input, {
+        "scopeStatus": object.union(base_input.scopeStatus, {"toolScope": "VIOLATION"}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["TOOL_SCOPE_VIOLATION"]
+}
+
+test_data_scope_violation_is_blocked if {
+    request := object.union(base_input, {
+        "scopeStatus": object.union(base_input.scopeStatus, {"dataScope": "VIOLATION"}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["DATA_SCOPE_VIOLATION"]
+}
+
+test_mandate_scope_violation_is_blocked if {
+    request := object.union(base_input, {
+        "scopeStatus": object.union(base_input.scopeStatus, {"mandate": "VIOLATION"}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["MANDATE_SCOPE_VIOLATION"]
+}
+
+test_passport_violation_is_blocked if {
+    request := object.union(base_input, {
+        "scopeStatus": object.union(base_input.scopeStatus, {"passportStatus": "VIOLATION"}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["TASK_PASSPORT_INACTIVE"]
+}
+
+test_agent_binding_violation_is_blocked if {
+    request := object.union(base_input, {
+        "scopeStatus": object.union(base_input.scopeStatus, {"agentBinding": "VIOLATION"}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["AGENT_IDENTITY_MISMATCH"]
+}
+
+test_prompt_injection_is_blocked if {
+    request := object.union(base_input, {
+        "risk": object.union(base_input.risk, {"promptInjectionDetected": true}),
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["PROMPT_INJECTION"]
+}
+
+test_hard_request_limit_is_blocked if {
+    request := object.union(base_input, {
+        "limits": {"hardRequestLimitExceeded": true},
+    })
+    result := authorization.decision with input as request
+    result.decision == "BLOCK"
+    result.reasonCodes == ["HARD_REQUEST_LIMIT_EXCEEDED"]
+}
+
 test_behavior_critical_blocks_with_valid_scope if {
     request := object.union(base_input, {
         "risk": object.union(base_input.risk, {"behaviorRiskLevel": "CRITICAL"}),
