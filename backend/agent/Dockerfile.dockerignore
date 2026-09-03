@@ -12,3 +12,10 @@
 !backend/agent/src/
 !backend/agent/src/main/
 !backend/agent/src/main/**
+
+# Keep local secrets out even when placed under application resources.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/gradle.properties
