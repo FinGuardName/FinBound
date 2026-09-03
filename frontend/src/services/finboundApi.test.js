@@ -147,6 +147,41 @@ describe('real Core API adapter', () => {
     })
   })
 
+  it('preserves verified AgentRun and permission context when execution lookup fails', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-PARTIAL-1',
+        passportId: 'PASS-PARTIAL-1',
+        status: 'RUNNING',
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: {
+          allowedTools: ['CREDIT_SCORE_READ'],
+          allowedData: ['CREDIT_SCORE'],
+        },
+        withheldTools: ['INCOME_READ'],
+      }))
+      .mockRejectedValueOnce(new Error('execution endpoint unavailable'))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
+      code: 'CORE_API_UNAVAILABLE',
+      executionContext: {
+        agentRun: {
+          agentRunId: 'RUN-PARTIAL-1',
+          passportId: 'PASS-PARTIAL-1',
+        },
+        permission: {
+          agentEffectivePermission: {
+            allowedTools: ['CREDIT_SCORE_READ'],
+            allowedData: ['CREDIT_SCORE'],
+          },
+          withheldTools: ['INCOME_READ'],
+        },
+      },
+    })
+  })
+
   it('maps official audit fields and sends only supported server filters', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
       items: [{

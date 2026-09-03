@@ -80,6 +80,33 @@ const promptStatusText = (event) => {
   if (event.promptInjectionDetected === null) return '탐지 결과 미제공'
   return event.promptInjectionDetected ? '위험 감지' : '위험 미감지'
 }
+const scopeStatusLabel = (value, event) => {
+  if (value === 'OK') return '정상'
+  if (value === 'VIOLATION') return '범위 초과'
+  return event.auditStatus === 'PROCESSING' ? '확인 중' : '확인 불가'
+}
+const evidenceLabel = (value, event) => (
+  value ?? (event.auditStatus === 'PROCESSING' ? '확인 중' : '확인 불가')
+)
+const versionLabel = (value, event, fallback = '미제공') => (
+  value ?? (event.auditStatus === 'PROCESSING' ? '확인 중' : fallback)
+)
+const reasonCodeLabel = (event) => {
+  if (event.reasonCodes[0]) return event.reasonCodes[0]
+  if (event.auditStatus === 'PROCESSING') return '확인 중'
+  if (event.decision === 'ALLOW' && event.systemOutcome === 'COMPLETED') return '차단 사유 없음'
+  return '처리 사유 미제공'
+}
+const downstreamStatusLabel = (event) => {
+  if (event.downstreamReached === true) return '요청 전달됨'
+  if (event.downstreamReached === false) return '요청 전달 안 됨'
+  return event.auditStatus === 'PROCESSING' ? '확인 중' : '확인 불가'
+}
+const responseStatusLabel = (event) => {
+  if (event.responseReleased === true) return '제공함'
+  if (event.responseReleased === false) return '제공 안 함'
+  return event.auditStatus === 'PROCESSING' ? '확인 중' : '확인 불가'
+}
 
 async function loadEvents() {
   dashboardLoading.value = true
@@ -241,30 +268,30 @@ watch(page, () => {
           <div class="scope-list">
             <span v-for="(value, key) in selectedEvent.scopeStatus" :key="key">
               <small>{{ scopeLabels[key] }}</small>
-              <StatusBadge :value="value" :label="value === 'OK' ? '정상' : '범위 초과'" />
+              <StatusBadge :value="value" :label="scopeStatusLabel(value, selectedEvent)" />
             </span>
           </div>
         </div>
         <div class="detail-section reason-section">
           <p>처리 사유</p>
           <strong>{{ describeAuditReason(selectedEvent) }}</strong>
-          <details><summary>시스템 처리 코드 보기</summary><small>{{ selectedEvent.reasonCodes[0] || '차단 사유 없음' }} · {{ selectedEvent.auditEventId }} · {{ selectedEvent.requestedTool }}</small></details>
+          <details><summary>시스템 처리 코드 보기</summary><small>{{ reasonCodeLabel(selectedEvent) }} · {{ selectedEvent.auditEventId }} · {{ selectedEvent.requestedTool }}</small></details>
         </div>
         <dl class="execution-state">
-          <div><dt>금융시스템 조회</dt><dd>{{ selectedEvent.downstreamReached ? '조회함' : '조회 안 함' }}</dd></div>
-          <div><dt>결과 제공</dt><dd>{{ selectedEvent.responseReleased ? '제공함' : '제공 안 함' }}</dd></div>
+          <div><dt>금융시스템 요청</dt><dd>{{ downstreamStatusLabel(selectedEvent) }}</dd></div>
+          <div><dt>결과 제공</dt><dd>{{ responseStatusLabel(selectedEvent) }}</dd></div>
         </dl>
         <details class="evidence-details">
           <summary>판단 근거와 버전 정보</summary>
           <dl>
-            <div><dt>권한 판단</dt><dd>{{ selectedEvent.decision }}</dd></div>
+            <div><dt>권한 판단</dt><dd>{{ evidenceLabel(selectedEvent.decision, selectedEvent) }}</dd></div>
             <div><dt>시스템 처리</dt><dd>{{ selectedEvent.auditStatus }}</dd></div>
             <div><dt>입력 평가</dt><dd>{{ selectedEvent.promptEvaluationStatus }}</dd></div>
             <div><dt>입력 모델</dt><dd>{{ selectedEvent.promptModelVersion || '미평가' }}</dd></div>
-            <div><dt>행동 위험</dt><dd>{{ selectedEvent.behaviorRiskLevel }}</dd></div>
-            <div><dt>특징 버전</dt><dd>{{ selectedEvent.featureVersion || '미제공' }}</dd></div>
-            <div><dt>행동 모델</dt><dd>{{ selectedEvent.behaviorModelVersion || '미제공' }}</dd></div>
-            <div><dt>정책 버전</dt><dd>{{ selectedEvent.policyVersion }}</dd></div>
+            <div><dt>행동 위험</dt><dd>{{ evidenceLabel(selectedEvent.behaviorRiskLevel === 'UNKNOWN' ? null : selectedEvent.behaviorRiskLevel, selectedEvent) }}</dd></div>
+            <div><dt>특징 버전</dt><dd>{{ versionLabel(selectedEvent.featureVersion, selectedEvent) }}</dd></div>
+            <div><dt>행동 모델</dt><dd>{{ versionLabel(selectedEvent.behaviorModelVersion, selectedEvent) }}</dd></div>
+            <div><dt>정책 버전</dt><dd>{{ versionLabel(selectedEvent.policyVersion, selectedEvent, '확인 불가') }}</dd></div>
           </dl>
         </details>
       </aside>
