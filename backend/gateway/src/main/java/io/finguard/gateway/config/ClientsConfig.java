@@ -1,5 +1,6 @@
 package io.finguard.gateway.config;
 
+import java.time.Clock;
 import java.time.Duration;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -17,5 +18,10 @@ public class ClientsConfig {
         factory.setConnectTimeout(Duration.ofMillis(opaTimeoutMs));
         factory.setReadTimeout(Duration.ofMillis(opaTimeoutMs));
         return RestClient.builder().requestFactory(factory);
+    }
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
     }
 }

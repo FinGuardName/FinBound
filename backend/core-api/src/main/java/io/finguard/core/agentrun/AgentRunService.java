@@ -5,11 +5,13 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.finguard.core.domain.AgentRun;
 import io.finguard.core.domain.AgentRunStatus;
+import io.finguard.core.domain.AgentSimulationScenario;
 import io.finguard.core.domain.ConsumerMandate;
 import io.finguard.core.domain.EmployeeAuthority;
 import io.finguard.core.domain.FinancialCase;
@@ -64,6 +66,7 @@ public class AgentRunService {
     private final SecuredAgentInputRepository securedInputs;
     private final PromptRiskSnapshotRepository promptRiskSnapshots;
     private final EffectivePermissionCalculator calculator;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public AgentRunService(
@@ -76,6 +79,7 @@ public class AgentRunService {
             SecuredAgentInputRepository securedInputs,
             PromptRiskSnapshotRepository promptRiskSnapshots,
             EffectivePermissionCalculator calculator,
+            ApplicationEventPublisher events,
             Clock clock) {
         this.employeeAuthorities = employeeAuthorities;
         this.permissionTemplates = permissionTemplates;
@@ -86,12 +90,17 @@ public class AgentRunService {
         this.securedInputs = securedInputs;
         this.promptRiskSnapshots = promptRiskSnapshots;
         this.calculator = calculator;
+        this.events = events;
         this.clock = clock;
     }
 
     @Transactional
     public AgentRunStarted start(
-            String employeeId, String consumerId, TaskType taskType, String inputText) {
+            String employeeId,
+            String consumerId,
+            TaskType taskType,
+            String inputText,
+            AgentSimulationScenario scenario) {
         Instant now = clock.instant();
 
         EmployeeAuthority authority =
@@ -186,6 +195,12 @@ public class AgentRunService {
                     PromptRiskSnapshot.notEvaluated(
                             inputRef, inputHash, PromptRiskModel.CURRENT_VERSION, now));
         }
+
+        // 실행 지시는 커밋 이후다. 여기서 직접 부르면 Agent가 Gateway를 거쳐 되돌아왔을 때
+        // 이 트랜잭션이 아직 안 닫혀 있어 Passport를 찾지 못한다 — AgentRunLauncher 참조.
+        events.publishEvent(
+                new AgentRunCreated(
+                        agentRun.getAgentRunId(), passport.getPassportId(), scenario));
 
         return new AgentRunStarted(
                 agentRun.getAgentRunId(),

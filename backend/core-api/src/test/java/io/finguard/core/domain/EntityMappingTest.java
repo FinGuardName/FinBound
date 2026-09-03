@@ -21,6 +21,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import io.finguard.core.context.ScopeState;
 import jakarta.persistence.EntityManager;
 
 /**
@@ -397,6 +398,92 @@ class EntityMappingTest {
     }
 
     @Test
+    void auditEventRoundTripsTheResolvedContextTheSchemaRequires() {
+        // contracts/audit/audit-event.schema.json 이 정의하지만 V1·V2 에는 칸이 없던 항목들이다.
+        // Scope 는 9개 중 하나만 VIOLATION 으로 둬서 자리가 섞이지 않았는지 함께 본다.
+        AuditEvent event = auditEvent("AUD-900", "REQ-900");
+        event.recordResolvedContext(
+                new ResolvedAuditContext(
+                        "EMP-900",
+                        "PASS-900",
+                        EnumSet.of(DataType.CREDIT_SCORE),
+                        new AuditScopeStatus(
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.OK,
+                                ScopeState.VIOLATION),
+                        new BigDecimal("0.0500"),
+                        PromptRiskEvaluationStatus.EVALUATED,
+                        "prompt-guard-1"));
+        em.persist(event);
+        em.flush();
+        em.clear();
+
+        AuditEvent found = em.find(AuditEvent.class, "AUD-900");
+
+        assertThat(found.getEmployeeId()).isEqualTo("EMP-900");
+        assertThat(found.getPassportId()).isEqualTo("PASS-900");
+        assertThat(found.getRequestedData()).containsExactly(DataType.CREDIT_SCORE);
+        assertThat(found.getPromptRisk()).isEqualByComparingTo("0.0500");
+        assertThat(found.getPromptRiskEvaluationStatus())
+                .isEqualTo(PromptRiskEvaluationStatus.EVALUATED);
+        assertThat(found.getPromptModelVersion()).isEqualTo("prompt-guard-1");
+        assertThat(found.getScopeStatus().dataScope()).isEqualTo(ScopeState.VIOLATION);
+        assertThat(found.getScopeStatus().employeeAuthority()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().permissionTemplate()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().caseStatus()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().mandate()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().passportStatus()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().agentBinding()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().customerScope()).isEqualTo(ScopeState.OK);
+        assertThat(found.getScopeStatus().toolScope()).isEqualTo(ScopeState.OK);
+    }
+
+    @Test
+    void auditEventAcceptsAnIdenticalEvidenceRetry() {
+        AuditEvent event = auditEvent("AUD-900", "REQ-900");
+        event.recordResolvedContext(resolvedContext("PASS-900", new BigDecimal("0.0500")));
+
+        // 같은 요청을 다시 해석해 같은 결론이 나왔다. 거부하면 Gateway 재시도가 실패한다.
+        event.recordResolvedContext(resolvedContext("PASS-900", new BigDecimal("0.0500")));
+
+        em.persist(event);
+        em.flush();
+        em.clear();
+
+        assertThat(em.find(AuditEvent.class, "AUD-900").getPassportId()).isEqualTo("PASS-900");
+    }
+
+    @Test
+    void auditEventRejectsEvidenceThatDiffersOutsideTheScopeStatus() {
+        AuditEvent event = auditEvent("AUD-900", "REQ-900");
+        event.recordResolvedContext(resolvedContext("PASS-900", new BigDecimal("0.0500")));
+
+        // Scope 판정은 같은데 대상 Passport가 다르다. 덮어쓰면 앞선 판정의 근거가 조용히 바뀐다.
+        assertThatThrownBy(
+                        () ->
+                                event.recordResolvedContext(
+                                        resolvedContext("PASS-901", new BigDecimal("0.0500"))))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void auditEventTreatsTheSamePromptRiskWrittenWithADifferentScaleAsUnchanged() {
+        AuditEvent event = auditEvent("AUD-900", "REQ-900");
+        event.recordResolvedContext(resolvedContext("PASS-900", new BigDecimal("0.0500")));
+
+        // 0.05와 0.0500은 같은 값이다. 자릿수로 갈라 거부하면 정상 재시도가 실패한다.
+        event.recordResolvedContext(resolvedContext("PASS-900", new BigDecimal("0.05")));
+
+        assertThat(event.getPassportId()).isEqualTo("PASS-900");
+    }
+
+    @Test
     void auditEventReadsExecutionOutcomeNeededByBehaviorHistory() {
         em.persist(auditEvent("AUD-900", "REQ-900"));
         em.flush();
@@ -486,6 +573,26 @@ class EntityMappingTest {
                 inputRefs,
                 AgentRunStatus.RUNNING,
                 ISSUED);
+    }
+
+    private ResolvedAuditContext resolvedContext(String passportId, BigDecimal promptRisk) {
+        return new ResolvedAuditContext(
+                "EMP-900",
+                passportId,
+                EnumSet.of(DataType.CREDIT_SCORE),
+                new AuditScopeStatus(
+                        ScopeState.OK,
+                        ScopeState.OK,
+                        ScopeState.OK,
+                        ScopeState.OK,
+                        ScopeState.OK,
+                        ScopeState.OK,
+                        ScopeState.OK,
+                        ScopeState.OK,
+                        ScopeState.OK),
+                promptRisk,
+                PromptRiskEvaluationStatus.EVALUATED,
+                "prompt-guard-1");
     }
 
     private AuditEvent auditEvent(String auditEventId, String requestId) {

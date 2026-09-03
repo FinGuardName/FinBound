@@ -41,9 +41,11 @@ Content-Type: application/json
 | `DATA_SCOPE_ATTACK` | `CUST-1001` | CREDIT_SCORE_READ / CREDIT_SCORE + INCOME, 추가 Data 시도 |
 | `MANDATE_SCOPE_ATTACK` | `CUST-1001` | DEBT_READ / DEBT, Mandate 밖 Data 시도 |
 
-7개 Scenario 이름은 PR #79 소비자 리뷰를 반영한 `docs/04-api-contract.md` §3.1을 따릅니다.
-Core의 Enum 확장 구현은 #75 담당자가 반영하며, 병합 전 지원 여부를 확인합니다.
-Simulator는 모든 Scenario를 다음 Gateway Contract로 변환합니다 (정상 신용점수 예시).
+Agent Simulator의 7개 Scenario는 PR #79 소비자 리뷰를 반영한
+`docs/04-api-contract.md` §3.1을 따릅니다. Simulator는 모든 Scenario를 다음
+Gateway Contract로 변환합니다 (정상 신용점수 예시). 현재 Core Enum은 기존
+2개 Scenario만 지원하므로 확장 Scenario를 Core 실행 경로에서 사용하려면
+같은 7개 값으로 확장해야 합니다.
 
 ```http
 POST /gateway/v1/tool-calls
@@ -81,42 +83,58 @@ export GATEWAY_BASE_URL=http://localhost:8081
 연결되지 않은 환경에서는 자동 테스트가 Mock Gateway Client를 사용해 요청 Contract를
 검증합니다.
 
-## Core 실행 경계와 선행 PR
+## Core 발급 참조 경계
 
-최종 실행 방향은 **Core → Agent → Gateway**입니다. #74 / PR #75가 Core 오케스트레이션을
-담당하고 #59 / PR #78이 기존 Agent Core Client를 제거합니다. 현재 #60 기반에 남아 있는
-legacy Core Client는 확장 Scenario의 실행 진입점이 아니며 #78 통합 시 제거되어야 합니다.
-
-`POST /api/v1/agent-runs`와 다음 데이터의 발급·저장 책임은 Core에 있습니다.
+최종 실행 방향은 **Core → Agent → Gateway**입니다. `POST /api/v1/agent-runs`와
+다음 데이터의 발급·저장 책임은 Core에 있습니다.
 
 - Financial Case
 - Task Passport
 - Secured Input / PromptRiskSnapshot
 - AgentRun ID와 상태
 
-Agent는 Core가 Simulator 요청에 전달한 `agentRunId`, `passportId`를 Gateway로 전달합니다.
-로컬 ID/원문 저장이나 상태 전환은 하지 않습니다. nonblank ID와 내부 공유 Credential만으로
-실제 발급 여부를 증명하지 못하며, 참조 존재·결합·Scope 검증은 Gateway와 실제 Core Resolver의
-책임입니다. 기본 MockCoreClient는 보안 검증이나 실데이터 접근에 사용하면 안 됩니다.
+P0 Simulator는 Core가 발급한 `agentRunId`와 `passportId`를 요청으로 받습니다.
+Agent는 이 참조를 로컬에서 생성하거나 저장하지 않고, AgentRun 상태를 전환하거나
+입력 원문을 보관하지 않습니다.
+
+다만 Agent는 참조가 비어 있지 않은지만 검사하며, 실제 발급 여부나 Run/Passport 결합을
+증명하지 않습니다. 공유 내부 Credential도 Core만의 신원 증명은 아닙니다. non-blank 미발급
+참조는 Gateway로 전달될 수 있고, Gateway 인증 후 실제 Core Resolver에서 거부해야 합니다.
+현재 Gateway의 기본 MockCoreClient는 이를 보장하지 않으므로 보안 검증이나 실제 데이터 실행에
+사용하면 안 됩니다. 실제 Core 연동 및 기본 fail-closed 설정은 통합 환경에서 확인합니다.
 
 실행 흐름:
 
 ```text
-Core POST /api/v1/agent-runs
-→ Core가 Case / Passport / AgentRun 발급
-→ Core가 Agent Simulator 호출 (발급 참조 + Scenario)
-→ Agent가 Gateway Tool Call 실행
+Operator
+→ Core POST /api/v1/agent-runs
+→ Core가 Case / Passport / Input Reference / AgentRun 발급
+→ Core가 발급 agentRunId / passportId로 Simulator 호출
+→ Agent가 동일 참조로 Gateway Tool Call 실행
 ```
 
-병합 순서는 **#77 → #75 → #79**이며 **#78도 #79 통합 전에 반영**합니다.
-#77 이전 Gateway Enum은 CREDIT_SCORE_READ/CREDIT_SCORE만 수용하므로 새 5개 Scenario는
-역직렬화 HTTP 400으로 종료됩니다. 이는 의도한 Scope BLOCK 검증이 아닙니다.
+Core 생성 실패·Timeout 시 Simulator를 호출하지 않는 오케스트레이션과 상태 갱신은
+Core의 책임입니다. Agent에는 중복 Core Client·Controller 연결·상태 갱신을 두지 않으며,
+Agent는 Operator Credential을 보유하거나 Core 생성 API를 직접 호출하지 않습니다.
 
-- [ ] #77의 세 Tool/Data 지원 및 실제 Core Resolver 연결 확인
-- [ ] #75의 7개 Scenario 지원과 Core → Agent 호출 확인
-- [ ] #78 병합 후 최신 develop 반영, README의 7개 표와 참조 검증 설명 모두 보존
-- [ ] #78의 엄격한 ALLOW 응답 검증을 포함해 Agent check/CI 재실행
-- [ ] 전용 Fixture로 실제 Scope/전체 Reason Code와 금융 downstream 0회 확인
+Case/Input Reference는 Core의 AgentRun에 연결되어 있으며 P0 Simulator Body에는 전달하지
+않습니다. 입력 원문을 Agent가 저장하거나 재전송하지도 않습니다. Simulator 호출 후 Timeout은
+이미 실행된 금융 요청의 취소를 의미하지 않으므로 자동 재시도하지 않습니다.
+
+Gateway의 필수 응답 필드 누락, 잘못된 JSON, `403 + ALLOW`, 금융 결과가 포함된 BLOCK은
+`GATEWAY_RESPONSE_INVALID`로 실패합니다. Gateway 시스템 오류는 HTTP 502와 실행 오류 코드로
+반환하고 `ALLOW/BLOCK`으로 바꾸지 않으며, 원본 오류 본문을 노출하지 않습니다.
+ALLOW에는 요청과 같은 `result.tool`, `result.consumerId`, Tool별 숫자 결과가 필요합니다.
+`{"tool":"CREDIT_SCORE_READ"}`만 있는 stub 응답은 성공으로 받지 않습니다.
+요청과 응답을 대조하는 이 검사는 Scope 판단이나 참조 출처 검증을 대신하지 않습니다.
+
+Simulator의 ALLOW/BLOCK 응답은 HTTP 200 `{scenario, gatewayResponse}`이며 정책 결과는
+`gatewayResponse.decision`에 있습니다. 실행 오류는 HTTP 502 `{errorCode, message}`입니다.
+전체 응답 예시는 `docs/04-api-contract.md` §3.1을 참조하세요.
+
+현재 `develop`에는 #77·#75·#78이 반영되어 세 Tool/Data, Core → Agent 호출,
+엄격한 Gateway 응답 검증을 제공합니다. 다만 Core Enum은 아직 기존 2개
+Scenario만 수용하므로 #79 병합 전 7개 값으로 맞춰야 합니다.
 
 ## 검증
 
@@ -124,8 +142,14 @@ Core POST /api/v1/agent-runs
 ./gradlew :backend:agent:check
 ```
 
-테스트는 정상/공격 Scenario 변환, 내부 Credential 거부, Gateway Header와 Body,
+테스트는 전달받은 참조의 변경 없는 전달, 필수 참조 누락 시 Gateway 미호출,
+정상/공격 Scenario 변환, 내부 Credential 거부, Gateway Header와 최소 Runtime Body,
 `ALLOW/BLOCK` 구분, Timeout/5xx/잘못된 응답의 명시적 실패를 검증합니다.
+
+실제 HTTP 통합 테스트는 정상 Gateway 1회, 누락/null/공백 참조의 Gateway 0회, BLOCK 전달,
+4xx/5xx/Timeout/잘못된 응답의 실행 오류 및 재시도 없음을 검증합니다.
+Core 생성 실패·트랜잭션 Timeout의 Simulator 미호출 및 AgentRun 상태 갱신은 Core의
+검증 책임입니다. Agent는 Core를 호출하지 않으므로 Agent에 Core HTTP Client를 추가하지 않습니다.
 
 ## 공격 재현 조건 및 통합 의존성
 
@@ -158,11 +182,19 @@ Mock Gateway로 정상 3개/공격 4개의 호출 1회 및 BLOCK/Reason Code 전
 단일 Scope Reason 전달과 복수 코드의 순서·중복 보존은 별도 테스트로 구분합니다.
 `policy/finguard_authz_test.rego`는 주어진 ScopeStatus의 단일/복합 위반이 정확한 전체
 Reason Code로 변환되는지 검증합니다. 이는 Core가 해당 Scope를 생성했다는 E2E 증거는 아닙니다.
-Mock은 Scope나 OPA를 재구현하지 않습니다. 실제 금융 downstream 0회 검증은 #75·#77 통합 및
-전용 Core Fixture 준비 후 필요하며, 이 테스트를 전체 인가 E2E로 간주하지 않습니다.
+Mock은 Scope나 OPA를 재구현하지 않습니다. 실제 금융 downstream 0회 검증은 전용 Core Fixture
+준비 후 필요하며, 이 테스트를 전체 인가 E2E로 간주하지 않습니다.
 
-PR 검토 요청:
+현재 Compose 기본 파일의 Agent 서비스는 아직 주석 상태입니다. 위 테스트는 실제 Agent와
+HTTP Mock Gateway 사이의 통합 검증이며 전체 Core–Gateway–Mock Finance E2E를 대신하지 않습니다.
+미발급 참조에 대한 테스트도 Mock이 반환한 거부 결과의 전달을 검증할 뿐, 실제 Core 조회나
+기본 Gateway 프로파일의 보안을 입증하지 않습니다.
 
-- Backend 1: #75의 Core Scenario Enum에 새 5개 값을 수용할지 확인하고 제한된 Fixture를 준비합니다.
-- Backend 2: #77에서 실제 Scope 위반 및 복수 Reason Code, 금융 downstream 미호출을 검증합니다.
-- #59 / PR #78 병합 후 해당 변경을 반영하고 Agent 회귀 테스트를 다시 실행합니다.
+## 통합 검토 사항
+
+- Core의 `AgentSimulationScenario`를 Agent와 같은 7개 값으로 확장합니다.
+- 전용 Core Fixture로 실제 Scope 위반·전체 Reason Code·금융 downstream 0회를
+  검증합니다.
+- Core 발급 → Agent → Gateway → 금융 API의 ALLOW/BLOCK/ERROR E2E를 별도로 검증합니다.
+- 정상 HTTP Fixture에도 `result.tool`·`consumerId`·Tool별 금융 값을 포함합니다.
+- 관련 기능/인수 조건: `F06`, `F07`, `AC-01`, `AC-14`.

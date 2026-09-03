@@ -49,7 +49,11 @@ public class AgentRunController {
 
         AgentRunStarted started =
                 agentRunService.start(
-                        request.employeeId(), request.consumerId(), request.taskType(), request.inputText());
+                        request.employeeId(),
+                        request.consumerId(),
+                        request.taskType(),
+                        request.inputText(),
+                        request.scenario());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(
