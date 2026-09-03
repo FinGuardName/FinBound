@@ -34,4 +34,5 @@ public class CoreConfig {
     FinancialContextResolver financialContextResolver() {
         return new FinancialContextResolver();
     }
+
 }

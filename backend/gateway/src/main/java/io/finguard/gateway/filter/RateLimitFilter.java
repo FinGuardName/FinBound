@@ -1,6 +1,7 @@
 package io.finguard.gateway.filter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +52,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } else {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader(HttpHeaders.RETRY_AFTER, "1");
+            response.setContentType("application/problem+json");
+            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            response.getWriter().write("{\"reasonCode\":\"REQUEST_RATE_LIMITED\"}");
         }
     }
 

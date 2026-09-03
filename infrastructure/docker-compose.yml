@@ -5,6 +5,9 @@ networks:
     driver: bridge
   internal-zone:
     driver: bridge
+  finance-zone:
+    driver: bridge
+    internal: true
   data-zone:
     driver: bridge
     internal: true
@@ -24,6 +27,7 @@ secrets:
 
 x-java-runtime: &java-runtime
   entrypoint: ["/bin/sh", "/opt/finguard/with-secrets.sh", "java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
+  restart: unless-stopped
   volumes:
     - ./docker/with-secrets.sh:/opt/finguard/with-secrets.sh:ro
   # Compose materializes environment-backed secrets during container creation.
@@ -36,6 +40,7 @@ services:
   # data-zone
   postgres:
     image: postgres:17.10-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-finguard}
       POSTGRES_USER: ${POSTGRES_USER:-finguard}
@@ -101,6 +106,7 @@ services:
 
   opa:
     image: openpolicyagent/opa:1.17.0-static
+    restart: unless-stopped
     command: [run, --server, --addr=0.0.0.0:8181, /policy]
     volumes:
       - ../policy:/policy:ro
@@ -124,11 +130,11 @@ services:
         SERVICE_MODULE: gateway
     environment:
       CORE_URL: http://core-api:8080
-      AI_URL: http://ai-risk:8000
       OPA_URL: http://opa:8181
       MOCK_FINANCE_URL: http://mock-finance:8083
-      # PR #77: do not silently select MockCore/MockAi/MockDownstream clients.
-      SPRING_PROFILES_ACTIVE: real-core,real-ai,real-downstream
+      # AI service is supplied by the #73 override. Keep MockAiClient until that
+      # service is present so the six-service base stack can exercise ALLOW paths.
+      SPRING_PROFILES_ACTIVE: real-core,real-downstream
       FINGUARD_REQUIRED_SECRETS: FINGUARD_CREDENTIALS_VALIDAGENTTOKENS FINGUARD_CREDENTIALS_INTERNALSERVICE
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
     secrets:
@@ -152,7 +158,7 @@ services:
     mem_limit: ${GATEWAY_MEM_LIMIT:-512m}
     ports:
       - "127.0.0.1:${GATEWAY_HOST_PORT:-8091}:8081"
-    networks: [public-zone, internal-zone]
+    networks: [public-zone, internal-zone, finance-zone]
 
   agent:
     <<: *java-runtime
@@ -204,8 +210,9 @@ services:
       timeout: 3s
       retries: 12
       start_period: 30s
-    networks: [internal-zone]
+    networks: [finance-zone]
 
+  # ai-risk is added by the #73 override together with the real-ai profile.
   # ai-risk:
   #   build:
   #     context: ../ai-risk

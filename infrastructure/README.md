@@ -2,14 +2,14 @@
 
 Issue #62는 Backend 3 서비스 배선입니다. 정상 금융 호출 경로는
 `Agent → Gateway → Mock Finance`이며 Scope 비교·Persistence는 Core의 책임입니다.
-Kubernetes 및 Agent의 Gateway 네트워크 우회 방지는 P1입니다.
+Kubernetes는 P1입니다.
 
 ## 선행 PR과 작업 경계
 
 | PR | 필요한 구현 | #62와의 관계 |
 |---|---|---|
 | [#83](https://github.com/FinGuardName/FinBound/pull/83) / #61 | Agent·Mock Finance Dockerfile | 필수 빌드 입력; #62에서 복제하지 않음 |
-| [#77](https://github.com/FinGuardName/FinBound/pull/77) | Gateway 실제 Core/AI/Downstream Client | `real-core,real-ai,real-downstream` 활성화 |
+| [#77](https://github.com/FinGuardName/FinBound/pull/77) | Gateway 실제 Core/AI/Downstream Client | 기본은 `real-core,real-downstream`; AI override에서 `real-ai` 활성화 |
 | [#75](https://github.com/FinGuardName/FinBound/pull/75) | Core → Agent 실행 | `AGENT_URL=http://agent:8082` 연결 |
 | [#78](https://github.com/FinGuardName/FinBound/pull/78), [#79](https://github.com/FinGuardName/FinBound/pull/79) | Agent 발급 참조·공격 Scenario | 업무 E2E 선행 작업 |
 | [#56](https://github.com/FinGuardName/FinBound/pull/56) | Core Audit/Dashboard | Gateway Audit 계약 통합 확인 |
@@ -47,8 +47,10 @@ AI/Frontend는 #73의 override가 병합된 후 추가합니다.
 docker compose -f docker-compose.yml -f docker-compose.frontend-ai.yml up -d --build
 ```
 
-AI 부재나 Prompt Snapshot 미준비를 정상 Risk로 해석하지 않습니다.
-Gateway를 Mock 프로파일로 바꿔 ALLOW를 만들지 않습니다.
+기본 6개 서비스 구성은 AI 서비스가 없으므로 `real-core,real-downstream`만 활성화하고,
+AI Risk 신호는 결정론적 Mock을 사용합니다. Mock AI는 권한 판정을 하지 않으며
+Core Context와 OPA 정책 집행을 우회하지 않습니다. #73 override가 AI를 추가할 때
+`real-ai`와 AI readiness 의존성을 함께 활성화합니다.
 
 ### 선택적 override
 
@@ -80,7 +82,8 @@ Gateway의 두 설정은 #77의 `finguard.credentials.*`를 덮어씁니다.
 Core API 인증은 `finguard.api.*`에 바인딩합니다. Agent에 Operator/Viewer/DB Credential을 주지 않습니다.
 
 Secret 누락은 Compose 컨테이너 생성 또는 실행 스크립트에서 실패합니다.
-빈 값·공백만 있는 값·동일한 Viewer/Operator Credential은 JVM 실행 전에 일반 오류와 exit 64로 거부합니다.
+빈 값·공백만 있는 값·32자 미만의 값·동일한 Viewer/Operator Credential은 JVM 실행 전에
+일반 오류와 exit 64로 거부합니다.
 `config`는 배포가 아니므로 secret 존재 여부까지 보장하지 않습니다.
 
 기본 Compose의 전체 `config`/컨테이너 설정에는 secret **이름**만 남고 값은 남지 않습니다.
@@ -96,10 +99,12 @@ Compose secret은 Docker/호스트 관리자에게서 비밀을 숨기는 경계
 ## 빌드 및 readiness
 
 Agent/Mock Finance는 #61 Dockerfile을 재사용합니다. Core/Gateway는 infrastructure의 공통
-Compose 전용 Multi-stage Dockerfile을 사용하며 기존 모듈 Dockerfile은 수정하지 않습니다.
+Compose 전용 Multi-stage Dockerfile을 사용합니다. root Runtime과 `COPY . .`을 사용하던
+기존 `backend/gateway/Dockerfile`은 제거해 Gateway 이미지 빌드 경로를 하나로 유지합니다.
 Allowlist build context는 `.env`, 개인 `gradle.properties`, Git 정보, 로컬 빌드 결과를 제외합니다.
 따라서 개인 Windows JDK 경로가 Linux 이미지로 복사되지 않습니다.
 Runtime은 JRE 21, non-root, `/tmp` tmpfs, 메모리 상한을 사용합니다.
+모든 기본 서비스는 `restart: unless-stopped`로 예상치 못한 종료 후 재기동합니다.
 Compose의 environment-backed secret은 컨테이너 생성 시 파일로 전달되므로 Java 서비스에는
 `read_only`를 사용하지 않습니다(Compose가 이 조합을 거부함). Read-only root가 필요하면
 file-backed secret 방식으로 전환하는 별도 운영 구성이 필요합니다. OPA는 read-only입니다.
@@ -116,7 +121,8 @@ Health 성공은 업무 권한·AI 준비·Audit 계약의 E2E 성공을 뜻하�
 | Zone | 소속 서비스 |
 |---|---|
 | public-zone | Gateway (Frontend는 별도 override) |
-| internal-zone | Core, OPA, Gateway, Agent, Mock Finance (AI는 별도 override) |
+| internal-zone | Core, OPA, Gateway, Agent (AI는 별도 override) |
+| finance-zone (`internal: true`) | Gateway, Mock Finance만 |
 | data-zone (`internal: true`) | PostgreSQL, Core만 |
 
 PostgreSQL은 호스트 포트를 publish하지 않습니다. Gateway/Agent/Mock Finance에는 DB 환경변수,
@@ -128,8 +134,8 @@ Core expose override도 `127.0.0.1:8080`으로만 엽니다. Agent/Mock Finance�
 - Agent → Core: `http://core-api:8080` (`CORE_API_BASE_URL`; #78 이후 직접 생성 Client는 제거됨)
 - Core → Agent: `http://agent:8082`
 
-같은 internal-zone의 Agent가 Mock Finance에 네트워크상 연결할 수 있는 것은 P0의 한계입니다.
-공유 Internal Credential을 아는 Agent의 직접 우회를 네트워크 수준에서 막았다고 주장하지 않습니다.
+Agent와 Mock Finance는 공유 네트워크가 없습니다. Agent는 Mock Finance의 서비스 DNS나
+finance-zone 직접 IP로 접근할 수 없고, Gateway만 finance-zone에 참여해 금융 Tool을 호출합니다.
 
 ## 자동 검증 (저장소 루트)
 
@@ -146,12 +152,13 @@ pwsh -File infrastructure/tests/compose-smoke.ps1
 기존 프로세스 환경변수는 종료 시 복원합니다.
 
 `secret-entrypoint.ps1`: 네트워크 없는 컨테이너에서 실행 스크립트의 정상 전달, 누락, 빈 값,
-공백, 일부 누락, 잘못된 변수명·경로, 동일 Viewer/Operator를 검사합니다.
+공백, 32자 미만, 일부 누락, 잘못된 변수명·경로, 동일 Viewer/Operator를 검사합니다.
 
 `compose-smoke.ps1`: 고유한 `finguard-62-<random>` 프로젝트와 무작위 테스트 Credential로
 실제 build/up, 6개 health, 서비스 간 HTTP, Core→DB 양성 대조,
 Agent/Gateway/Mock Finance→DB DNS 및 직접 IP 접근 불가, Internal Credential 누락·불일치 401,
-Credential 없는 기동 실패·후속 명령 미실행, 로그·컨테이너 metadata 비노출를 검사합니다.
+Agent→Mock Finance DNS·직접 IP 접근 불가, Credential 없는 기동 실패·후속 명령 미실행,
+로그·컨테이너 metadata 비노출를 검사합니다.
 종료 시 **자신이 만든 테스트 프로젝트와 테스트 DB 볼륨만** 삭제합니다.
 선행 PR 소스는 별도 디렉터리로 준비해 `-RepositoryRoot`로 지정할 수 있습니다.
 
@@ -159,8 +166,9 @@ Credential 없는 기동 실패·후속 명령 미실행, 로그·컨테이너 m
 Agent→Gateway의 존재하지 않는 Run에 대한 fail-closed BLOCK을 확인합니다.
 금융 응답은 출력하지 않습니다. 이 대조는 정책 ALLOW E2E와 구분합니다.
 
-전용 CI는 설정 계약과 실행 스크립트 단위 테스트를 자동 실행합니다. 선행 PR 미병합 상태에서
-전체 기동을 통과했다고 표시하지 않도록 real-topology job은 수동 `full_stack` 선택으로 실행합니다.
+전용 CI는 infrastructure뿐 아니라 Backend·Policy·Gradle 빌드 입력 변경에도 실행됩니다.
+설정 계약·Credential 기동 테스트와 실제 이미지 빌드·6개 서비스 기동 스모크를
+PR·`main`·`develop` Push에서 자동 실행하며, 수동 실행은 `full_stack`을 선택한 경우에만 실행합니다.
 
 ## 업무 E2E / 다른 담당자 확인 사항
 

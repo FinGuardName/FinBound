@@ -18,6 +18,7 @@ for name in $FINGUARD_REQUIRED_SECRETS; do
         *[![:space:]]*) ;;
         *) fail ;;
     esac
+    [ "${#value}" -ge 32 ] || fail
     export "$name=$value"
 done
 unset value name

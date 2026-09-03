@@ -3,19 +3,37 @@ name: Backend 3 Compose contracts
 on:
   pull_request:
     paths:
+      - backend/**
+      - policy/**
+      - gradle/**
+      - gradlew
+      - settings.gradle.kts
+      - build.gradle.kts
+      - naver-checkstyle.xml
+      - naver-checkstyle-suppressions.xml
+      - .dockerignore
       - infrastructure/**
       - .env.example
       - .github/workflows/compose-services.yml
   push:
     branches: [main, develop]
     paths:
+      - backend/**
+      - policy/**
+      - gradle/**
+      - gradlew
+      - settings.gradle.kts
+      - build.gradle.kts
+      - naver-checkstyle.xml
+      - naver-checkstyle-suppressions.xml
+      - .dockerignore
       - infrastructure/**
       - .env.example
       - .github/workflows/compose-services.yml
   workflow_dispatch:
     inputs:
       full_stack:
-        description: Run real topology smoke after PR 83 and 77 are integrated
+        description: Run real topology smoke
         type: boolean
         default: false
 
@@ -36,7 +54,8 @@ jobs:
         run: ./infrastructure/tests/secret-entrypoint.ps1
 
   real-topology:
-    if: github.event_name == 'workflow_dispatch' && inputs.full_stack
+    if: github.event_name != 'workflow_dispatch' || inputs.full_stack
+    needs: configuration-and-startup
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

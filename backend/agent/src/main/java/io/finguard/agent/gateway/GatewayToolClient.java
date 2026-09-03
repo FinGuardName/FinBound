@@ -1,13 +1,16 @@
 package io.finguard.agent.gateway;
 
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import org.springframework.core.codec.DecodingException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import io.finguard.agent.config.AgentProperties;
 import io.finguard.agent.domain.PolicyDecision;
@@ -17,10 +20,10 @@ import reactor.core.publisher.Mono;
 public class GatewayToolClient {
     static final String REQUEST_ID_HEADER = "X-Request-Id";
     static final String TRACEPARENT_HEADER = "Traceparent";
-
-    private static final Set<PolicyDecision> SUPPORTED_DECISIONS = Set.of(
-            PolicyDecision.ALLOW,
-            PolicyDecision.BLOCK
+    private static final Map<String, String> RESULT_FIELDS = Map.of(
+            "CREDIT_SCORE_READ", "creditScore",
+            "INCOME_READ", "annualIncome",
+            "DEBT_READ", "totalDebt"
     );
 
     private final WebClient webClient;
@@ -43,13 +46,16 @@ public class GatewayToolClient {
                                 .switchIfEmpty(Mono.error(new GatewayCallException(
                                         "GATEWAY_RESPONSE_INVALID"
                                 )))
-                                .flatMap(this::validateResponse);
+                                .flatMap(body -> validateResponse(
+                                        body, response.statusCode().value(), request));
                     }
                     return response.releaseBody().then(Mono.error(
                             new GatewayCallException("GATEWAY_REQUEST_FAILED")
                     ));
                 })
                 .timeout(properties.gatewayTimeout())
+                .onErrorMap(DecodingException.class, exception ->
+                        new GatewayCallException("GATEWAY_RESPONSE_INVALID"))
                 .onErrorMap(TimeoutException.class, exception ->
                         new GatewayCallException("GATEWAY_TIMEOUT"))
                 .onErrorMap(
@@ -58,11 +64,35 @@ public class GatewayToolClient {
                 );
     }
 
-    private Mono<GatewayToolCallResponse> validateResponse(GatewayToolCallResponse response) {
-        if (response.decision() == null || !SUPPORTED_DECISIONS.contains(response.decision())) {
+    private Mono<GatewayToolCallResponse> validateResponse(
+            GatewayToolCallResponse response, int status, GatewayToolCallRequest request) {
+        if (response.requestId() == null || response.requestId().isBlank()
+                || response.decision() == null) {
+            return Mono.error(new GatewayCallException("GATEWAY_RESPONSE_INVALID"));
+        }
+        if (response.decision() == PolicyDecision.ALLOW
+                && (status == HttpStatus.FORBIDDEN.value()
+                || !hasExpectedFinancialResult(response.result(), request))) {
+            return Mono.error(new GatewayCallException("GATEWAY_RESPONSE_INVALID"));
+        }
+        if (response.decision() == PolicyDecision.BLOCK
+                && (response.reasonCodes().isEmpty()
+                || response.reasonCodes().stream().anyMatch(String::isBlank)
+                || (response.result() != null && !response.result().isNull()))) {
             return Mono.error(new GatewayCallException("GATEWAY_RESPONSE_INVALID"));
         }
         return Mono.just(response);
+    }
+
+    private boolean hasExpectedFinancialResult(JsonNode result, GatewayToolCallRequest request) {
+        if (result == null || !result.isObject()
+                || !request.tool().name().equals(result.path("tool").asText())
+                || !request.targetConsumerId().equals(result.path("consumerId").asText())) {
+            return false;
+        }
+        // §5 ALLOW contains the requested tool/customer and its financial value, not a stub acknowledgement.
+        String field = RESULT_FIELDS.get(request.tool().name());
+        return field != null && result.path(field).isNumber();
     }
 
     private void addRuntimeHeaders(HttpHeaders headers, String serviceCredential) {

@@ -2,20 +2,22 @@
 [CmdletBinding()]
 param([string]$RepositoryRoot = (Resolve-Path "$PSScriptRoot/../..").Path)
 $ErrorActionPreference = 'Stop'
+$validCredential = 'credential-marker-0123456789abcdef'
 $cases = @(
-    @{ Name = 'valid'; Required = 'TEST_CREDENTIAL'; Setup = 'printf credential-marker > /run/secrets/TEST_CREDENTIAL'; Exit = 0 },
+    @{ Name = 'valid'; Required = 'TEST_CREDENTIAL'; Setup = "printf $validCredential > /run/secrets/TEST_CREDENTIAL"; Exit = 0 },
     @{ Name = 'missing'; Required = 'TEST_CREDENTIAL'; Setup = ':'; Exit = 64 },
     @{ Name = 'empty'; Required = 'TEST_CREDENTIAL'; Setup = ': > /run/secrets/TEST_CREDENTIAL'; Exit = 64 },
     @{ Name = 'whitespace'; Required = 'TEST_CREDENTIAL'; Setup = 'printf "   \n" > /run/secrets/TEST_CREDENTIAL'; Exit = 64 },
-    @{ Name = 'missing second secret'; Required = 'TEST_CREDENTIAL SECOND_CREDENTIAL'; Setup = 'printf credential-marker > /run/secrets/TEST_CREDENTIAL'; Exit = 64 },
+    @{ Name = 'too short'; Required = 'TEST_CREDENTIAL'; Setup = 'printf short-credential > /run/secrets/TEST_CREDENTIAL'; Exit = 64 },
+    @{ Name = 'missing second secret'; Required = 'TEST_CREDENTIAL SECOND_CREDENTIAL'; Setup = "printf $validCredential > /run/secrets/TEST_CREDENTIAL"; Exit = 64 },
     @{ Name = 'invalid variable'; Required = '1INVALID'; Setup = 'printf credential-marker > /run/secrets/1INVALID'; Exit = 64 },
     @{ Name = 'path traversal'; Required = '../TEST_CREDENTIAL'; Setup = ':'; Exit = 64 },
     @{ Name = 'no declared requirements'; Required = ''; Setup = ':'; Exit = 64 },
     @{ Name = 'equal API credentials'; Required = 'FINGUARD_API_VIEWERCREDENTIAL FINGUARD_API_OPERATORCREDENTIAL';
-        Setup = 'printf credential-marker > /run/secrets/FINGUARD_API_VIEWERCREDENTIAL; printf credential-marker > /run/secrets/FINGUARD_API_OPERATORCREDENTIAL'; Exit = 64 }
+        Setup = "printf $validCredential > /run/secrets/FINGUARD_API_VIEWERCREDENTIAL; printf $validCredential > /run/secrets/FINGUARD_API_OPERATORCREDENTIAL"; Exit = 64 }
 )
 foreach ($case in $cases) {
-    $command = 'mkdir -p /run/secrets; ' + $case.Setup + '; /bin/sh /opt/finguard/with-secrets.sh sh -c ''test "$TEST_CREDENTIAL" = credential-marker && echo DOWNSTREAM_REACHED'''
+    $command = 'mkdir -p /run/secrets; ' + $case.Setup + "; /bin/sh /opt/finguard/with-secrets.sh sh -c 'test \"`$TEST_CREDENTIAL\" = $validCredential && echo DOWNSTREAM_REACHED'"
     $arguments = @('run', '--rm', '--network', 'none', '--entrypoint', 'sh',
         '--env', "FINGUARD_REQUIRED_SECRETS=$($case.Required)",
         '--mount', "type=bind,source=$RepositoryRoot/infrastructure/docker/with-secrets.sh,target=/opt/finguard/with-secrets.sh,readonly",

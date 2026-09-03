@@ -30,6 +30,7 @@ try {
     foreach ($service in @('postgres', 'core-api', 'opa', 'gateway', 'agent', 'mock-finance')) {
         Assert-Contract ($names -contains $service) "missing $service"
         Assert-Contract ($services[$service].healthcheck.test.Count -gt 1) "$service lacks a healthcheck"
+        Assert-Contract ($services[$service].restart -eq 'unless-stopped') "$service restart policy missing"
         foreach ($dependency in $services[$service].depends_on.Keys) {
             Assert-Contract ($services[$service].depends_on[$dependency].condition -eq 'service_healthy') 'dependency is not health-gated'
         }
@@ -40,17 +41,32 @@ try {
         Assert-Contract (@($services[$service].secrets | Where-Object source -eq 'postgres-password').Count -eq 0) "$service has DB secret"
     }
     Assert-Contract ($config.networks['data-zone'].internal -eq $true) 'data-zone must be internal'
+    Assert-Contract ($config.networks['finance-zone'].internal -eq $true) 'finance-zone must be internal'
     Assert-Contract (-not $services.postgres.ports) 'PostgreSQL must not publish a host bypass'
     foreach ($service in @('agent', 'mock-finance', 'core-api', 'opa')) {
         Assert-Contract (-not $services[$service].ports) "$service exposes an internal port"
         Assert-Contract (-not $services[$service].networks.ContainsKey('public-zone')) "$service joined public-zone"
     }
     Assert-Contract ($services.gateway.networks.ContainsKey('public-zone')) 'Gateway public zone missing'
+    Assert-Contract ($services.gateway.networks.ContainsKey('finance-zone')) 'Gateway finance zone missing'
+    Assert-Contract ($services['mock-finance'].networks.ContainsKey('finance-zone')) 'Mock Finance finance zone missing'
+    Assert-Contract (-not $services['mock-finance'].networks.ContainsKey('internal-zone')) 'Mock Finance joined Agent network'
+    Assert-Contract (-not $services.agent.networks.ContainsKey('finance-zone')) 'Agent joined finance zone'
+    $sharedAgentFinanceNetworks = @($services.agent.networks.Keys | Where-Object {
+        $services['mock-finance'].networks.ContainsKey($_)
+    })
+    Assert-Contract ($sharedAgentFinanceNetworks.Count -eq 0) 'Agent can share a network with Mock Finance'
     Assert-Contract ($services.gateway.environment.MOCK_FINANCE_URL -eq 'http://mock-finance:8083') 'wrong Mock Finance URL'
     Assert-Contract ($services.agent.environment.CORE_API_BASE_URL -eq 'http://core-api:8080') 'wrong Agent Core URL'
     Assert-Contract ($services.agent.environment.GATEWAY_BASE_URL -eq 'http://gateway:8081') 'wrong Agent Gateway URL'
     Assert-Contract ($services['core-api'].environment.AGENT_URL -eq 'http://agent:8082') 'wrong Core Agent URL'
-    Assert-Contract ($services.gateway.environment.SPRING_PROFILES_ACTIVE -eq 'real-core,real-ai,real-downstream') 'Gateway must not silently use mocks'
+    Assert-Contract ($services.gateway.environment.SPRING_PROFILES_ACTIVE -eq 'real-core,real-downstream') 'Gateway base profiles are unsafe'
+    Assert-Contract (-not $services.gateway.environment.ContainsKey('AI_URL')) 'base stack points to absent AI service'
+    Assert-Contract ($services.gateway.build.dockerfile -eq 'infrastructure/docker/spring-service.Dockerfile') 'wrong Gateway Dockerfile'
+    Assert-Contract ($services['core-api'].build.dockerfile -eq 'infrastructure/docker/spring-service.Dockerfile') 'wrong Core Dockerfile'
+    Assert-Contract (-not (Test-Path (Join-Path $RepositoryRoot 'backend/gateway/Dockerfile'))) 'legacy Gateway Dockerfile remains'
+    $exampleEnv = Get-Content -LiteralPath (Join-Path $RepositoryRoot '.env.example') -Raw
+    Assert-Contract ($exampleEnv -match '(?m)^GATEWAY_BASE_URL=http://localhost:8091$') 'wrong host Gateway URL example'
     Assert-Contract (-not $services['core-api'].depends_on.ContainsKey('agent')) 'Core/Agent startup cycle'
     foreach ($dependency in @('core-api', 'gateway')) {
         Assert-Contract ($services.agent.depends_on[$dependency].condition -eq 'service_healthy') 'Agent readiness ordering missing'

@@ -75,6 +75,8 @@ class AgentSimulationControllerTest {
                 .jsonPath("$.gatewayResponse.result.creditScore").isEqualTo(812);
 
         GatewayToolCallRequest gatewayRequest = capturedGatewayRequest();
+        assertThat(gatewayRequest.agentRunId()).isEqualTo("RUN-CORE-001");
+        assertThat(gatewayRequest.passportId()).isEqualTo("PASS-CORE-001");
         assertThat(gatewayRequest.targetConsumerId()).isEqualTo("CUST-1001");
         assertThat(gatewayRequest.tool()).isEqualTo(FinancialTool.CREDIT_SCORE_READ);
         assertThat(gatewayRequest.requestedData()).containsExactly(FinancialDataType.CREDIT_SCORE);
@@ -159,6 +161,27 @@ class AgentSimulationControllerTest {
     }
 
     @Test
+    void rejectsMissingAgentRunReferenceBeforeGatewayCall() {
+        assertInvalidReferenceRequest("""
+                {
+                  "passportId": "PASS-CORE-001",
+                  "scenario": "NORMAL_CREDIT_SCORE"
+                }
+                """);
+    }
+
+    @Test
+    void rejectsBlankPassportReferenceBeforeGatewayCall() {
+        assertInvalidReferenceRequest("""
+                {
+                  "agentRunId": "RUN-CORE-001",
+                  "passportId": "   ",
+                  "scenario": "NORMAL_CREDIT_SCORE"
+                }
+                """);
+    }
+
+    @Test
     void exposesGatewayFailureWithoutTreatingItAsAllow() {
         when(gatewayToolClient.execute(any())).thenReturn(Mono.error(
                 new GatewayCallException("GATEWAY_TIMEOUT")
@@ -201,10 +224,24 @@ class AgentSimulationControllerTest {
     private String simulationRequest(AgentSimulationScenario scenario) {
         return """
                 {
-                  "agentRunId": "RUN-001",
-                  "passportId": "PASS-001",
+                  "agentRunId": "RUN-CORE-001",
+                  "passportId": "PASS-CORE-001",
                   "scenario": "%s"
                 }
                 """.formatted(scenario.name());
+    }
+
+    private void assertInvalidReferenceRequest(String body) {
+        client().post()
+                .uri(ENDPOINT)
+                .header(INTERNAL_CREDENTIAL_HEADER, "test-internal-credential")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("INVALID_AGENT_SIMULATION_REQUEST");
+
+        verifyNoInteractions(gatewayToolClient);
     }
 }

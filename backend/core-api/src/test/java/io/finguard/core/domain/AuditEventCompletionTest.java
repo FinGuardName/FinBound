@@ -1,6 +1,7 @@
 package io.finguard.core.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,6 +44,67 @@ class AuditEventCompletionTest {
         assertThat(event.getSuccess()).isTrue();
         assertThat(event.getRecordsRead()).isEqualTo(1);
         assertThat(event.getLatencyMs()).isEqualTo(120L);
+    }
+
+    /**
+     * {@code contracts/audit/execution-outcome.schema.json}:48-104의 조건부 불변식. DTO에서도 막지만
+     * 도메인에도 둔다 — 기존 패턴이고, 이 record를 직접 만드는 경로가 검증을 우회하면 안 된다.
+     */
+    @Test
+    void blockedOutcomeCannotClaimTheResponseWasReleased() {
+        assertThatThrownBy(() -> completion(PolicyDecision.BLOCK, AuditStatus.COMPLETED,
+                        Set.of("CASE_SCOPE_VIOLATION"), false, true, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void blockedOutcomeRequiresAtLeastOneReasonCode() {
+        assertThatThrownBy(() -> completion(PolicyDecision.BLOCK, AuditStatus.COMPLETED,
+                        Set.of(), false, false, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void errorOutcomeCannotClaimTheResponseWasReleased() {
+        assertThatThrownBy(() -> completion(PolicyDecision.ALLOW, AuditStatus.ERROR,
+                        Set.of("DOWNSTREAM_TIMEOUT"), true, true, false))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void errorOutcomeRequiresAtLeastOneReasonCode() {
+        assertThatThrownBy(() -> completion(PolicyDecision.ALLOW, AuditStatus.ERROR,
+                        Set.of(), true, false, false))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void allowedCompletionMustHaveReachedDownstreamAndReleasedTheResponse() {
+        assertThatThrownBy(() -> completion(PolicyDecision.ALLOW, AuditStatus.COMPLETED,
+                        Set.of(), false, true, true))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private AuditCompletion completion(
+            PolicyDecision decision,
+            AuditStatus systemOutcome,
+            Set<String> reasonCodes,
+            boolean downstreamReached,
+            boolean responseReleased,
+            Boolean success) {
+        return new AuditCompletion(
+                decision,
+                systemOutcome,
+                reasonCodes,
+                downstreamReached,
+                responseReleased,
+                success,
+                null,
+                null,
+                systemOutcome == AuditStatus.ERROR ? "DOWNSTREAM" : null,
+                null,
+                "loan-review-policy-1",
+                COMPLETED_AT);
     }
 
     private AuditEvent processingEvent() {

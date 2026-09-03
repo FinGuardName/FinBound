@@ -58,7 +58,11 @@ try {
     foreach ($service in @('agent', 'gateway', 'mock-finance')) {
         $null = Exec-Service $service "if echo | nc -w 2 postgres 5432 >/dev/null 2>&1; then exit 1; fi; if echo | nc -w 2 $dbIp 5432 >/dev/null 2>&1; then exit 1; fi"
     }
-    Write-Output 'PASS: service DNS/HTTP connectivity; PostgreSQL DNS and direct-IP isolation'
+    $financeNetwork = "$($project)_finance-zone"
+    $financeIp = (Run-Docker @('inspect', '--format', "{{(index .NetworkSettings.Networks `"$financeNetwork`").IPAddress}}", $ids['mock-finance'])).Trim()
+    Assert-Contract ($financeIp -match '^\d+\.\d+\.\d+\.\d+$') 'Mock Finance IP not found'
+    $null = Exec-Service 'agent' "if echo | nc -w 2 mock-finance 8083 >/dev/null 2>&1; then exit 1; fi; if echo | nc -w 2 $financeIp 8083 >/dev/null 2>&1; then exit 1; fi"
+    Write-Output 'PASS: service HTTP connectivity; PostgreSQL and Agent-to-finance DNS/direct-IP isolation'
 
     # wget prints headers only on rejected calls; bodies stay inside the container.
     foreach ($test in @(@('agent', '8082', '/internal/v1/agent-simulations'), @('mock-finance', '8083', '/internal/v1/finance/tool-calls'))) {
@@ -90,15 +94,15 @@ wget -qO- --header="X-FinGuard-Internal-Credential: $credential" \
 
     # Exercise the wrapper independently of application validation. A denied startup
     # must never execute the supplied downstream command or echo a present credential.
-    foreach ($required in @('MISSING_SECRET', 'EMPTY_SECRET', 'BLANK_SECRET')) {
-        $setup = 'mkdir -p /run/secrets; : > /run/secrets/EMPTY_SECRET; printf "   " > /run/secrets/BLANK_SECRET; '
+    foreach ($required in @('MISSING_SECRET', 'EMPTY_SECRET', 'BLANK_SECRET', 'SHORT_SECRET')) {
+        $setup = 'mkdir -p /run/secrets; : > /run/secrets/EMPTY_SECRET; printf "   " > /run/secrets/BLANK_SECRET; printf short > /run/secrets/SHORT_SECRET; '
         $script = $setup + '/bin/sh /opt/finguard/with-secrets.sh echo DOWNSTREAM_REACHED'
         $arguments = @('run', '--rm', '--network', 'none', '--entrypoint', 'sh',
             '--env', "FINGUARD_REQUIRED_SECRETS=$required",
             '--mount', "type=bind,source=$RepositoryRoot/infrastructure/docker/with-secrets.sh,target=/opt/finguard/with-secrets.sh,readonly",
             'eclipse-temurin:21-jre-alpine', '-c', $script)
         $result = (& docker @arguments 2>&1) -join "`n"
-        Assert-Contract ($LASTEXITCODE -eq 64) 'missing/blank credential did not fail closed'
+        Assert-Contract ($LASTEXITCODE -eq 64) 'missing/blank/short credential did not fail closed'
         Assert-Contract (-not $result.Contains('DOWNSTREAM_REACHED')) 'startup rejection reached downstream'
     }
     # Missing host secret must fail container creation (not just `config`).
@@ -112,7 +116,11 @@ wget -qO- --header="X-FinGuard-Internal-Credential: $credential" \
     $logs = Run-Docker ($compose + @('logs', '--no-color'))
     Assert-Contract (-not $logs.Contains('"creditScore"')) 'financial response payload entered logs'
     foreach ($service in $ids.Keys) {
-        $null = Run-Docker @('inspect', $ids[$service])
+        $metadata = Run-Docker @('inspect', $ids[$service])
+        foreach ($name in $secretNames) {
+            $value = [Environment]::GetEnvironmentVariable($name)
+            Assert-Contract (-not $metadata.Contains($value)) "$service metadata leaked a credential"
+        }
     }
     Write-Output 'PASS: fail-closed startup, downstream non-execution, secret-free logs and container metadata'
     Write-Output 'NOTE: health/connectivity is not an ALLOW/BLOCK business E2E. See README dependency gates.'
