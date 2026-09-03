@@ -16,6 +16,8 @@ public record AuditCompletion(
         Long latencyMs,
         String errorLocation,
         BigDecimal behaviorRisk,
+        Severity severity,
+        Boolean riskFlagged,
         String policyVersion,
         Instant completedAt) {
 
@@ -74,6 +76,18 @@ public record AuditCompletion(
                 && (behaviorRisk.compareTo(BigDecimal.ZERO) < 0
                         || behaviorRisk.compareTo(BigDecimal.ONE) > 0)) {
             throw new IllegalArgumentException("Behavior risk must be between zero and one");
+        }
+        if ((severity == null) != (riskFlagged == null)) {
+            throw new IllegalArgumentException(
+                    "Severity and risk flag must be recorded together");
+        }
+        if (decision != null && severity == null) {
+            throw new IllegalArgumentException(
+                    "Policy decisions require severity and risk flag");
+        }
+        if (decision == null && severity != null) {
+            throw new IllegalArgumentException(
+                    "System failures without a policy decision cannot carry policy risk fields");
         }
         if (completedAt == null) {
             throw new IllegalArgumentException("Audit completion requires completedAt");

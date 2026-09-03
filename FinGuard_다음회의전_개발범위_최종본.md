@@ -260,9 +260,10 @@ Context Resolver 예시 출력:
   "promptRiskSnapshot": {
     "evaluationStatus": "NOT_EVALUATED",
     "promptRisk": 0.00,
+    "riskLevel": "LOW",
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-5"
+    "modelVersion": "prompt-guard-6"
   }
 }
 ```
@@ -695,12 +696,15 @@ POST /internal/v1/risk/prompt
 ## 다만 계약상 필드는 이번 사이클에도 흘려야 한다
 
 구현을 미루는 것과 필드를 비우는 것은 다르다. `.rego`의 `valid_input`은
-`input.risk.promptInjectionDetected`가 `true` 또는 `false`여야 참이 된다.
+`input.risk.promptRiskLevel`이 `LOW | ALERT | CRITICAL`이고,
+`promptInjectionDetected`가 `CRITICAL` 여부와 일치해야 참이 된다.
 
 ```rego
 valid_input if {
     ...
+    input.risk.promptRiskLevel in {"LOW", "ALERT", "CRITICAL"}
     input.risk.promptInjectionDetected in {true, false}
+    valid_prompt_detection
 }
 deny_reasons contains "CONTEXT_NOT_FOUND" if { not valid_input }
 ```
@@ -715,6 +719,7 @@ Core Context Resolver 응답의 promptRiskSnapshot   반드시 포함
   evaluationStatus                                NOT_EVALUATED   ← 필수
   detected                                        false
   promptRisk                                      0.00
+  riskLevel                                       LOW
   inputHash / modelVersion                        형식만 채운다
 
 Prompt Detector 실제 호출                          하지 않는다
@@ -793,9 +798,10 @@ POST /internal/v1/context/resolve
   "promptRiskSnapshot": {
     "evaluationStatus": "NOT_EVALUATED",
     "promptRisk": 0.00,
+    "riskLevel": "LOW",
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-5"
+    "modelVersion": "prompt-guard-6"
   }
 }
 ```
@@ -1049,6 +1055,7 @@ AI는 `requestCount1m`을 **관측 Feature로만** 쓴다 — 집행 카운터�
     },
     "risk": {
       "promptRisk": 0.05,
+      "promptRiskLevel": "LOW",
       "promptInjectionDetected": false,
       "behaviorRisk": 0.21,
       "behaviorRiskLevel": "LOW",
@@ -1067,7 +1074,7 @@ OPA 응답 예시:
 {
   "result": {
     "decision": "BLOCK",
-    "severity": "HIGH",
+    "severity": "CRITICAL",
     "riskFlagged": true,
     "reasonCodes": ["CASE_SCOPE_VIOLATION"],
     "policyVersion": "loan-review-policy-1"
@@ -1086,7 +1093,8 @@ policyVersion 은 loan-review-policy-1        "v1" 이 아니다 (policy/finguar
 `.rego`가 실제로 읽는 필드는 **점수가 아니라 판정값**이다.
 
 ```text
-input.risk.promptInjectionDetected      boolean          ← promptRisk(실수)가 아니다
+input.risk.promptRiskLevel              LOW|ALERT|CRITICAL ← CRITICAL만 직접 차단
+input.risk.promptInjectionDetected      boolean          ← CRITICAL과 정확히 같은 하위 호환 필드
 input.risk.behaviorRiskLevel            LOW|ALERT|CRITICAL ← behaviorRisk(실수)가 아니다
 input.limits.hardRequestLimitExceeded   boolean
 ```
@@ -1101,14 +1109,19 @@ input.limits.hardRequestLimitExceeded   boolean
 |---|---|---|
 | Core `context/resolve` | `scopeStatus` | `input.scopeStatus` (그대로) |
 | Core `context/resolve` | `promptRiskSnapshot.detected` | `input.risk.promptInjectionDetected` |
+| Core `context/resolve` | `promptRiskSnapshot.riskLevel` | `input.risk.promptRiskLevel` |
 | Core `context/resolve` | `promptRiskSnapshot.promptRisk` | `input.risk.promptRisk` |
 | AI `risk/behavior` | `behaviorRiskLevel` | `input.risk.behaviorRiskLevel` (그대로) |
 | AI `risk/behavior` | `behaviorRisk` | `input.risk.behaviorRisk` (그대로) |
 | AI `risk/behavior` | **`isAnomaly`** | **`input.risk.behaviorAnomalyDetected`** |
 | Gateway 자체 카운터 | 한도 초과 여부 | `input.limits.hardRequestLimitExceeded` |
 
-`detected → promptInjectionDetected`와 `isAnomaly → behaviorAnomalyDetected` 두 개가 이름이 바뀐다.
+`riskLevel → promptRiskLevel`, `detected → promptInjectionDetected`,
+`isAnomaly → behaviorAnomalyDetected` 세 개가 이름이 바뀐다.
 매핑을 빠뜨리면 `valid_input`이 거짓이 되어 전량 BLOCK 된다.
+
+`promptRiskSnapshot.evaluationStatus != EVALUATED`이면 Gateway는 OPA 입력으로 낮은 Risk를 만들지
+않고 `PROMPT_RISK_UNAVAILABLE`로 fail-closed한다.
 
 ---
 

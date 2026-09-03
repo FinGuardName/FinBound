@@ -106,10 +106,11 @@ class ContextResolveApiTest {
         assertThat(scope.get("dataScope").asText()).isEqualTo("OK");
         JsonNode promptRisk = body.get("promptRiskSnapshot");
         assertThat(promptRisk.get("evaluationStatus").asText()).isEqualTo("NOT_EVALUATED");
+        assertThat(promptRisk.get("riskLevel").asText()).isEqualTo("LOW");
         assertThat(promptRisk.get("detected").asBoolean()).isFalse();
         assertThat(promptRisk.get("promptRisk").decimalValue()).isZero();
         assertThat(promptRisk.get("inputHash").asText()).startsWith("sha256:");
-        assertThat(promptRisk.get("modelVersion").asText()).isEqualTo("prompt-guard-5");
+        assertThat(promptRisk.get("modelVersion").asText()).isEqualTo("prompt-guard-6");
     }
 
     @Test
@@ -184,7 +185,8 @@ class ContextResolveApiTest {
         Map<String, Object> row =
                 jdbcTemplate.queryForMap(
                         "select employee_id, passport_id, scope_customer_scope, scope_tool_scope,"
-                                + " prompt_risk_evaluation_status, prompt_model_version"
+                                + " prompt_risk_evaluation_status, prompt_risk_level,"
+                                + " prompt_model_version"
                                 + " from audit_events where request_id = ?",
                         REQUEST_ID);
 
@@ -194,8 +196,9 @@ class ContextResolveApiTest {
         assertThat(row.get("scope_customer_scope")).isEqualTo("VIOLATION");
         assertThat(row.get("scope_tool_scope")).isEqualTo("OK");
         assertThat(row.get("prompt_risk_evaluation_status")).isEqualTo("NOT_EVALUATED");
+        assertThat(row.get("prompt_risk_level")).isEqualTo("LOW");
         // 리터럴로 박으면 모델을 재학습해 버전을 올릴 때마다 이 줄만 조용히 어긋난다.
-        assertThat(row.get("prompt_model_version")).isEqualTo(PromptRiskModel.CURRENT_VERSION);
+        assertThat(row).containsEntry("prompt_model_version", PromptRiskModel.CURRENT_VERSION);
 
         assertThat(
                         jdbcTemplate.queryForObject(
@@ -334,8 +337,8 @@ class ContextResolveApiTest {
         jdbcTemplate.update(
                 "insert into prompt_risk_snapshots"
                         + " (input_ref, input_hash, evaluation_status, detected, prompt_risk,"
-                        + "  model_version, evaluated_at)"
-                        + " values (?, ?, 'EVALUATED', false, 0.1000, 'prompt-guard-5', now())",
+                        + "  risk_level, model_version, evaluated_at)"
+                        + " values (?, ?, 'EVALUATED', false, 0.1000, 'LOW', 'prompt-guard-6', now())",
                 "INPUT-LATER",
                 "sha256:later-input");
         jdbcTemplate.update(

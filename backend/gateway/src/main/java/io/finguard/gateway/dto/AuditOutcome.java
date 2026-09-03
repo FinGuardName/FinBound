@@ -20,6 +20,8 @@ public record AuditOutcome(
     Long latencyMs,
     String errorLocation,
     BigDecimal behaviorRisk,
+    String severity,
+    Boolean riskFlagged,
     String policyVersion,
     Instant completedAt
 ) {

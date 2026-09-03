@@ -3,6 +3,9 @@ package io.finguard.gateway.authorization;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -11,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import io.finguard.gateway.client.AiClient;
 import io.finguard.gateway.client.CoreClient;
@@ -95,6 +99,8 @@ class AuthorizationServiceTest {
         AuthorizationOutcome outcome = service.decide(identity, request, "REQ-2P", null, Instant.now());
 
         assertThat(outcome.reasonCodes()).containsExactly("PROMPT_RISK_UNAVAILABLE");
+        verify(core, never()).behaviorHistory(any(), any(), any(), any());
+        verifyNoInteractions(ai, opa);
     }
 
     @Test
@@ -111,6 +117,8 @@ class AuthorizationServiceTest {
         AuthorizationOutcome outcome = service.decide(identity, request, "REQ-2N", null, Instant.now());
 
         assertThat(outcome.reasonCodes()).containsExactly("PROMPT_RISK_UNAVAILABLE");
+        verify(core, never()).behaviorHistory(any(), any(), any(), any());
+        verifyNoInteractions(ai, opa);
     }
 
     @Test
@@ -140,6 +148,12 @@ class AuthorizationServiceTest {
         assertThat(outcome.isAllow()).isTrue();
         assertThat(outcome.behaviorRisk()).isEqualTo(0.10);
         assertThat(outcome.policyVersion()).isEqualTo("policy-1");
+        ArgumentCaptor<AuthorizationContext> context =
+            ArgumentCaptor.forClass(AuthorizationContext.class);
+        verify(opa).decide(context.capture());
+        assertThat(context.getValue().risk().promptRisk()).isEqualTo(0.05);
+        assertThat(context.getValue().risk().promptRiskLevel()).isEqualTo("LOW");
+        assertThat(context.getValue().risk().behaviorRisk()).isEqualTo(0.10);
     }
 
     private ResolvedContext resolvedContext() {
@@ -147,7 +161,9 @@ class AuthorizationServiceTest {
             UUID.randomUUID(),
             new ResolvedContext.References("EMP-101", "LOAN-2026-001", "PASS-001"),
             ScopeStatus.allOk(),
-            new PromptRiskSnapshot("EVALUATED", BigDecimal.valueOf(0.05), false, "sha256:evaluated", "prompt-guard-1"));
+            new PromptRiskSnapshot(
+                "EVALUATED", BigDecimal.valueOf(0.05), "LOW", false,
+                "sha256:evaluated", "prompt-guard-1"));
     }
 
     private BehaviorRiskResult behaviorLow() {

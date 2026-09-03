@@ -192,9 +192,10 @@ function createAuditEvent({
   scopeStatus = okScope,
   auditStatus = 'COMPLETED',
   promptRisk = 0.05,
+  promptRiskLevel = 'LOW',
   promptEvaluationStatus = 'EVALUATED',
   promptInjectionDetected = false,
-  promptModelVersion = 'prompt-guard-5',
+  promptModelVersion = 'prompt-guard-6',
   behaviorRisk = 0.21,
   behaviorRiskLevel = 'LOW',
   behaviorAnomalyDetected = false,
@@ -219,6 +220,7 @@ function createAuditEvent({
     reasonCodes,
     riskFlagged,
     promptRisk,
+    promptRiskLevel,
     promptEvaluationStatus,
     promptInjectionDetected,
     promptModelVersion,
@@ -238,7 +240,7 @@ function createAuditEvent({
 
 export const auditEventsFixture = [
   createAuditEvent({ auditEventId: 'AUD-009', requestId: '00000000-0000-4000-8000-000000009009', requestedAt: '2026-08-25T18:15:42+09:00', caseId: 'LOAN-2026-031', targetConsumerId: 'CUST-1001', requestedTool: 'CREDIT_SCORE_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['BEHAVIOR_ANOMALY'], behaviorRisk: 1, behaviorRiskLevel: 'CRITICAL', behaviorAnomalyDetected: true, riskFlagged: true }),
-  createAuditEvent({ auditEventId: 'AUD-008', requestId: '00000000-0000-4000-8000-000000008008', requestedAt: '2026-08-25T18:11:27+09:00', caseId: 'LOAN-2026-030', targetConsumerId: 'CUST-1001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['PROMPT_INJECTION'], promptRisk: 0.96, promptInjectionDetected: true, riskFlagged: true }),
+  createAuditEvent({ auditEventId: 'AUD-008', requestId: '00000000-0000-4000-8000-000000008008', requestedAt: '2026-08-25T18:11:27+09:00', caseId: 'LOAN-2026-030', targetConsumerId: 'CUST-1001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'CRITICAL', reasonCodes: ['PROMPT_INJECTION'], promptRisk: 0.96, promptRiskLevel: 'CRITICAL', promptInjectionDetected: true, riskFlagged: true }),
   createAuditEvent({ auditEventId: 'AUD-007', requestId: '00000000-0000-4000-8000-000000007007', requestedAt: '2026-08-25T18:07:03+09:00', caseId: 'LOAN-2026-029', targetConsumerId: 'CUST-1001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'HIGH', behaviorRisk: 0.95, behaviorRiskLevel: 'ALERT', riskFlagged: true }),
   createAuditEvent({ auditEventId: 'AUD-006', requestId: '00000000-0000-4000-8000-000000006006', requestedAt: '2026-08-25T18:02:31+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'INCOME_READ', decision: 'BLOCK', severity: 'HIGH', reasonCodes: ['MANDATE_SCOPE_VIOLATION'], scopeStatus: { ...okScope, mandate: 'VIOLATION' } }),
   createAuditEvent({ auditEventId: 'AUD-005', requestId: '00000000-0000-4000-8000-000000005005', requestedAt: '2026-08-25T17:58:14+09:00', caseId: 'LOAN-2026-027', targetConsumerId: 'CUST-3001', requestedTool: 'DEBT_READ', decision: 'ALLOW', severity: 'MEDIUM', promptRisk: 0.03, behaviorRisk: 0.16 }),

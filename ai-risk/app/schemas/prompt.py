@@ -21,6 +21,12 @@ class PromptAttackType(StrEnum):
     UNKNOWN_PROMPT_ATTACK = "UNKNOWN_PROMPT_ATTACK"
 
 
+class PromptRiskLevel(StrEnum):
+    LOW = "LOW"
+    ALERT = "ALERT"
+    CRITICAL = "CRITICAL"
+
+
 class PromptRiskRequest(ContractModel):
     agent_run_id: str = Field(min_length=1, max_length=128)
     input_ref: str = Field(min_length=1, max_length=128)
@@ -34,6 +40,7 @@ class PromptRiskRequest(ContractModel):
 class PromptRiskResponse(ContractModel):
     detected: bool
     prompt_risk: float = Field(ge=0.0, le=1.0)
+    risk_level: PromptRiskLevel
     attack_type: PromptAttackType | None
     matched_rules: list[str]
     input_hash: str

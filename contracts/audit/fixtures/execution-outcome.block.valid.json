@@ -5,5 +5,7 @@
   "reasonCodes": ["CASE_SCOPE_VIOLATION"],
   "downstreamReached": false,
   "responseReleased": false,
+  "severity": "CRITICAL",
+  "riskFlagged": true,
   "completedAt": "2026-08-17T21:33:11+09:00"
 }

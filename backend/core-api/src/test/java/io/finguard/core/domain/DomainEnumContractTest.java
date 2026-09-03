@@ -73,4 +73,11 @@ class DomainEnumContractTest {
                 .extracting(Enum::name)
                 .containsExactly("EVALUATED", "NOT_EVALUATED");
     }
+
+    @Test
+    void promptRiskLevelMatchesConvention() {
+        assertThat(PromptRiskLevel.values())
+                .extracting(Enum::name)
+                .containsExactly("LOW", "ALERT", "CRITICAL");
+    }
 }

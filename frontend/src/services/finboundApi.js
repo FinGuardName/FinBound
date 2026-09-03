@@ -166,11 +166,12 @@ export function mapAuditEvent(raw) {
 
 function queryString({ filters = {}, page = 1, pageSize = 5 }) {
   const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
-  const supported = ['period', 'agentId', 'caseId', 'consumerId', 'tool', 'outcome', 'reasonCode']
+  const supported = ['period', 'agentId', 'caseId', 'consumerId', 'tool', 'outcome', 'severity', 'reasonCode']
   supported.forEach((key) => {
     const value = filters[key]
     if (value && value !== 'ALL') query.set(key, value)
   })
+  if (filters.riskOnly) query.set('riskOnly', 'true')
   return query.toString()
 }
 
@@ -431,8 +432,8 @@ export const finboundApi = {
   isRealMode: () => runtime.mode === 'real',
   hasCredential: () => Boolean(runtime.credential),
   capabilities: () => ({
-    severityFilter: runtime.mode === 'mock',
-    riskOnlyFilter: runtime.mode === 'mock',
+    severityFilter: true,
+    riskOnlyFilter: true,
   }),
   setCredential(credential) { runtime.credential = credential || null },
   clearCredential() { runtime.credential = null },

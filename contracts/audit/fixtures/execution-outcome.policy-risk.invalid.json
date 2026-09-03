@@ -1,14 +1,10 @@
 {
-  "requestId": "REQ-001",
+  "requestId": "REQ-006",
   "decision": "ALLOW",
   "systemOutcome": "COMPLETED",
   "reasonCodes": [],
   "downstreamReached": true,
   "responseReleased": true,
   "success": true,
-  "recordsRead": 1,
-  "latencyMs": 120,
-  "severity": "LOW",
-  "riskFlagged": false,
-  "completedAt": "2026-08-17T21:32:11+09:00"
+  "completedAt": "2026-08-17T21:37:11+09:00"
 }

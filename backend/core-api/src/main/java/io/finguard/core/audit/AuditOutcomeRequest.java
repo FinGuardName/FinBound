@@ -7,6 +7,7 @@ import java.util.Set;
 import io.finguard.core.domain.AuditStatus;
 import io.finguard.core.domain.PolicyDecision;
 import io.finguard.core.domain.ReasonCode;
+import io.finguard.core.domain.Severity;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -27,6 +28,8 @@ public record AuditOutcomeRequest(
         @Min(0) Long latencyMs,
         @Pattern(regexp = "^[A-Z][A-Z0-9_]*$") @Size(max = 64) String errorLocation,
         @DecimalMin("0.0") @DecimalMax("1.0") BigDecimal behaviorRisk,
+        Severity severity,
+        Boolean riskFlagged,
         @Size(max = 64) String policyVersion,
         @NotNull Instant completedAt) {
 

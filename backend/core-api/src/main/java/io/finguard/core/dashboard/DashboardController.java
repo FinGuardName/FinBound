@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.finguard.core.domain.Severity;
 import io.finguard.core.domain.Tool;
 import io.finguard.core.security.CoreApiRole;
 import io.finguard.core.security.RequiresRole;
@@ -19,10 +20,8 @@ import io.finguard.core.security.RequiresRole;
  * <p>Vue는 PostgreSQL을 직접 조회하지 않고 이 API만 호출한다({@code docs/06} §25).
  * 전부 읽기 전용이다 — 외부에서 AuditEvent를 고치거나 지우는 경로는 만들지 않는다.
  *
- * <p><strong>Severity와 riskFlagged로는 아직 거를 수 없다.</strong> OPA는 두 값을 내보내지만
- * ({@code policy/finguard_authz.rego}) {@code contracts/audit/audit-event.schema.json}에 이 속성이
- * 없어 저장되지 않는다. 있지도 않은 필터를 받아 조용히 무시하면 "걸었는데 안 걸린" 화면이 되므로
- * 파라미터 자체를 두지 않았다.
+ * <p>Severity와 riskFlagged는 OPA의 판정 결과를 저장한 감사 컬럼으로만 필터링한다. 프론트에서
+ * Prompt/Behavior 점수를 다시 해석해 정책 결과를 만들지 않는다.
  */
 @RestController
 public class DashboardController {
@@ -50,6 +49,8 @@ public class DashboardController {
             @RequestParam(required = false) String consumerId,
             @RequestParam(required = false) Tool tool,
             @RequestParam(required = false) DashboardService.Outcome outcome,
+            @RequestParam(required = false) Severity severity,
+            @RequestParam(required = false) Boolean riskOnly,
             @RequestParam(required = false) String reasonCode,
             @RequestParam(required = false) String period,
             @RequestParam(defaultValue = "1") int page,
@@ -57,7 +58,15 @@ public class DashboardController {
 
         DashboardService.AuditEventQuery query =
                 new DashboardService.AuditEventQuery(
-                        agentId, caseId, consumerId, tool, outcome, reasonCode, startOf(period));
+                        agentId,
+                        caseId,
+                        consumerId,
+                        tool,
+                        outcome,
+                        severity,
+                        riskOnly,
+                        reasonCode,
+                        startOf(period));
 
         return ResponseEntity.ok(dashboard.findEvents(query, page, pageSize));
     }

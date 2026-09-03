@@ -38,6 +38,8 @@ class AuditEventCompletionTest {
                         120L,
                         null,
                         new BigDecimal("0.08"),
+                        Severity.LOW,
+                        false,
                         "loan-review-policy-1",
                         COMPLETED_AT));
 
@@ -85,6 +87,27 @@ class AuditEventCompletionTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void policyDecisionRequiresTheOriginalPolicyRiskFields() {
+        assertThatThrownBy(() -> new AuditCompletion(
+                        PolicyDecision.ALLOW,
+                        AuditStatus.COMPLETED,
+                        Set.of(),
+                        true,
+                        true,
+                        true,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "loan-review-policy-1",
+                        COMPLETED_AT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Policy decisions require");
+    }
+
     private AuditCompletion completion(
             PolicyDecision decision,
             AuditStatus systemOutcome,
@@ -103,6 +126,8 @@ class AuditEventCompletionTest {
                 null,
                 systemOutcome == AuditStatus.ERROR ? "DOWNSTREAM" : null,
                 null,
+                decision == PolicyDecision.BLOCK ? Severity.CRITICAL : Severity.LOW,
+                decision == PolicyDecision.BLOCK,
                 "loan-review-policy-1",
                 COMPLETED_AT);
     }

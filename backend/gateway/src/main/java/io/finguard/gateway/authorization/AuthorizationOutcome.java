@@ -16,6 +16,14 @@ public record AuthorizationOutcome(PolicyDecisionResult decision, Double behavio
         return decision.policyVersion();
     }
 
+    public String severity() {
+        return decision.severity();
+    }
+
+    public boolean riskFlagged() {
+        return decision.riskFlagged();
+    }
+
     public static AuthorizationOutcome failClosed(String reasonCode) {
         return new AuthorizationOutcome(PolicyDecisionResult.block(reasonCode), null);
     }

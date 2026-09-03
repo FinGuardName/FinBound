@@ -504,16 +504,19 @@ Tool Call 발생
 {
   "detected": true,
   "promptRisk": 0.96,
+  "riskLevel": "CRITICAL",
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
   "inputHash": "sha256:...",
-  "modelVersion": "prompt-guard-5"
+  "modelVersion": "prompt-guard-6"
 }
 ```
 
 ### 처리 규칙
 
-- 한국어·영어 Rule Detection과 분류 모델을 결합한다.
+- 분류 모델을 주 판단 신호로, 한국어·영어 Rule Detection을 설명 가능한 보조 증거로 결합한다.
+- Rule 단독 일치는 `ALERT`까지만 만들고 `CRITICAL`은 AI 고신뢰 또는 AI 중간신뢰+Rule 일치에서만 만든다.
+- 인용문 안에만 있는 지시는 Rule과 별개로 전체 텍스트를 보는 AI 모델이 평가한다.
 - 원본 입력을 FastAPI Application Log / DB에 저장하지 않는다.
 - 모델 오류를 낮은 Risk로 대체하지 않는다.
 - Prompt Risk는 권한을 확대하지 않는다.
@@ -607,6 +610,7 @@ agentRunId
 caseId
 passportId
 Scope Status
+Prompt Risk Evaluation Status
 Prompt Risk
 Behavior Risk
 Hard Limit Status
@@ -616,6 +620,7 @@ Hard Limit Status
 
 - Prompt 원문과 금융 API Payload 원문을 OPA에 전달하지 않는다.
 - OPA에는 필요한 상태값과 Risk만 전달한다.
+- Prompt Risk가 `EVALUATED` 상태가 아니면 `PROMPT_RISK_UNAVAILABLE`로 Fail-closed한다.
 - 필수 Context가 없으면 OPA 호출 전 Fail-closed 처리한다.
 
 ---
@@ -649,6 +654,7 @@ AuthorizationContext를 Rego 정책으로 평가해 최종 `ALLOW / BLOCK`을 �
 | Case/Mandate/Passport/Tool/Data 위반 | BLOCK | true |
 | Agent Binding 위반 | BLOCK | true |
 | Prompt Injection 차단 조건 | BLOCK | true |
+| Prompt Alert 구간 | ALLOW | true |
 | Behavior Alert 구간 | ALLOW | true |
 | Behavior Critical 구간 | BLOCK | true |
 | Hard Request Limit 초과 | BLOCK | true |

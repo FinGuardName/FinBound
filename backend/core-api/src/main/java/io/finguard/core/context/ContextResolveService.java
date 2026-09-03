@@ -165,6 +165,7 @@ public class ContextResolveService {
                         toAuditScopeStatus(scopeStatus),
                         promptRisk.getPromptRisk(),
                         promptRisk.getEvaluationStatus(),
+                        promptRisk.getRiskLevel(),
                         promptRisk.getModelVersion()));
 
         return new ContextResolveResponse(
@@ -175,6 +176,7 @@ public class ContextResolveService {
                 new PromptRiskView(
                         promptRisk.getEvaluationStatus(),
                         promptRisk.getPromptRisk(),
+                        promptRisk.getRiskLevel(),
                         promptRisk.isDetected(),
                         promptRisk.getInputHash(),
                         promptRisk.getModelVersion()));

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import io.finguard.core.domain.AuditEvent;
 import io.finguard.core.domain.AuditStatus;
 import io.finguard.core.domain.PolicyDecision;
+import io.finguard.core.domain.Severity;
 import io.finguard.core.domain.Tool;
 import io.finguard.core.repository.AuditEventRepository;
 
@@ -70,13 +71,15 @@ public class DashboardService {
                 .orElseThrow(() -> new AuditEventNotFoundException(auditEventId));
     }
 
-    /** 저장된 컬럼으로만 거른다. Severity와 riskFlagged는 아직 저장되지 않아 여기 없다. */
+    /** 저장된 감사 컬럼으로만 거른다. 점수에서 정책 결과를 다시 계산하지 않는다. */
     public record AuditEventQuery(
             String agentId,
             String caseId,
             String targetConsumerId,
             Tool requestedTool,
             Outcome outcome,
+            Severity severity,
+            Boolean riskOnly,
             String reasonCode,
             Instant requestedAfter) {
 
@@ -102,6 +105,12 @@ public class DashboardService {
             }
             if (outcome != null) {
                 spec = spec.and(outcome.toSpecification());
+            }
+            if (severity != null) {
+                spec = spec.and((root, cq, cb) -> cb.equal(root.get("severity"), severity));
+            }
+            if (Boolean.TRUE.equals(riskOnly)) {
+                spec = spec.and((root, cq, cb) -> cb.isTrue(root.get("riskFlagged")));
             }
             return spec;
         }
