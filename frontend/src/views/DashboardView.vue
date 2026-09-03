@@ -38,6 +38,7 @@ const decisionLabels = {
   UNKNOWN: '확인 불가',
 }
 const severityLabels = { LOW: '일반', MEDIUM: '관찰', HIGH: '주의', CRITICAL: '긴급' }
+const riskLevelLabels = { LOW: '낮음', ALERT: '주의', CRITICAL: '높음' }
 const scopeLabels = {
   employeeAuthority: '담당 직원 권한',
   permissionTemplate: '업무 권한 기준',
@@ -77,7 +78,8 @@ const capabilities = finboundApi.capabilities()
 
 const promptStatusText = (event) => {
   if (event.promptEvaluationStatus === 'NOT_EVALUATED') return '미평가'
-  if (event.promptInjectionDetected === null) return '탐지 결과 미제공'
+  if (riskLevelLabels[event.promptRiskLevel]) return riskLevelLabels[event.promptRiskLevel]
+  if (event.promptInjectionDetected === null) return Number.isFinite(event.promptRisk) ? '평가 완료' : '결과 미제공'
   return event.promptInjectionDetected ? '위험 감지' : '위험 미감지'
 }
 const scopeStatusLabel = (value, event) => {

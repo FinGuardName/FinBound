@@ -5,7 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 from app.schemas.prompt import PromptRiskLevel
-from evaluate.prompt_external_blind import build_report, read_external_records
+from evaluate.prompt_external_blind import (
+    build_report,
+    read_external_records,
+    verify_pinned_external_dataset,
+)
 
 AI_RISK_ROOT = Path(__file__).parents[1]
 
@@ -42,6 +46,21 @@ def test_external_reader_rejects_non_binary_labels(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="binary label"):
         read_external_records(dataset)
+
+
+def test_external_blind_set_rejects_an_unpinned_row_count() -> None:
+    with pytest.raises(ValueError, match="row count mismatch"):
+        verify_pinned_external_dataset(
+            [{"text": "safe", "label": 0}],
+            "de0996d15cabd838d50a4925a8493062ba70c29f845601cd6a17412236614486",
+        )
+
+
+def test_external_blind_set_rejects_modified_bytes() -> None:
+    records = [{"text": f"sample-{index}", "label": index % 2} for index in range(116)]
+
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        verify_pinned_external_dataset(records, "0" * 64)
 
 
 def test_committed_external_report_keeps_provenance_and_privacy_contract() -> None:

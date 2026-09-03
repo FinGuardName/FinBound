@@ -49,6 +49,8 @@
     },
     "behaviorFeatureVersion": { "$ref": "#/$defs/nonEmptyIdentifier" },
     "behaviorModelVersion": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "severity": { "$ref": "#/$defs/severity" },
+    "riskFlagged": { "type": "boolean" },
     "decision": {
       "type": "string",
       "enum": ["ALLOW", "BLOCK"]
@@ -77,6 +79,10 @@
     },
     "requestedAt": { "$ref": "#/$defs/timestamp" },
     "completedAt": { "$ref": "#/$defs/timestamp" }
+  },
+  "dependentRequired": {
+    "severity": ["riskFlagged"],
+    "riskFlagged": ["severity"]
   },
   "allOf": [
     {
@@ -172,6 +178,10 @@
     "upperSnakeCase": {
       "type": "string",
       "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     },
     "tool": {
       "type": "string",

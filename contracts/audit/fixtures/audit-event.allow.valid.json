@@ -29,6 +29,8 @@
   "behaviorRiskLevel": "LOW",
   "behaviorFeatureVersion": "behavior-features-1",
   "behaviorModelVersion": "iforest-1",
+  "severity": "LOW",
+  "riskFlagged": false,
   "decision": "ALLOW",
   "reasonCodes": [],
   "policyVersion": "loan-review-policy-1",

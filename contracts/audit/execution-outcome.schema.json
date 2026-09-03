@@ -35,9 +35,19 @@
       "minimum": 0
     },
     "errorLocation": { "$ref": "#/$defs/upperSnakeCase" },
+    "severity": { "$ref": "#/$defs/severity" },
+    "riskFlagged": { "type": "boolean" },
     "completedAt": { "$ref": "#/$defs/timestamp" }
   },
+  "dependentRequired": {
+    "severity": ["riskFlagged"],
+    "riskFlagged": ["severity"]
+  },
   "allOf": [
+    {
+      "if": { "required": ["decision"] },
+      "then": { "required": ["severity", "riskFlagged"] }
+    },
     {
       "if": {
         "properties": { "systemOutcome": { "const": "COMPLETED" } },
@@ -112,6 +122,10 @@
     "upperSnakeCase": {
       "type": "string",
       "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     },
     "reasonCodes": {
       "type": "array",

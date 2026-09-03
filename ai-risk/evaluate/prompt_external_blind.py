@@ -41,6 +41,23 @@ def read_external_records(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def verify_pinned_external_dataset(
+    records: list[dict[str, Any]], evaluation_set_sha256: str
+) -> None:
+    source = load_source(SOURCE_ID)
+    expected = source["normalizedArtifacts"][SOURCE_SPLIT]
+    if len(records) != expected["records"]:
+        raise ValueError(
+            "External blind set row count mismatch: "
+            f"expected {expected['records']}, received {len(records)}"
+        )
+    if evaluation_set_sha256 != expected["sha256"]:
+        raise ValueError(
+            "External blind set SHA-256 mismatch: "
+            f"expected {expected['sha256']}, received {evaluation_set_sha256}"
+        )
+
+
 def build_report(
     records: list[dict[str, Any]],
     evaluator: PromptEvaluator,
@@ -119,6 +136,7 @@ def main() -> None:
         )
     records = read_external_records(args.dataset)
     digest = hashlib.sha256(args.dataset.read_bytes()).hexdigest()
+    verify_pinned_external_dataset(records, digest)
     report = build_report(records, PromptRiskService(), digest)
     args.output.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",

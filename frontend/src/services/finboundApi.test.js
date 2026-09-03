@@ -182,13 +182,16 @@ describe('real Core API adapter', () => {
     })
   })
 
-  it('maps official audit fields and sends only supported server filters', async () => {
+  it('maps official audit fields and sends supported server filters', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({
       items: [{
         auditEventId: 'AUD-REAL-1',
         status: 'ERROR',
         systemOutcome: 'ERROR',
         promptRiskEvaluationStatus: 'EVALUATED',
+        promptRiskLevel: 'ALERT',
+        severity: 'HIGH',
+        riskFlagged: true,
         behaviorFeatureVersion: 'behavior-features-2',
         reasonCodes: ['DOWNSTREAM_TIMEOUT'],
       }],
@@ -214,11 +217,14 @@ describe('real Core API adapter', () => {
     expect(url.searchParams.get('period')).toBe('24H')
     expect(url.searchParams.get('outcome')).toBe('ERROR')
     expect(url.searchParams.get('page')).toBe('2')
-    expect(url.searchParams.has('severity')).toBe(false)
-    expect(url.searchParams.has('riskOnly')).toBe(false)
+    expect(url.searchParams.get('severity')).toBe('HIGH')
+    expect(url.searchParams.get('riskOnly')).toBe('true')
     expect(result.items[0]).toMatchObject({
       auditStatus: 'ERROR',
       promptEvaluationStatus: 'EVALUATED',
+      promptRiskLevel: 'ALERT',
+      severity: 'HIGH',
+      riskFlagged: true,
       featureVersion: 'behavior-features-2',
     })
   })

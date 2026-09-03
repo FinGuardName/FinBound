@@ -869,6 +869,8 @@ Rego는 raw Case/Customer/Tool/Data 비교를 하지 않는다.
   "success": true,
   "recordsRead": 1,
   "latencyMs": 120,
+  "severity": "LOW",
+  "riskFlagged": false,
   "completedAt": "2026-08-17T21:32:11+09:00"
 }
 ```
@@ -1013,6 +1015,10 @@ Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 �
 | `GET /api/v1/agent-runs/{agentRunId}/permission-comparison` | Viewer 또는 Operator |
 
 Vue는 PostgreSQL을 직접 조회하지 않는다.
+
+`GET /api/v1/audit-events`는 기본 필터와 함께 `severity=LOW|MEDIUM|HIGH|CRITICAL`,
+`riskOnly=true`를 지원한다. 두 값은 Prompt/Behavior 점수에서 Dashboard가 다시 계산하지 않고,
+OPA 판정 시점에 기록된 `severity`와 `riskFlagged` 감사 필드를 사용한다.
 
 ---
 

@@ -203,6 +203,8 @@ public class ToolCallEnforcementService {
             null,
             systemFailure ? errorLocation(reasonCodes) : null,
             behaviorRisk(outcome),
+            systemFailure ? null : outcome.severity(),
+            systemFailure ? null : outcome.riskFlagged(),
             outcome.policyVersion(),
             completedAt);
     }
@@ -219,6 +221,8 @@ public class ToolCallEnforcementService {
             latencyMs,
             null,
             behaviorRisk(outcome),
+            outcome.severity(),
+            outcome.riskFlagged(),
             outcome.policyVersion(),
             completedAt);
     }
@@ -238,6 +242,8 @@ public class ToolCallEnforcementService {
             null,
             "MOCK_FINANCE",
             behaviorRisk(outcome),
+            outcome.severity(),
+            outcome.riskFlagged(),
             outcome.policyVersion(),
             completedAt);
     }

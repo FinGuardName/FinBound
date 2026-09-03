@@ -27,6 +27,8 @@
   "behaviorRiskLevel": "LOW",
   "behaviorFeatureVersion": "behavior-features-1",
   "behaviorModelVersion": "iforest-1",
+  "severity": "CRITICAL",
+  "riskFlagged": true,
   "decision": "BLOCK",
   "reasonCodes": ["CASE_SCOPE_VIOLATION"],
   "policyVersion": "loan-review-policy-1",

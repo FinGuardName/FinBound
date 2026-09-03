@@ -198,7 +198,7 @@ class ContextResolveApiTest {
         assertThat(row.get("prompt_risk_evaluation_status")).isEqualTo("NOT_EVALUATED");
         assertThat(row.get("prompt_risk_level")).isEqualTo("LOW");
         // 리터럴로 박으면 모델을 재학습해 버전을 올릴 때마다 이 줄만 조용히 어긋난다.
-        assertThat(row.get("prompt_model_version")).isEqualTo(PromptRiskModel.CURRENT_VERSION);
+        assertThat(row).containsEntry("prompt_model_version", PromptRiskModel.CURRENT_VERSION);
 
         assertThat(
                         jdbcTemplate.queryForObject(

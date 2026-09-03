@@ -26,3 +26,22 @@ alter table audit_events
     add constraint chk_audit_prompt_risk_level check (
         prompt_risk_level is null or prompt_risk_level in ('LOW', 'ALERT', 'CRITICAL')
     );
+
+-- OPA 판정 결과를 프론트에서 재계산하지 않고 그대로 보존한다. 과거 행과 정책 판정 전
+-- 시스템 오류는 원래 값을 복원할 수 없으므로 nullable로 두고 추측해 채우지 않는다.
+alter table audit_events add column severity varchar(16);
+alter table audit_events add column risk_flagged boolean;
+alter table audit_events
+    add constraint chk_audit_severity check (
+        severity is null or severity in ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')
+    );
+alter table audit_events
+    add constraint chk_audit_policy_risk_pair check (
+        (severity is null and risk_flagged is null)
+        or (severity is not null and risk_flagged is not null)
+    );
+
+create index idx_audit_event_severity_requested_at
+    on audit_events (severity, requested_at desc);
+create index idx_audit_event_risk_flagged_requested_at
+    on audit_events (risk_flagged, requested_at desc);

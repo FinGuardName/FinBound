@@ -13,6 +13,7 @@ import io.finguard.core.domain.DataType;
 import io.finguard.core.domain.PolicyDecision;
 import io.finguard.core.domain.PromptRiskEvaluationStatus;
 import io.finguard.core.domain.PromptRiskLevel;
+import io.finguard.core.domain.Severity;
 import io.finguard.core.domain.Tool;
 
 /**
@@ -51,6 +52,8 @@ public record AuditEventView(
         PromptRiskLevel promptRiskLevel,
         String promptModelVersion,
         BigDecimal behaviorRisk,
+        Severity severity,
+        Boolean riskFlagged,
         PolicyDecision decision,
         Set<String> reasonCodes,
         String policyVersion,
@@ -89,6 +92,8 @@ public record AuditEventView(
                 event.getPromptRiskLevel(),
                 event.getPromptModelVersion(),
                 event.getBehaviorRisk(),
+                event.getSeverity(),
+                event.getRiskFlagged(),
                 event.getDecision(),
                 Set.copyOf(event.getReasonCodes()),
                 event.getPolicyVersion(),

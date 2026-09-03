@@ -458,6 +458,43 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).toContain('입력 모델미평가')
   })
 
+  it('renders the Core prompt risk level when the legacy boolean is unavailable', async () => {
+    const promptAlert = mapAuditEvent({
+      auditEventId: 'AUD-PROMPT-LEVEL',
+      requestId: 'REQ-PROMPT-LEVEL',
+      agentId: 'LOAN-AGENT-01',
+      agentRunId: 'RUN-PROMPT-LEVEL',
+      status: 'COMPLETED',
+      systemOutcome: 'COMPLETED',
+      decision: 'ALLOW',
+      reasonCodes: [],
+      downstreamReached: true,
+      responseReleased: true,
+      promptRiskEvaluationStatus: 'EVALUATED',
+      promptRiskLevel: 'ALERT',
+      promptRisk: 0.55,
+      behaviorRisk: 0.1,
+      requestedAt: '2026-09-03T10:00:00+09:00',
+    })
+    vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 1, block: 0, error: 0 })
+    vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
+      items: [promptAlert],
+      page: 1,
+      pageSize: 5,
+      totalItems: 1,
+      totalPages: 1,
+      filterOptions: { agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] },
+    })
+    vi.spyOn(finboundApi, 'getAuditEvent').mockResolvedValue(promptAlert)
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.risk-meter')[0].text()).toContain('주의')
+    expect(wrapper.findAll('.risk-meter')[0].text()).not.toContain('결과 미제공')
+  })
+
   it('supports MEDIUM severity and server-style pagination at the API boundary', async () => {
     const firstPage = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, page: 1, pageSize: 5 })
     const secondPage = await finboundApi.getAuditEvents({ filters: { period: 'ALL' }, page: 2, pageSize: 5 })
