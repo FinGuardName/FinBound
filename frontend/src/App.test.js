@@ -383,6 +383,27 @@ describe('FinBound P0 application', () => {
     expect(wrapper.get('.evidence-details').text()).toContain('정책 버전확인 중')
   })
 
+  it('keeps trace information collapsed in audit details and supports copying it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    const details = wrapper.get('.technical-details')
+    const traceId = wrapper.get('.technical-details code').text()
+    expect(details.attributes('open')).toBeUndefined()
+    expect(details.text()).toContain('요청 ID')
+    expect(traceId).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+
+    await details.get('button').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledWith(traceId)
+    expect(details.get('button').text()).toBe('복사됨')
+  })
+
   it('distinguishes downstream arrival from successful processing after a timeout', async () => {
     const timeout = mapAuditEvent({
       auditEventId: 'AUD-TIMEOUT',
