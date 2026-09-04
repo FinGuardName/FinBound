@@ -49,3 +49,5 @@ Critical 재현율은 `0.9625`, ROC-AUC는 `0.9940`입니다.
 고정 Seed 재학습은 Scaler, Calibration 점수, Threshold, 평가 JSON과 고정 Feature 전체의 추론 결과가
 동일한지 검증합니다. joblib 파일의 SHA-256은 특정 배포 파일의 무결성 확인에는 사용할 수 있지만,
 직렬화 환경이 달라질 수 있는 재학습 결과의 의미적 동일성 기준으로 사용하지 않습니다.
+배포 Runtime은 `behavior_iforest.json`에 고정된 SHA-256과 일치하는 Artifact만 허용하고, 검증에
+사용한 동일 바이트에서 joblib Bundle을 로드합니다.

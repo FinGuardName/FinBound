@@ -1,3 +1,6 @@
+import hashlib
+import io
+import json
 import os
 from pathlib import Path
 
@@ -19,7 +22,11 @@ from app.schemas.behavior import (
 )
 
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "models" / "behavior_iforest.joblib"
+DEFAULT_MODEL_METADATA_PATH = (
+    Path(__file__).resolve().parents[2] / "models" / "behavior_iforest.json"
+)
 MODEL_PATH_ENV = "FINGUARD_BEHAVIOR_MODEL_PATH"
+MODEL_METADATA_PATH_ENV = "FINGUARD_BEHAVIOR_MODEL_METADATA_PATH"
 COLD_START_MIN_EVENTS = 5
 COLD_START_RISK = 0.0
 
@@ -32,19 +39,47 @@ class BehaviorRiskService:
     def __init__(
         self,
         model_path: Path | None = None,
+        metadata_path: Path | None = None,
     ) -> None:
         configured_path = os.getenv(MODEL_PATH_ENV)
+        configured_metadata_path = os.getenv(MODEL_METADATA_PATH_ENV)
         self._model_path = model_path or (
             Path(configured_path) if configured_path else DEFAULT_MODEL_PATH
         )
+        self._metadata_path = metadata_path or (
+            Path(configured_metadata_path)
+            if configured_metadata_path
+            else DEFAULT_MODEL_METADATA_PATH
+        )
         self._bundle: BehaviorModelBundle | None = None
+
+    def _read_verified_model(self) -> bytes:
+        if not self._model_path.is_file():
+            raise BehaviorModelError(f"Behavior model artifact not found: {self._model_path}")
+        try:
+            metadata = json.loads(self._metadata_path.read_text(encoding="utf-8"))
+            expected_digest = metadata["artifactSha256"]
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise BehaviorModelError("Behavior model metadata is invalid") from error
+        if (
+            not isinstance(expected_digest, str)
+            or len(expected_digest) != 64
+            or any(character not in "0123456789abcdef" for character in expected_digest)
+        ):
+            raise BehaviorModelError("Behavior model artifact digest is invalid")
+        try:
+            model_bytes = self._model_path.read_bytes()
+        except OSError as error:
+            raise BehaviorModelError("Behavior model artifact is unavailable") from error
+        if hashlib.sha256(model_bytes).hexdigest() != expected_digest:
+            raise BehaviorModelError("Behavior model artifact digest does not match")
+        return model_bytes
 
     def _load_bundle(self) -> BehaviorModelBundle:
         if self._bundle is None:
-            if not self._model_path.is_file():
-                raise BehaviorModelError(f"Behavior model artifact not found: {self._model_path}")
+            model_bytes = self._read_verified_model()
             try:
-                bundle = joblib.load(self._model_path)
+                bundle = joblib.load(io.BytesIO(model_bytes))
             except Exception as error:
                 raise BehaviorModelError("Behavior model artifact could not be loaded") from error
             if not isinstance(bundle, BehaviorModelBundle):

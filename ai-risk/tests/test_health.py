@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app, prompt_service
+from app.prompt.model import PromptModelError
 
 
 def test_health() -> None:
@@ -30,3 +31,19 @@ def test_ready_fails_when_internal_credential_is_missing(
 
     assert response.status_code == 503
     assert response.json()["detail"] == "BEHAVIOR_RISK_UNAVAILABLE"
+
+
+def test_ready_fails_closed_when_prompt_model_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FINGUARD_INTERNAL_CREDENTIAL", "test-internal-credential")
+
+    def fail_readiness() -> None:
+        raise PromptModelError("model unavailable")
+
+    monkeypatch.setattr(prompt_service, "check_ready", fail_readiness)
+
+    response = TestClient(app).get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "PROMPT_RISK_UNAVAILABLE"
