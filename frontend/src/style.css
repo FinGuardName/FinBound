@@ -789,6 +789,7 @@ main { padding: 30px clamp(28px, 3.2vw, 48px) 48px; }
   .sidebar nav { flex: 1; margin: 0; }
   .nav-item { min-height: 46px; grid-template-columns: 28px 1fr; justify-items: start; text-align: left; }
   .nav-item .nav-icon { width: 28px; height: 28px; }
+  .nav-item .nav-label { display: block; line-height: 1.3; }
   .system-state { display: none; }
   main { padding: 22px 15px 42px; }
   .topbar { margin-bottom: 22px; }
@@ -802,8 +803,10 @@ main { padding: 30px clamp(28px, 3.2vw, 48px) 48px; }
 }
 
 @media (max-width: 480px) {
-  .nav-item .nav-icon { display: none; }
-  .nav-item { grid-template-columns: 1fr; justify-items: center; }
+  .brand-mark { width: 32px; height: 32px; }
+  .nav-item { grid-template-columns: 24px minmax(0, 1fr); gap: 7px; padding-inline: 6px; justify-items: start; }
+  .nav-item .nav-icon { width: 24px; height: 24px; display: grid; }
+  .nav-item .nav-label { display: block; font-size: .58rem; line-height: 1.25; }
   .work-card { grid-template-columns: 44px minmax(0, 1fr) 24px; padding: 14px; }
   .work-icon { width: 44px; height: 44px; }
   .bank-workbench, .guardrail-panel { padding: 18px; }
