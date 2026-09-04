@@ -25,7 +25,9 @@ on conflict (employee_id) do update
 
 insert into consumers (consumer_id, created_at)
 values ('CUST-1001', timestamptz '2026-08-17 09:00:00+09'),
-       ('CUST-9999', timestamptz '2026-08-17 09:00:00+09')  -- 데모의 반대편. 실재해야 한다.
+       ('CUST-9999', timestamptz '2026-08-17 09:00:00+09'),  -- 데모의 반대편. 실재해야 한다.
+       ('CUST-1002', timestamptz '2026-08-17 09:00:00+09'),  -- Tool/Data 공격 Fixture
+       ('CUST-1003', timestamptz '2026-08-17 09:00:00+09')   -- Mandate 공격 Fixture
 on conflict (consumer_id) do update
     set created_at = excluded.created_at;
 
@@ -112,6 +114,52 @@ select m.mandate_id, d.data_type
 from consumer_mandates m
          cross join (values ('CREDIT_SCORE'), ('INCOME'), ('DEBT')) as d(data_type)
 where m.consumer_id = 'CUST-1001'
+  and m.purpose = 'LOAN_REVIEW'
+on conflict (mandate_id, data_type) do nothing;
+
+-- ---------------------------------------------------------------- 공격 Scenario Fixture
+
+-- docs/04-api-contract.md §3.1의 공격 Scenario가 실제로 차단되려면 발급되는 Passport가 좁아야 한다.
+-- Passport = Employee Authority ∩ Permission Template ∩ Consumer Mandate 인데
+-- (EffectivePermissionCalculator) 셋 중 실행 시점에 고를 수 있는 것은 Mandate 뿐이다 —
+-- Authority는 운영 자격증명이 직원 하나에 묶여 있고 Template은 taskType으로 결정된다.
+-- 그래서 좁은 Mandate를 가진 고객을 따로 둔다.
+--
+-- Data를 좁히면 그 Data를 요구하는 Tool도 함께 떨어진다(계산기의 removeIf). 그래서 Mandate 축소
+-- 하나로 toolScope·dataScope·mandate 가 함께 위반된다. 의도한 동작이다 — 위반 하나만 나게 하는
+-- 격리는 Authority/Template을 고를 수 없는 이상 불가능하다.
+
+insert into consumer_mandates (consumer_id, purpose, status, version)
+values ('CUST-1002', 'LOAN_REVIEW', 'ACTIVE', 1),
+       ('CUST-1003', 'LOAN_REVIEW', 'ACTIVE', 1)
+on conflict (consumer_id, purpose) do update
+    set status = excluded.status,
+        version = consumer_mandates.version + 1;
+
+delete
+from consumer_mandate_allowed_data
+where mandate_id in (
+    select mandate_id
+    from consumer_mandates
+    where consumer_id in ('CUST-1002', 'CUST-1003')
+      and purpose = 'LOAN_REVIEW'
+);
+
+-- CUST-1002: INCOME 없음 → Passport tools {CREDIT_SCORE_READ, DEBT_READ}
+insert into consumer_mandate_allowed_data (mandate_id, data_type)
+select m.mandate_id, d.data_type
+from consumer_mandates m
+         cross join (values ('CREDIT_SCORE'), ('DEBT')) as d(data_type)
+where m.consumer_id = 'CUST-1002'
+  and m.purpose = 'LOAN_REVIEW'
+on conflict (mandate_id, data_type) do nothing;
+
+-- CUST-1003: DEBT 없음 → Passport tools {CREDIT_SCORE_READ, INCOME_READ}
+insert into consumer_mandate_allowed_data (mandate_id, data_type)
+select m.mandate_id, d.data_type
+from consumer_mandates m
+         cross join (values ('CREDIT_SCORE'), ('INCOME')) as d(data_type)
+where m.consumer_id = 'CUST-1003'
   and m.purpose = 'LOAN_REVIEW'
 on conflict (mandate_id, data_type) do nothing;
 
