@@ -47,7 +47,11 @@ function endSession() {
             <svg v-if="screen.id === 'run'" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2" /><circle cx="12" cy="9.5" r="2.25" /><path d="M8.5 17.5v-.8a3.5 3.5 0 0 1 7 0v.8" /></svg>
             <svg v-else viewBox="0 0 24 24"><path d="M12 3.2c2.1 1.2 4.35 2.08 6.75 2.65v5.3c0 4.25-2.57 7.55-6.75 9.65-4.18-2.1-6.75-5.4-6.75-9.65v-5.3C7.65 5.28 9.9 4.4 12 3.2Z" /><path d="m8.8 12.1 2.05 2.05 4.45-4.7" /></svg>
           </span>
-          <span class="nav-label"><small>{{ screen.kicker }}</small>{{ screen.label }}</span>
+          <span class="nav-label">
+            <small>{{ screen.kicker }}</small>
+            <template v-if="screen.id === 'dashboard'">AI 업무<br class="compact-nav-break" /> 안전 현황</template>
+            <template v-else>{{ screen.label }}</template>
+          </span>
         </button>
       </nav>
       <div class="system-state">

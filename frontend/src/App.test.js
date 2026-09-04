@@ -15,6 +15,14 @@ const getAllAuditEvents = async () => {
 }
 
 describe('FinBound P0 application', () => {
+  it('provides a deliberate compact navigation break for the safety dashboard label', () => {
+    const wrapper = mount(App)
+
+    const dashboardNav = wrapper.get('[data-screen="dashboard"]')
+    expect(dashboardNav.text()).toContain('AI 업무 안전 현황')
+    expect(dashboardNav.find('.compact-nav-break').exists()).toBe(true)
+  })
+
   it('keeps the real Core credential in memory instead of Web Storage', async () => {
     const storageWrite = vi.spyOn(Storage.prototype, 'setItem')
     configureFinboundApi({ mode: 'real' })
