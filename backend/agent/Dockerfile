@@ -7,16 +7,16 @@ WORKDIR /workspace
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle gradle
 COPY naver-checkstyle.xml naver-checkstyle-suppressions.xml ./
-RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle \
+RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle,sharing=locked \
     ./gradlew --version --no-daemon >/dev/null
 
 COPY backend/agent/build.gradle.kts backend/agent/
-RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle \
+RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle,sharing=locked \
     ./gradlew :backend:agent:dependencies \
         --configuration runtimeClasspath --no-daemon --quiet >/dev/null
 
 COPY backend/agent/src backend/agent/src
-RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle \
+RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle,sharing=locked \
     ./gradlew :backend:agent:bootJar --no-daemon \
     && cp backend/agent/build/libs/*.jar /workspace/agent.jar
 
