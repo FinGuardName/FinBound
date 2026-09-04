@@ -18,7 +18,7 @@ const dashboardError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
 const summary = ref(null)
-const copiedTraceId = ref('')
+const traceCopyState = ref('idle')
 const filterOptions = ref({ agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] })
 const filters = ref({
   period: '24H',
@@ -184,7 +184,7 @@ async function loadDashboard() {
 
 async function selectEvent(auditEventId) {
   selectedId.value = auditEventId
-  copiedTraceId.value = ''
+  traceCopyState.value = 'idle'
   try {
     const detail = await finboundApi.getAuditEvent(auditEventId)
     const index = events.value.findIndex((event) => event.auditEventId === auditEventId)
@@ -195,11 +195,16 @@ async function selectEvent(auditEventId) {
 }
 
 async function copyTraceId(traceId) {
+  traceCopyState.value = 'idle'
+  if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+    traceCopyState.value = 'failed'
+    return
+  }
   try {
     await navigator.clipboard.writeText(traceId)
-    copiedTraceId.value = traceId
+    traceCopyState.value = 'copied'
   } catch {
-    copiedTraceId.value = ''
+    traceCopyState.value = 'failed'
   }
 }
 
@@ -351,7 +356,16 @@ watch(page, () => {
           <summary>기술 정보</summary>
           <dl>
             <div><dt>요청 ID</dt><dd>{{ selectedEvent.requestId }}</dd></div>
-            <div><dt>추적 ID</dt><dd class="trace-id"><code>{{ selectedEvent.traceId || '미제공' }}</code><button v-if="selectedEvent.traceId" type="button" @click="copyTraceId(selectedEvent.traceId)">{{ copiedTraceId === selectedEvent.traceId ? '복사됨' : '복사' }}</button></dd></div>
+            <div>
+              <dt>추적 ID</dt>
+              <dd>
+                <div class="trace-id">
+                  <code>{{ selectedEvent.traceId || '미제공' }}</code>
+                  <button v-if="selectedEvent.traceId" type="button" @click="copyTraceId(selectedEvent.traceId)">{{ traceCopyState === 'copied' ? '복사됨' : traceCopyState === 'failed' ? '복사 실패' : '복사' }}</button>
+                </div>
+                <p v-if="traceCopyState === 'failed'" class="trace-copy-feedback" role="status">클립보드에 복사하지 못했습니다. 추적 ID를 직접 선택해 복사해 주세요.</p>
+              </dd>
+            </div>
           </dl>
         </details>
       </aside>
