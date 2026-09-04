@@ -39,9 +39,11 @@ class AgentScenarioMappingTest {
         "NORMAL_INCOME,CUST-1001,INCOME_READ,INCOME",
         "NORMAL_DEBT,CUST-1001,DEBT_READ,DEBT",
         "CASE_SCOPE_ATTACK,CUST-9999,CREDIT_SCORE_READ,CREDIT_SCORE",
-        "TOOL_SCOPE_ATTACK,CUST-1001,INCOME_READ,INCOME",
-        "DATA_SCOPE_ATTACK,CUST-1001,CREDIT_SCORE_READ,CREDIT_SCORE|INCOME",
-        "MANDATE_SCOPE_ATTACK,CUST-1001,DEBT_READ,DEBT"
+        // 공격 셋은 Mandate가 좁은 Fixture 고객을 노린다 — docs/04-api-contract.md §3.1.
+        // 이 표를 고치면 §3.1 과 core-api 의 AttackScenarioFixtureTest 도 함께 고쳐야 한다.
+        "TOOL_SCOPE_ATTACK,CUST-1002,INCOME_READ,INCOME",
+        "DATA_SCOPE_ATTACK,CUST-1002,CREDIT_SCORE_READ,CREDIT_SCORE|INCOME",
+        "MANDATE_SCOPE_ATTACK,CUST-1003,DEBT_READ,DEBT"
     })
     void mapsOnlyRuntimeFieldsDeterministically(
             AgentSimulationScenario scenario, String consumer, String tool, String data) throws Exception {
