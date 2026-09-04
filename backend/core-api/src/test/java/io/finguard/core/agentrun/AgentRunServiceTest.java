@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -223,5 +225,38 @@ class AgentRunServiceTest {
         assertThat(published.agentRunId()).isEqualTo(started.agentRunId());
         assertThat(published.passportId()).isEqualTo(started.passportId());
         assertThat(published.scenario()).isEqualTo(AgentSimulationScenario.CASE_SCOPE_ATTACK);
+    }
+
+    /**
+     * 계약이 정의한 7개가 전부 실행 이벤트에 실리는지 본다. 값을 하나 늘려 놓고 전달 경로를 빠뜨리면
+     * 그 시나리오는 조용히 {@code NORMAL_CREDIT_SCORE}로 도는데, 그러면 <strong>공격 시연이
+     * 정상 조회가 된다.</strong> 이름만 고정하는 {@code DomainEnumContractTest}로는 못 잡는다.
+     *
+     * <p><strong>Agent 호출까지는 확인하지 않는다.</strong> {@link AgentRunLauncher}가
+     * {@code AFTER_COMMIT}에 붙어 있고 이 테스트는 롤백되므로 리스너가 아예 돌지 않는다. 여기서
+     * 보는 것은 "이벤트에 시나리오가 실렸는가"까지다. 실제 호출은 {@code AgentRunLauncherTest}가 본다.
+     *
+     * <p>이벤트를 하나만 발행하는지도 함께 본다. {@code findFirst()}만 쓰면 두 번 발행해도 통과해
+     * Agent가 같은 실행을 두 번 받는 상태를 놓친다.
+     */
+    @ParameterizedTest
+    @EnumSource(AgentSimulationScenario.class)
+    void publishesEveryContractScenarioOnTheRunCreatedEvent(
+            AgentSimulationScenario scenario, ApplicationEvents events) {
+        AgentRunStarted started =
+                service.start(
+                        "EMP-101",
+                        "CUST-1001",
+                        TaskType.LOAN_REVIEW,
+                        "CUST-1001의 대출심사를 진행해줘.",
+                        scenario);
+
+        assertThat(events.stream(AgentRunCreated.class)).hasSize(1);
+
+        AgentRunCreated published =
+                events.stream(AgentRunCreated.class).findFirst().orElseThrow();
+
+        assertThat(published.agentRunId()).isEqualTo(started.agentRunId());
+        assertThat(published.scenario()).isEqualTo(scenario);
     }
 }
