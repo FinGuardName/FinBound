@@ -4,11 +4,13 @@ import java.time.Instant;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import io.finguard.core.domain.PromptRiskSnapshot;
+import jakarta.persistence.LockModeType;
 
 public interface PromptRiskSnapshotRepository extends JpaRepository<PromptRiskSnapshot, Long> {
 
@@ -32,12 +34,17 @@ public interface PromptRiskSnapshotRepository extends JpaRepository<PromptRiskSn
      * 실패한 트랜잭션 밖에서 해야 하므로 Case 와 Passport 부터 다시 만들게 된다. 그래서
      * {@code ON CONFLICT DO NOTHING} 을 쓴다.
      *
-     * <p>{@code flushAutomatically}·{@code clearAutomatically} 가 필요하다. 네이티브 쿼리는
-     * 영속성 컨텍스트를 우회하므로, 붙이지 않으면 바로 뒤 조회가 방금 넣은 행을 보지 못한다.
+     * <p>{@code flushAutomatically} 가 <strong>반드시</strong> 필요하다. 이 표의
+     * {@code fk_prompt_risk_input} 이 같은 트랜잭션에서 방금 만든 {@code secured_agent_inputs}
+     * 행을 가리키므로, flush 하지 않으면 네이티브 INSERT 가 FK 위반으로 죽는다.
+     *
+     * <p>{@code clearAutomatically} 는 쓰지 않는다. 뒤따르는 조회는 DB 로 나가므로 영속성 컨텍스트를
+     * 비우지 않아도 방금 넣은 행을 본다. 비우면 앞서 저장한 Case·Passport·AgentRun 이 함께
+     * 분리될 뿐이다.
      *
      * @return 삽입했으면 1, 이미 있어 건너뛰었으면 0
      */
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query(
             value =
                     """
@@ -55,4 +62,21 @@ public interface PromptRiskSnapshotRepository extends JpaRepository<PromptRiskSn
             @Param("inputHash") String inputHash,
             @Param("modelVersion") String modelVersion,
             @Param("recordedAt") Instant recordedAt);
+
+    /**
+     * 승격 대상 행을 잠그고 읽는다.
+     *
+     * <p>{@code PromptRiskSnapshot#promote} 의 "이미 EVALUATED 면 거절" 검사만으로는 부족하다.
+     * {@code NOT_EVALUATED} 행이 이미 있을 때 두 실행이 동시에 들어오면 둘 다 그 상태를 읽고
+     * 둘 다 UPDATE 를 날려 나중 커밋이 이긴다. 엔티티에 {@code @Version} 이 없어 낙관적 잠금도
+     * 걸리지 않는다.
+     *
+     * <p>행 잠금으로 직렬화한다. 뒤에 온 쪽은 앞이 커밋한 뒤 잠금을 얻고, 그때 다시 읽은 상태가
+     * {@code EVALUATED} 라 {@code promote} 가 정상적으로 거절한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from PromptRiskSnapshot s where s.inputHash = :inputHash"
+            + " and s.modelVersion = :modelVersion")
+    Optional<PromptRiskSnapshot> lockForPromotion(
+            @Param("inputHash") String inputHash, @Param("modelVersion") String modelVersion);
 }

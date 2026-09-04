@@ -23,6 +23,7 @@ import io.finguard.core.domain.PromptRiskLevel;
 import io.finguard.core.domain.TaskType;
 import io.finguard.core.risk.PromptRiskEvaluation;
 import io.finguard.core.risk.PromptRiskModel;
+import io.finguard.core.risk.RequestTrace;
 import jakarta.persistence.EntityManager;
 
 /**
@@ -73,18 +74,18 @@ class AgentRunPromptRiskTest {
     private PromptRiskEvaluation critical() {
         return new PromptRiskEvaluation(
                 true, new BigDecimal("0.9600"), PromptRiskLevel.CRITICAL, null,
-                Set.of("IGNORE_PREVIOUS_INSTRUCTION"), PromptRiskModel.CURRENT_VERSION);
+                Set.of("IGNORE_PREVIOUS_INSTRUCTION"), PromptRiskModel.CURRENT_VERSION,
+                java.time.Instant.parse("2026-09-04T00:00:00Z"));
     }
 
     private String start(String inputText, Optional<PromptRiskEvaluation> evaluation) {
-        PreparedAgentRun base = preparer.prepare(inputText);
+        PreparedAgentRun base = preparer.prepare(inputText, RequestTrace.of(null, null));
         PreparedAgentRun prepared =
                 new PreparedAgentRun(base.agentRunId(), base.inputRef(), base.inputHash(), evaluation);
         service.start(
                 "EMP-101",
                 "CUST-1001",
                 TaskType.LOAN_REVIEW,
-                inputText,
                 prepared,
                 AgentSimulationScenario.NORMAL_CREDIT_SCORE);
         entityManager.flush();

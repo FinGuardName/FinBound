@@ -12,5 +12,5 @@ import java.util.Optional;
 public interface PromptRiskClient {
 
     Optional<PromptRiskEvaluation> evaluate(
-            String agentRunId, String inputRef, String inputText, String inputHash);
+            String agentRunId, String inputRef, String inputText, String inputHash, RequestTrace trace);
 }

@@ -109,10 +109,14 @@ public class PromptRiskSnapshot {
      * <p>승격은 한 방향이다. 같은 입력·같은 모델이면 결과가 같아야 하지만 그 가정을 코드로 강제한다 —
      * 재평가가 기존 판정을 사후에 바꾸면 이미 그 스냅샷을 근거로 남은 Audit 이 거짓이 된다.
      *
+     * <p><strong>이 검사만으로는 동시성에 안전하지 않다.</strong> 두 트랜잭션이 같은
+     * {@code NOT_EVALUATED} 행을 함께 읽으면 둘 다 여기서 {@code true} 를 받는다. 호출부가
+     * {@code PromptRiskSnapshotRepository#lockForPromotion} 으로 행을 잠근 뒤 불러야 한다.
+     *
      * <p>{@code docs/07} §10 이 금지하는 것은 <strong>Tool Call 마다의 재평가</strong>다. Core 는
      * AgentRun 생성 시점에만 Detector 를 부르므로 그 조건과 어긋나지 않는다.
      */
-    public boolean promote(io.finguard.core.risk.PromptRiskEvaluation evaluation, Instant evaluatedAt) {
+    public boolean promote(io.finguard.core.risk.PromptRiskEvaluation evaluation) {
         if (evaluationStatus == PromptRiskEvaluationStatus.EVALUATED) {
             return false;
         }
@@ -123,7 +127,9 @@ public class PromptRiskSnapshot {
         this.attackType = evaluation.attackType();
         this.matchedRules.clear();
         this.matchedRules.addAll(evaluation.matchedRules());
-        this.evaluatedAt = evaluatedAt;
+        // ai-risk 가 보낸 시각이다. Core 수신 시각으로 채우면 "언제 검사했는가" 에 실제로 추론이
+        // 일어난 시각이 아닌 값이 들어간다.
+        this.evaluatedAt = evaluation.evaluatedAt();
         return true;
     }
 

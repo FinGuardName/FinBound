@@ -99,7 +99,6 @@ public class AgentRunService {
             String employeeId,
             String consumerId,
             TaskType taskType,
-            String inputText,
             PreparedAgentRun prepared,
             AgentSimulationScenario scenario) {
         Instant now = clock.instant();
@@ -199,16 +198,16 @@ public class AgentRunService {
         promptRiskSnapshots.insertIfAbsent(
                 inputRef, inputHash, PromptRiskModel.CURRENT_VERSION, now);
 
-        // 새로 평가한 결과가 있으면 승격한다. 이미 EVALUATED면 promote가 거절한다 —
-        // 재평가가 기존 판정을 사후에 바꾸면 그 스냅샷을 근거로 남은 Audit이 거짓이 된다.
+        // 새로 평가한 결과가 있으면 승격한다. 행을 잠그고 읽어야 한다 — NOT_EVALUATED 행이 이미
+        // 있을 때 두 실행이 동시에 들어오면 둘 다 그 상태를 읽고 둘 다 UPDATE를 날려 나중 커밋이
+        // 이긴다. promote 안의 검사만으로는 그 경합을 막지 못한다.
         prepared
                 .evaluation()
                 .ifPresent(
                         evaluation ->
                                 promptRiskSnapshots
-                                        .findByInputHashAndModelVersion(
-                                                inputHash, PromptRiskModel.CURRENT_VERSION)
-                                        .ifPresent(snapshot -> snapshot.promote(evaluation, now)));
+                                        .lockForPromotion(inputHash, PromptRiskModel.CURRENT_VERSION)
+                                        .ifPresent(snapshot -> snapshot.promote(evaluation)));
 
         // 실행 지시는 커밋 이후다. 여기서 직접 부르면 Agent가 Gateway를 거쳐 되돌아왔을 때
         // 이 트랜잭션이 아직 안 닫혀 있어 Passport를 찾지 못한다 — AgentRunLauncher 참조.

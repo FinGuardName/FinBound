@@ -9,6 +9,7 @@ import io.finguard.core.repository.PromptRiskSnapshotRepository;
 import io.finguard.core.risk.PromptRiskClient;
 import io.finguard.core.risk.PromptRiskEvaluation;
 import io.finguard.core.risk.PromptRiskModel;
+import io.finguard.core.risk.RequestTrace;
 
 /**
  * AgentRun 을 만들기 전에 식별자를 확보하고 Prompt Risk 를 평가한다.
@@ -29,7 +30,7 @@ public class AgentRunPreparer {
         this.snapshots = snapshots;
     }
 
-    public PreparedAgentRun prepare(String inputText) {
+    public PreparedAgentRun prepare(String inputText, RequestTrace trace) {
         String agentRunId = Identifiers.agentRunId();
         String inputRef = Identifiers.inputRef();
         String inputHash = Identifiers.inputHash(inputText);
@@ -45,7 +46,7 @@ public class AgentRunPreparer {
         Optional<PromptRiskEvaluation> evaluation =
                 alreadyEvaluated
                         ? Optional.empty()
-                        : promptRisk.evaluate(agentRunId, inputRef, inputText, inputHash);
+                        : promptRisk.evaluate(agentRunId, inputRef, inputText, inputHash, trace);
 
         return new PreparedAgentRun(agentRunId, inputRef, inputHash, evaluation);
     }

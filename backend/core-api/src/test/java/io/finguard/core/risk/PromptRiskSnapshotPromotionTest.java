@@ -25,13 +25,14 @@ class PromptRiskSnapshotPromotionTest {
                 PromptRiskLevel.CRITICAL,
                 null,
                 Set.of("IGNORE_PREVIOUS_INSTRUCTION"),
-                PromptRiskModel.CURRENT_VERSION);
+                PromptRiskModel.CURRENT_VERSION,
+                NOW.plusSeconds(1));
     }
 
     private PromptRiskEvaluation low() {
         return new PromptRiskEvaluation(
                 false, new BigDecimal("0.0500"), PromptRiskLevel.LOW, null, Set.of(),
-                PromptRiskModel.CURRENT_VERSION);
+                PromptRiskModel.CURRENT_VERSION, NOW);
     }
 
     @Test
@@ -39,7 +40,7 @@ class PromptRiskSnapshotPromotionTest {
         PromptRiskSnapshot snapshot =
                 PromptRiskSnapshot.notEvaluated("INPUT-001", HASH, PromptRiskModel.CURRENT_VERSION, NOW);
 
-        boolean promoted = snapshot.promote(critical(), NOW.plusSeconds(1));
+        boolean promoted = snapshot.promote(critical());
 
         assertThat(promoted).isTrue();
         assertThat(snapshot.getEvaluationStatus()).isEqualTo(PromptRiskEvaluationStatus.EVALUATED);
@@ -56,13 +57,13 @@ class PromptRiskSnapshotPromotionTest {
         // 재평가가 기존 판정을 조용히 바꾸면 Audit 이 사후에 달라진다.
         PromptRiskSnapshot snapshot =
                 PromptRiskSnapshot.notEvaluated("INPUT-001", HASH, PromptRiskModel.CURRENT_VERSION, NOW);
-        snapshot.promote(critical(), NOW);
+        snapshot.promote(critical());
 
-        boolean promotedAgain = snapshot.promote(low(), NOW.plusSeconds(5));
+        boolean promotedAgain = snapshot.promote(low());
 
         assertThat(promotedAgain).isFalse();
         assertThat(snapshot.getRiskLevel()).isEqualTo(PromptRiskLevel.CRITICAL);
-        assertThat(snapshot.getEvaluatedAt()).isEqualTo(NOW);
+        assertThat(snapshot.getEvaluatedAt()).isEqualTo(NOW.plusSeconds(1));
     }
 
     @Test
@@ -71,7 +72,7 @@ class PromptRiskSnapshotPromotionTest {
                 PromptRiskSnapshot.notEvaluated("INPUT-001", HASH, PromptRiskModel.CURRENT_VERSION, NOW);
 
         assertThat(snapshot.isEvaluated()).isFalse();
-        snapshot.promote(low(), NOW);
+        snapshot.promote(low());
         assertThat(snapshot.isEvaluated()).isTrue();
     }
 }
