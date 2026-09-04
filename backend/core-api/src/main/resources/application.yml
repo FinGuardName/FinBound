@@ -26,6 +26,16 @@ finguard:
     connect-timeout-ms: ${AGENT_CONNECT_TIMEOUT_MS:1000}
     # Agent는 Gateway와 Mock Finance를 거쳐 오므로 한 Tool Call보다 넉넉해야 한다.
     read-timeout-ms: ${AGENT_READ_TIMEOUT_MS:10000}
+  risk:
+    # docs/04 §8 — ai-risk는 8000에서 실행하고 Compose 주소는 http://ai-risk:8000 이다.
+    # 이슈 #72가 compose에 서비스를 올리기 전까지 이 주소는 닿지 않는다. 그때는 평가가
+    # 실패하고 스냅샷이 NOT_EVALUATED로 남는다 — 의도한 동작이다(AC-14).
+    base-url: ${AI_RISK_URL:http://localhost:8000}
+    # ai-risk의 /internal/** 도 같은 공유 자격 증명으로 보호된다.
+    service-credential: ${finguard.internal.credential}
+    connect-timeout-ms: ${AI_RISK_CONNECT_TIMEOUT_MS:1000}
+    # ONNX 추론 한 번이다. Agent 왕복(10초)보다 짧아도 된다.
+    read-timeout-ms: ${AI_RISK_READ_TIMEOUT_MS:3000}
 
 management:
   endpoints:
