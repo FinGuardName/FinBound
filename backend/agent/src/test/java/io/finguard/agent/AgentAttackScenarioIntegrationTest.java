@@ -88,9 +88,10 @@ class AgentAttackScenarioIntegrationTest {
     @ParameterizedTest
     @CsvSource({
         "CASE_SCOPE_ATTACK,CREDIT_SCORE_READ,CREDIT_SCORE,CUST-9999,CASE_SCOPE_VIOLATION",
-        "TOOL_SCOPE_ATTACK,INCOME_READ,INCOME,CUST-1001,TOOL_SCOPE_VIOLATION",
-        "DATA_SCOPE_ATTACK,CREDIT_SCORE_READ,CREDIT_SCORE|INCOME,CUST-1001,DATA_SCOPE_VIOLATION",
-        "MANDATE_SCOPE_ATTACK,DEBT_READ,DEBT,CUST-1001,MANDATE_SCOPE_VIOLATION"
+        // 공격 셋의 대상 고객은 Mandate가 좁은 Fixture다 — docs/04-api-contract.md §3.1.
+        "TOOL_SCOPE_ATTACK,INCOME_READ,INCOME,CUST-1002,TOOL_SCOPE_VIOLATION",
+        "DATA_SCOPE_ATTACK,CREDIT_SCORE_READ,CREDIT_SCORE|INCOME,CUST-1002,DATA_SCOPE_VIOLATION",
+        "MANDATE_SCOPE_ATTACK,DEBT_READ,DEBT,CUST-1003,MANDATE_SCOPE_VIOLATION"
     })
     void preservesGatewayBlockAndReasonCodes(
             String scenario, String tool, String data, String consumer, String reason) throws Exception {
@@ -131,7 +132,7 @@ class AgentAttackScenarioIntegrationTest {
                 .returnResult().getResponseBody();
         assertThat(mapper.readTree(responseBody).path("gatewayResponse").path("reasonCodes"))
                 .isEqualTo(mapper.valueToTree(expected));
-        assertRequest("DEBT_READ", "DEBT", "CUST-1001");
+        assertRequest("DEBT_READ", "DEBT", "CUST-1003");
     }
 
     @ParameterizedTest
