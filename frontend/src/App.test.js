@@ -15,6 +15,19 @@ const getAllAuditEvents = async () => {
 }
 
 describe('FinBound P0 application', () => {
+  it('uses one label source for the compact navigation and page heading', async () => {
+    const wrapper = mount(App)
+
+    const dashboardNav = wrapper.get('[data-screen="dashboard"]')
+    expect(dashboardNav.text()).toContain('AI 업무 안전 현황')
+    expect(dashboardNav.find('.compact-nav-break').exists()).toBe(true)
+
+    await dashboardNav.trigger('click')
+
+    expect(wrapper.get('h1').text()).toBe('AI 업무 안전 현황')
+    expect(dashboardNav.text()).toContain(wrapper.get('h1').text())
+  })
+
   it('keeps the real Core credential in memory instead of Web Storage', async () => {
     const storageWrite = vi.spyOn(Storage.prototype, 'setItem')
     configureFinboundApi({ mode: 'real' })
@@ -381,6 +394,61 @@ describe('FinBound P0 application', () => {
     expect(wrapper.get('.event-detail').text()).not.toContain('점수 0.00')
     expect(wrapper.get('.event-detail').text()).not.toContain('차단 사유 없음')
     expect(wrapper.get('.evidence-details').text()).toContain('정책 버전확인 중')
+  })
+
+  it('keeps trace information collapsed in audit details and supports copying it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    const details = wrapper.get('.technical-details')
+    const traceId = wrapper.get('.technical-details code').text()
+    expect(details.attributes('open')).toBeUndefined()
+    expect(details.text()).toContain('요청 ID')
+    expect(traceId).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+
+    await details.get('button').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledWith(traceId)
+    expect(details.get('button').text()).toBe('복사됨')
+  })
+
+  it('shows a selectable fallback when the trace ID cannot be copied', async () => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    const details = wrapper.get('.technical-details')
+    await details.get('button').trigger('click')
+    await flushPromises()
+
+    expect(details.get('button').text()).toBe('복사 실패')
+    expect(details.get('[role="status"]').text()).toContain('직접 선택해 복사해 주세요')
+    expect(details.get('code').text()).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+  })
+
+  it('reports a clipboard write rejection instead of failing silently', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('clipboard permission denied'))
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    const details = wrapper.get('.technical-details')
+    const traceId = details.get('code').text()
+    await details.get('button').trigger('click')
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledWith(traceId)
+    expect(details.get('button').text()).toBe('복사 실패')
+    expect(details.get('[role="status"]').text()).toContain('직접 선택해 복사해 주세요')
   })
 
   it('distinguishes downstream arrival from successful processing after a timeout', async () => {

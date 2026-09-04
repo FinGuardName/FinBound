@@ -182,6 +182,7 @@ export const agentExecutionFixtures = {
 function createAuditEvent({
   auditEventId,
   requestId,
+  traceId = `00-${requestId.replaceAll('-', '').padEnd(32, '0').slice(0, 32)}-0000000000000001-01`,
   requestedAt,
   caseId,
   targetConsumerId,
@@ -205,6 +206,7 @@ function createAuditEvent({
   return {
     auditEventId,
     requestId,
+    traceId,
     requestedAt,
     agentId: 'LOAN-AGENT-01',
     employeeId: 'EMP-101',

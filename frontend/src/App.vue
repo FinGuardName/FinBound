@@ -8,8 +8,8 @@ import DashboardView from './views/DashboardView.vue'
 import { finboundApi } from './services/finboundApi'
 
 const screens = [
-  { id: 'run', label: 'AI 업무 지원', kicker: '01', subtitle: 'AI Agent가 안전하게 업무를 지원하도록 권한을 최소화합니다.' },
-  { id: 'dashboard', label: 'AI 업무 안전 현황', kicker: '02', subtitle: 'AI 업무 처리 기록과 보호 설정의 작동 결과를 한눈에 확인합니다.' },
+  { id: 'run', labelParts: ['AI 업무 지원'], kicker: '01', subtitle: 'AI Agent가 안전하게 업무를 지원하도록 권한을 최소화합니다.' },
+  { id: 'dashboard', labelParts: ['AI 업무', '안전 현황'], kicker: '02', subtitle: 'AI 업무 처리 기록과 보호 설정의 작동 결과를 한눈에 확인합니다.' },
 ]
 const activeScreen = ref('run')
 const realMode = finboundApi.isRealMode()
@@ -19,6 +19,8 @@ const activeComponent = computed(() => ({
   run: AgentRunView,
   dashboard: DashboardView,
 })[activeScreen.value])
+const activeScreenConfig = computed(() => screens.find((screen) => screen.id === activeScreen.value))
+const screenLabel = (screen) => screen.labelParts.join(' ')
 
 function startSession() {
   if (!credential.value.trim()) return
@@ -47,7 +49,12 @@ function endSession() {
             <svg v-if="screen.id === 'run'" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2" /><circle cx="12" cy="9.5" r="2.25" /><path d="M8.5 17.5v-.8a3.5 3.5 0 0 1 7 0v.8" /></svg>
             <svg v-else viewBox="0 0 24 24"><path d="M12 3.2c2.1 1.2 4.35 2.08 6.75 2.65v5.3c0 4.25-2.57 7.55-6.75 9.65-4.18-2.1-6.75-5.4-6.75-9.65v-5.3C7.65 5.28 9.9 4.4 12 3.2Z" /><path d="m8.8 12.1 2.05 2.05 4.45-4.7" /></svg>
           </span>
-          <span class="nav-label"><small>{{ screen.kicker }}</small>{{ screen.label }}</span>
+          <span class="nav-label">
+            <small>{{ screen.kicker }}</small>
+            <template v-for="(labelPart, index) in screen.labelParts" :key="labelPart">
+              {{ index < screen.labelParts.length - 1 ? `${labelPart} ` : labelPart }}<br v-if="index < screen.labelParts.length - 1" class="compact-nav-break" />
+            </template>
+          </span>
         </button>
       </nav>
       <div class="system-state">
@@ -57,7 +64,7 @@ function endSession() {
     </aside>
     <main id="main-content">
       <header class="topbar">
-        <div><h1>{{ screens.find((screen) => screen.id === activeScreen)?.label }}</h1><p class="page-subtitle">{{ screens.find((screen) => screen.id === activeScreen)?.subtitle }}</p></div>
+        <div><h1>{{ screenLabel(activeScreenConfig) }}</h1><p class="page-subtitle">{{ activeScreenConfig?.subtitle }}</p></div>
         <div class="runtime-actions">
           <div class="environment-badge"><span></span> {{ realMode ? 'Core API 연결 모드' : 'Mock 검증 모드' }}</div>
           <button v-if="realMode && sessionReady" class="session-end" type="button" @click="endSession">연결 종료</button>
