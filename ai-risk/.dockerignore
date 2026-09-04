@@ -1,5 +1,6 @@
 **
 !Dockerfile
+!.container-smoke-*.key
 !requirements.runtime.lock
 !app/
 !app/**
