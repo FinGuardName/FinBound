@@ -61,10 +61,9 @@ describe('FinBound P0 application', () => {
         },
         withheldTools: ['INCOME_READ', 'DEBT_READ'],
       }))
-      .mockResolvedValueOnce(jsonResponse({
+      .mockResolvedValueOnce(jsonResponse({ items: [{
         agentRunId: 'RUN-REAL-1',
         status: 'COMPLETED',
-        attempts: [{
           requestId: 'REQ-REAL-1',
           requestedTool: 'CREDIT_SCORE_READ',
           targetConsumerId: 'CUST-1001',
@@ -75,8 +74,7 @@ describe('FinBound P0 application', () => {
           downstreamReached: true,
           responseReleased: true,
           scopeStatus: { customerScope: 'OK' },
-        }],
-      }))
+      }]}))
     configureFinboundApi({ mode: 'real', fetchImpl })
     const wrapper = mount(App)
 

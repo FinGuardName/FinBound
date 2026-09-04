@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('real Core API adapter', () => {
-  it('creates an AgentRun and reads its result only through the Core Public execution API', async () => {
+  it('creates an AgentRun and reads its result through the documented audit API', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse({
         agentRunId: 'RUN-REAL-1',
@@ -42,10 +42,9 @@ describe('real Core API adapter', () => {
         },
         withheldTools: ['INCOME_READ'],
       }))
-      .mockResolvedValueOnce(jsonResponse({
+      .mockResolvedValueOnce(jsonResponse({ items: [{
         agentRunId: 'RUN-REAL-1',
         status: 'COMPLETED',
-        attempts: [{
           requestId: 'REQ-REAL-1',
           requestedTool: 'CREDIT_SCORE_READ',
           targetConsumerId: 'CUST-1001',
@@ -56,8 +55,7 @@ describe('real Core API adapter', () => {
           downstreamReached: true,
           responseReleased: true,
           scopeStatus: { customerScope: 'OK' },
-        }],
-      }))
+      }]}))
 
     configureFinboundApi({
       mode: 'real',
@@ -78,7 +76,8 @@ describe('real Core API adapter', () => {
       inputText: '현재 고객의 신규 대출 심사자료 확인',
     })
     expect(fetchImpl.mock.calls[1][0]).toContain('/api/v1/agent-runs/RUN-REAL-1/permission-comparison')
-    expect(fetchImpl.mock.calls[2][0]).toBe('http://localhost:8080/api/v1/agent-runs/RUN-REAL-1/execution')
+    expect(fetchImpl.mock.calls[2][0]).toContain('/api/v1/audit-events?')
+    expect(new URL(fetchImpl.mock.calls[2][0]).searchParams.get('pageSize')).toBe('100')
     expect(fetchImpl.mock.calls.every(([url]) => !url.includes('/internal/'))).toBe(true)
     expect(result.status).toBe('COMPLETED')
     expect(result.attempts[0]).toMatchObject({
@@ -102,18 +101,17 @@ describe('real Core API adapter', () => {
     })
   })
 
-  it('polls a running Agent execution without calling an internal endpoint', async () => {
+  it('polls audit events until the Agent execution completes', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-POLL-1', status: 'RUNNING' }))
       .mockResolvedValueOnce(jsonResponse({
         agentEffectivePermission: { allowedTools: [], allowedData: [] },
         withheldTools: [],
       }))
-      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-POLL-1', status: 'RUNNING', attempts: [] }))
-      .mockResolvedValueOnce(jsonResponse({
+      .mockResolvedValueOnce(jsonResponse({ items: [] }))
+      .mockResolvedValueOnce(jsonResponse({ items: [{
         agentRunId: 'RUN-POLL-1',
         status: 'COMPLETED',
-        attempts: [{
           requestId: 'REQ-POLL-1',
           tool: 'CREDIT_SCORE_READ',
           targetConsumerId: 'CUST-1001',
@@ -123,8 +121,7 @@ describe('real Core API adapter', () => {
           reasonCodes: ['CASE_SCOPE_VIOLATION'],
           downstreamReached: false,
           responseReleased: false,
-        }],
-      }))
+      }]}))
     const sleepImpl = vi.fn().mockResolvedValue(undefined)
     configureFinboundApi({
       mode: 'real',
@@ -137,7 +134,7 @@ describe('real Core API adapter', () => {
     const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
 
     expect(sleepImpl).toHaveBeenCalledTimes(1)
-    expect(fetchImpl.mock.calls.filter(([url]) => url.endsWith('/execution'))).toHaveLength(2)
+    expect(fetchImpl.mock.calls.filter(([url]) => url.includes('/audit-events?'))).toHaveLength(2)
     expect(fetchImpl.mock.calls.every(([url]) => !url.includes('/internal/'))).toBe(true)
     expect(result.attempts[0]).toMatchObject({
       decision: 'BLOCK',
@@ -309,7 +306,7 @@ describe('real Core API adapter', () => {
         agentEffectivePermission: { allowedTools: [], allowedData: [] },
         withheldTools: [],
       }))
-      .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-BROKEN', status: 'COMPLETED', attempts: [] }))
+      .mockResolvedValueOnce(jsonResponse({ items: [{ agentRunId: 'RUN-BROKEN', status: 'COMPLETED' }] }))
     configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
 
     await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
@@ -328,10 +325,9 @@ describe('real Core API adapter', () => {
         agentEffectivePermission: { allowedTools: [], allowedData: [] },
         withheldTools: [],
       }))
-      .mockResolvedValueOnce(jsonResponse({
+      .mockResolvedValueOnce(jsonResponse({ items: [{
         agentRunId: 'RUN-FAILCLOSED',
-        status: 'COMPLETED',
-        attempts: [{
+        status: 'ERROR',
           requestId: '00000000-0000-4000-8000-00000000f001',
           requestedTool: 'CREDIT_SCORE_READ',
           systemOutcome: 'ERROR',
@@ -340,8 +336,7 @@ describe('real Core API adapter', () => {
           responseReleased: false,
           success: false,
           errorLocation: 'CORE',
-        }],
-      }))
+      }]}))
     configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
 
     const execution = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
@@ -362,17 +357,15 @@ describe('real Core API adapter', () => {
         agentEffectivePermission: { allowedTools: [], allowedData: [] },
         withheldTools: [],
       }))
-      .mockResolvedValueOnce(jsonResponse({
+      .mockResolvedValueOnce(jsonResponse({ items: [{
         agentRunId: 'RUN-BLOCKERROR',
-        status: 'COMPLETED',
-        attempts: [{
+        status: 'ERROR',
           requestId: '00000000-0000-4000-8000-00000000f003',
           requestedTool: 'CREDIT_SCORE_READ',
           decision: 'BLOCK',
           systemOutcome: 'ERROR',
           reasonCodes: ['POLICY_ENGINE_UNAVAILABLE'],
-        }],
-      }))
+      }]}))
     configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
 
     await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
@@ -389,15 +382,13 @@ describe('real Core API adapter', () => {
         agentEffectivePermission: { allowedTools: [], allowedData: [] },
         withheldTools: [],
       }))
-      .mockResolvedValueOnce(jsonResponse({
+      .mockResolvedValueOnce(jsonResponse({ items: [{
         agentRunId: 'RUN-NODECISION',
         status: 'COMPLETED',
-        attempts: [{
           requestId: '00000000-0000-4000-8000-00000000f002',
           requestedTool: 'CREDIT_SCORE_READ',
           systemOutcome: 'COMPLETED',
-        }],
-      }))
+      }]}))
     configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
 
     await expect(finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })).rejects.toMatchObject({
@@ -412,15 +403,13 @@ describe('real Core API adapter', () => {
         agentEffectivePermission: { allowedTools: [], allowedData: [] },
         withheldTools: [],
       }))
-      .mockResolvedValueOnce(jsonResponse({
+      .mockResolvedValueOnce(jsonResponse({ items: [{
         agentRunId: 'RUN-UNKNOWN',
         status: 'COMPLETED',
-        attempts: [{
           requestId: 'REQ-UNKNOWN',
           decision: 'ALLOW',
           systemOutcome: 'COMPLETED',
-        }],
-      }))
+      }]}))
     configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
 
     const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })

@@ -72,6 +72,29 @@ class ToolCallEnforcementServiceTest {
     }
 
     @Test
+    void completionUsesThePostExecutionTimeInsteadOfTheRequestTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00.000000499Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(
+            requestedAt,
+            requestedAt,
+            completedAt,
+            completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any()))
+            .thenReturn(allowOutcome());
+        when(downstreamClient.execute(any(), any(), any())).thenReturn(
+            new DownstreamToolResult("REQ-TIME", FinancialTool.CREDIT_SCORE_READ, "CUST-1001",
+                Map.of("creditScore", 812)));
+
+        advancingService.enforce(identity, request, "REQ-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-TIME").completedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
     void policyBlockCompletesAuditAsBlockAndReturns403() {
         when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
             new AuthorizationOutcome(

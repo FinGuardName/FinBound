@@ -260,12 +260,24 @@ function isContractualAttempt(attempt) {
   return ['ALLOW', 'BLOCK'].includes(attempt.decision)
 }
 
-async function getAgentExecution(agentRunId) {
-  const pathId = encodeURIComponent(agentRunId)
-  return validateExecution(
-    await coreRequest(`/api/v1/agent-runs/${pathId}/execution`),
+function executionFromAudit(agentRunId, audit) {
+  if (!audit) return { agentRunId, status: 'RUNNING', attempts: [] }
+  const status = audit.status === 'PROCESSING'
+    ? 'RUNNING'
+    : audit.status === 'ERROR' ? 'FAILED' : 'COMPLETED'
+  return {
     agentRunId,
-  )
+    status,
+    attempts: status === 'RUNNING' ? [] : [audit],
+    reasonCodes: audit.reasonCodes ?? [],
+  }
+}
+
+async function getAgentExecution(agentRunId) {
+  const query = queryString({ page: 1, pageSize: 100 })
+  const page = await coreRequest(`/api/v1/audit-events?${query}`)
+  const audit = (page.items ?? []).find((item) => item.agentRunId === agentRunId)
+  return validateExecution(executionFromAudit(agentRunId, audit), agentRunId)
 }
 
 async function waitForAgentExecution(agentRunId) {

@@ -115,7 +115,7 @@ public class ToolCallEnforcementService {
             identity, request, requestId, traceparent, requestedAt);
         if (!outcome.isAllow()) {
             EnforcementResult result = block(requestId, outcome.reasonCodes());
-            safeUpdateOutcome(identity, requestId, traceparent, blockOutcome(outcome, requestedAt));
+            safeUpdateOutcome(identity, requestId, traceparent, blockOutcome(outcome, clock.instant()));
             completedResponses.put(requestId, result);
             return result;
         }
@@ -136,18 +136,18 @@ public class ToolCallEnforcementService {
             EnforcementResult result = new EnforcementResult(
                 HttpStatus.OK,
                 ToolCallResponse.allow(requestId, downstreamResult(downstream)));
-            safeUpdateOutcome(identity, requestId, traceparent, allowOutcome(outcome, requestedAt, latencyMs));
+            safeUpdateOutcome(identity, requestId, traceparent, allowOutcome(outcome, clock.instant(), latencyMs));
             completedResponses.put(requestId, result);
             return result;
         } catch (DownstreamUnavailableException e) {
             log.warn("Downstream failed requestId={} reached={}", requestId, e.downstreamReached(), e);
             return recordDownstreamError(
-                identity, requestId, traceparent, outcome, requestedAt,
+                identity, requestId, traceparent, outcome, clock.instant(),
                 "DOWNSTREAM_ERROR", e.downstreamReached(), HttpStatus.BAD_GATEWAY);
         } catch (DownstreamTimeoutException e) {
             log.warn("Downstream timed out requestId={}", requestId, e);
             return recordDownstreamError(
-                identity, requestId, traceparent, outcome, requestedAt,
+                identity, requestId, traceparent, outcome, clock.instant(),
                 "DOWNSTREAM_TIMEOUT", true, HttpStatus.GATEWAY_TIMEOUT);
         }
     }
