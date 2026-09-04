@@ -25,6 +25,7 @@ Thumbs.db
 !.env.example
 *.pem
 *.key
+**/gradle.properties
 
 # Python (ai-risk가 컨텍스트에 있으면 무시)
 **/__pycache__/

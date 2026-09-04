@@ -1,0 +1,65 @@
+name: Backend 3 Compose contracts
+
+on:
+  pull_request:
+    paths:
+      - backend/**
+      - policy/**
+      - gradle/**
+      - gradlew
+      - settings.gradle.kts
+      - build.gradle.kts
+      - naver-checkstyle.xml
+      - naver-checkstyle-suppressions.xml
+      - .dockerignore
+      - infrastructure/**
+      - .env.example
+      - .github/workflows/compose-services.yml
+  push:
+    branches: [main, develop]
+    paths:
+      - backend/**
+      - policy/**
+      - gradle/**
+      - gradlew
+      - settings.gradle.kts
+      - build.gradle.kts
+      - naver-checkstyle.xml
+      - naver-checkstyle-suppressions.xml
+      - .dockerignore
+      - infrastructure/**
+      - .env.example
+      - .github/workflows/compose-services.yml
+  workflow_dispatch:
+    inputs:
+      full_stack:
+        description: Run real topology smoke
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  configuration-and-startup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose topology and secret-output contracts
+        shell: pwsh
+        run: ./infrastructure/tests/compose-contract.ps1
+      - name: Credential startup unit cases
+        shell: pwsh
+        run: ./infrastructure/tests/secret-entrypoint.ps1
+
+  real-topology:
+    if: github.event_name != 'workflow_dispatch' || inputs.full_stack
+    needs: configuration-and-startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, start and verify the isolated real topology
+        shell: pwsh
+        run: ./infrastructure/tests/compose-smoke.ps1
