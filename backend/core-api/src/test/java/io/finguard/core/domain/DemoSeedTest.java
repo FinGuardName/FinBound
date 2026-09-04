@@ -98,18 +98,32 @@ class DemoSeedTest {
     }
 
     @Test
-    void mandateCoversTheCaseConsumerOnly() {
+    void mandatesCoverTheCaseConsumerAndTheTwoAttackFixtures() {
+        // CUST-1001은 데모의 정상 경로다. CUST-1002·CUST-1003은 공격 Scenario가 실제로 막히도록
+        // Mandate를 좁혀 둔 Fixture다 — docs/04-api-contract.md §3.1. Mandate가 Data를 좁히면
+        // EffectivePermissionCalculator가 그 Data를 요구하는 Tool까지 함께 떨어뜨린다.
         List<String> mandateConsumers =
                 jdbcTemplate.queryForList("select consumer_id from consumer_mandates", String.class);
-        List<String> allowedData =
-                jdbcTemplate.queryForList(
-                        "select d.data_type from consumer_mandate_allowed_data d"
-                                + " join consumer_mandates m on m.mandate_id = d.mandate_id"
-                                + " where m.consumer_id = 'CUST-1001'",
-                        String.class);
 
-        assertThat(mandateConsumers).containsExactly("CUST-1001");
-        assertThat(allowedData).containsExactlyInAnyOrder("CREDIT_SCORE", "INCOME", "DEBT");
+        assertThat(mandateConsumers)
+                .containsExactlyInAnyOrder("CUST-1001", "CUST-1002", "CUST-1003");
+        assertThat(allowedDataOf("CUST-1001"))
+                .containsExactlyInAnyOrder("CREDIT_SCORE", "INCOME", "DEBT");
+        assertThat(allowedDataOf("CUST-1002"))
+                .as("TOOL/DATA 공격용 — INCOME이 빠져야 한다")
+                .containsExactlyInAnyOrder("CREDIT_SCORE", "DEBT");
+        assertThat(allowedDataOf("CUST-1003"))
+                .as("MANDATE 공격용 — DEBT가 빠져야 한다")
+                .containsExactlyInAnyOrder("CREDIT_SCORE", "INCOME");
+    }
+
+    private List<String> allowedDataOf(String consumerId) {
+        return jdbcTemplate.queryForList(
+                "select d.data_type from consumer_mandate_allowed_data d"
+                        + " join consumer_mandates m on m.mandate_id = d.mandate_id"
+                        + " where m.consumer_id = ?",
+                String.class,
+                consumerId);
     }
 
     @Test
