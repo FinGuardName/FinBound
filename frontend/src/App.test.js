@@ -135,6 +135,8 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).toContain('AI는 담당 직원보다 더 많은 정보에 접근할 수 없습니다')
     expect(wrapper.text()).toContain('허용 자료')
     expect(wrapper.text()).toContain('CREDIT_SCORE')
+    expect(wrapper.get('.security-details').element.tagName).toBe('SECTION')
+    expect(wrapper.find('details.security-details').exists()).toBe(false)
     expect(wrapper.findAll('input[type="radio"]')).toHaveLength(0)
     expect(wrapper.text()).toContain('직원이 요청한 업무')
     expect(wrapper.text()).toContain('AI로 이 업무 진행')
@@ -147,6 +149,11 @@ describe('FinBound P0 application', () => {
     await wrapper.get('.agent-task-form').trigger('submit')
     await flushPromises()
 
+    const reviewSteps = wrapper.findAll('.review-status span')
+    expect(reviewSteps[1].classes()).toContain('complete')
+    expect(reviewSteps[1].text()).toContain('자료 확인완료')
+    expect(reviewSteps[2].classes()).toContain('current')
+    expect(reviewSteps[2].text()).toContain('심사 의견진행 중')
     expect(wrapper.text()).toContain('신규 대출 심사자료 확인이 완료되었습니다')
     expect(wrapper.text()).toContain('3건 확인 · 0건 차단')
     expect(wrapper.text()).toContain('차단 사유 없음')
@@ -155,6 +162,30 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).not.toContain('CASE_SCOPE_VIOLATION')
     expect(wrapper.text()).not.toContain('FinBound 보호 작동')
     expect(wrapper.text()).not.toContain('POLICY_REQUIREMENTS_MET')
+  })
+
+  it('does not advance the review step while the Agent execution is still running', async () => {
+    vi.spyOn(finboundApi, 'executeAgentTask').mockResolvedValueOnce({
+      status: 'RUNNING',
+      title: 'AI 업무를 실행하고 있습니다',
+      message: '실행 결과를 기다리고 있습니다.',
+      resultHeading: '현재 업무 권한이 준비되었습니다',
+      resultItems: [],
+      nextAction: '잠시 기다려 주세요.',
+      attempts: [],
+    })
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    const reviewSteps = wrapper.findAll('.review-status span')
+    expect(reviewSteps[1].classes()).toContain('current')
+    expect(reviewSteps[1].classes()).not.toContain('complete')
+    expect(reviewSteps[1].text()).toContain('자료 확인진행 중')
+    expect(reviewSteps[2].classes()).not.toContain('current')
+    expect(reviewSteps[2].text()).toContain('심사 의견예정')
   })
 
   it('fails closed for an unsupported Agent task', async () => {
@@ -208,9 +239,47 @@ describe('FinBound P0 application', () => {
     expect(wrapper.text()).toContain('0건 확인 · 0건 차단 · 1건 오류')
     expect(wrapper.text()).toContain('처리 오류')
     expect(wrapper.text()).toContain('금융시스템 요청전달됨')
+    const reviewSteps = wrapper.findAll('.review-status span')
+    expect(reviewSteps[1].classes()).toContain('current')
+    expect(reviewSteps[1].classes()).not.toContain('complete')
+    expect(reviewSteps[2].classes()).not.toContain('current')
     expect(wrapper.text()).not.toContain('완료 · 1회')
     expect(wrapper.text()).not.toContain('1건 확인 · 0건 차단')
     executeAgentTask.mockRestore()
+  })
+
+  it('shows every policy reason for a single blocked attempt', async () => {
+    vi.spyOn(finboundApi, 'executeAgentTask').mockResolvedValueOnce({
+      status: 'COMPLETED',
+      title: 'AI 업무 처리가 완료되었습니다',
+      message: '실행 결과를 확인해 주세요.',
+      resultHeading: 'Agent 실행 결과',
+      resultItems: ['안전 차단 1건'],
+      nextAction: '차단 사유를 확인해 주세요.',
+      attempts: [{
+        requestId: 'REQ-MULTI-REASON',
+        decision: 'BLOCK',
+        systemOutcome: 'COMPLETED',
+        label: '부채자료 확인',
+        description: '업무 범위를 벗어나 차단했습니다.',
+        targetConsumerId: 'CUST-1001',
+        scopeStatus: { customerScope: 'OK' },
+        reasonCodes: ['DATA_SCOPE_VIOLATION', 'MANDATE_SCOPE_VIOLATION', 'TOOL_SCOPE_VIOLATION'],
+        downstreamReached: false,
+        responseReleased: false,
+        tool: 'DEBT_READ',
+        requestedData: ['DEBT'],
+      }],
+    })
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('.reason-code').text()).toBe(
+      'DATA_SCOPE_VIOLATION · MANDATE_SCOPE_VIOLATION · TOOL_SCOPE_VIOLATION',
+    )
   })
 
   it.each([
@@ -333,6 +402,8 @@ describe('FinBound P0 application', () => {
       promptRisk: 0.1,
       behaviorRisk: 0.2,
       behaviorRiskLevel: 'LOW',
+      errorLocation: 'DOWNSTREAM',
+      requestedData: ['CREDIT_SCORE'],
       requestedAt: '2026-09-03T10:00:00+09:00',
     })
     vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 0, block: 0, error: 1 })
@@ -353,8 +424,12 @@ describe('FinBound P0 application', () => {
     expect(wrapper.findAll('.execution-state dd').map((node) => node.text())).toEqual([
       '요청 전달됨',
       '제공 안 함',
+      '신용정보',
+      '금융시스템',
     ])
     expect(wrapper.get('.event-detail').text()).toContain('DOWNSTREAM_TIMEOUT')
+    expect(wrapper.get('.execution-state').text()).toContain('확인 요청 자료신용정보')
+    expect(wrapper.get('.execution-state').text()).toContain('오류 발생 위치금융시스템')
     expect(wrapper.get('.event-detail').text()).not.toContain('조회 완료')
   })
 
@@ -436,12 +511,14 @@ describe('FinBound P0 application', () => {
     await flushPromises()
 
     expect(wrapper.findAll('.event-row')).toHaveLength(5)
+    expect(wrapper.get('.event-list-heading em').text()).toBe('총 9건')
     expect(wrapper.text()).toContain('1 / 2 페이지')
 
     await wrapper.get('.pagination button:last-child').trigger('click')
     await flushPromises()
 
     expect(wrapper.findAll('.event-row')).toHaveLength(4)
+    expect(wrapper.get('.event-list-heading em').text()).toBe('총 9건')
     expect(wrapper.text()).toContain('2 / 2 페이지')
   })
 
@@ -456,6 +533,43 @@ describe('FinBound P0 application', () => {
 
     expect(wrapper.findAll('.risk-meter')[0].text()).toContain('미평가')
     expect(wrapper.text()).toContain('입력 모델미평가')
+  })
+
+  it('renders the Core prompt risk level when the legacy boolean is unavailable', async () => {
+    const promptAlert = mapAuditEvent({
+      auditEventId: 'AUD-PROMPT-LEVEL',
+      requestId: 'REQ-PROMPT-LEVEL',
+      agentId: 'LOAN-AGENT-01',
+      agentRunId: 'RUN-PROMPT-LEVEL',
+      status: 'COMPLETED',
+      systemOutcome: 'COMPLETED',
+      decision: 'ALLOW',
+      reasonCodes: [],
+      downstreamReached: true,
+      responseReleased: true,
+      promptRiskEvaluationStatus: 'EVALUATED',
+      promptRiskLevel: 'ALERT',
+      promptRisk: 0.55,
+      behaviorRisk: 0.1,
+      requestedAt: '2026-09-03T10:00:00+09:00',
+    })
+    vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 1, block: 0, error: 0 })
+    vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
+      items: [promptAlert],
+      page: 1,
+      pageSize: 5,
+      totalItems: 1,
+      totalPages: 1,
+      filterOptions: { agentIds: [], caseIds: [], consumerIds: [], tools: [], reasonCodes: [] },
+    })
+    vi.spyOn(finboundApi, 'getAuditEvent').mockResolvedValue(promptAlert)
+    const wrapper = mount(App)
+
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.risk-meter')[0].text()).toContain('주의')
+    expect(wrapper.findAll('.risk-meter')[0].text()).not.toContain('결과 미제공')
   })
 
   it('supports MEDIUM severity and server-style pagination at the API boundary', async () => {

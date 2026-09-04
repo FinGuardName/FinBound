@@ -7,6 +7,56 @@ Backend 3 소유 영역입니다. P0에서는 Spring AI 연동 또는 결정론�
 - Body의 Agent ID나 권한 목록을 권한 근거로 사용하지 않습니다.
 - Mock Financial API를 직접 호출하지 않습니다.
 
+## 컨테이너 실행
+
+이미지는 저장소 루트를 Build Context로 사용합니다. 이미지 빌드에는 Credential을 전달하지
+않으며, `Dockerfile.dockerignore`가 개인용 `gradle.properties`, `.env`, 다른 모듈과 빌드
+산출물을 Context에서 제외합니다.
+
+Docker Buildx/BuildKit이 필수입니다. Legacy Builder는 지원하지 않으며,
+`Dockerfile.dockerignore`가 적용되도록 `DOCKER_BUILDKIT=1`로 빌드합니다.
+스모크 실행에는 Git, Bash, Python 3.12 이상(표준 라이브러리만 사용), curl, OpenSSL이 필요합니다.
+
+```bash
+DOCKER_BUILDKIT=1 docker build -f backend/agent/Dockerfile -t finguard-agent:local .
+
+export AGENT_SERVICE_CREDENTIAL="$(openssl rand -base64 32)"
+export FINGUARD_INTERNAL_CREDENTIAL="$(openssl rand -base64 32)"
+docker run --rm --name finguard-agent \
+  --memory=512m \
+  --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --security-opt no-new-privileges:true \
+  --cap-drop=ALL \
+  -p 127.0.0.1:8082:8082 \
+  -e AGENT_SERVICE_CREDENTIAL \
+  -e FINGUARD_INTERNAL_CREDENTIAL \
+  -e GATEWAY_BASE_URL=http://host.docker.internal:8081 \
+  finguard-agent:local
+```
+
+`AGENT_SERVICE_CREDENTIAL`과 `FINGUARD_INTERNAL_CREDENTIAL`은 Runtime에만 주입합니다.
+둘 중 하나가 없으면 설정 검증 단계에서 기동이 실패합니다. `/actuator/health`는 Credential
+없이 조회할 수 있지만 `/internal/v1/agent-simulations`는 유효한 Internal Credential이
+없으면 `401 INTERNAL_CREDENTIAL_INVALID`로 거부됩니다.
+
+```bash
+curl -fsS http://localhost:8082/actuator/health
+docker run --rm --entrypoint java finguard-agent:local -version
+docker run --rm --entrypoint id finguard-agent:local -u
+docker history --no-trunc finguard-agent:local
+bash infrastructure/tests/service-container-smoke.sh
+```
+
+Runtime은 Java 21, UID/GID `10001`, 컨테이너 메모리 상한의 75% 이하 Heap으로 동작합니다.
+위 `docker run` 예시는 512 MiB 상한을 명시합니다. Compose 서비스 연결은 Issue #62에서
+담당합니다.
+
+Dockerfile Frontend와 JDK/JRE 베이스는 digest로 고정하고, Gradle 8.14.3 배포본은
+Wrapper의 `distributionSha256Sum`으로 새 다운로드를 검증합니다. 베이스 보안 업데이트 시
+두 Dockerfile의 digest를 함께 갱신하고 스모크를 재실행합니다. Maven 의존성 전체의
+Lockfile·검증 Metadata는 이 이미지 PR에 포함하지 않으며 별도 공통 빌드 작업으로 관리합니다.
+
 ## 현재 구현 상태
 
 P0 통합 전 정상 요청과 Case/Tool/Data/Mandate Scope 공격 요청을 반복 가능하게 생성하는 결정론적
@@ -134,7 +184,7 @@ Simulator의 ALLOW/BLOCK 응답은 HTTP 200 `{scenario, gatewayResponse}`이며 
 
 현재 `develop`에는 #77·#75·#78이 반영되어 세 Tool/Data, Core → Agent 호출,
 엄격한 Gateway 응답 검증을 제공합니다. 다만 Core Enum은 아직 기존 2개
-Scenario만 수용하므로 #79 병합 전 7개 값으로 맞춰야 합니다.
+Scenario만 수용하므로 확장 Scenario의 통합 활성화 전 7개 값으로 맞춰야 합니다.
 
 ## 검증
 
@@ -145,6 +195,23 @@ Scenario만 수용하므로 #79 병합 전 7개 값으로 맞춰야 합니다.
 테스트는 전달받은 참조의 변경 없는 전달, 필수 참조 누락 시 Gateway 미호출,
 정상/공격 Scenario 변환, 내부 Credential 거부, Gateway Header와 최소 Runtime Body,
 `ALLOW/BLOCK` 구분, Timeout/5xx/잘못된 응답의 명시적 실패를 검증합니다.
+
+컨테이너 스모크는 Health·인증 누락 거부 외에 Mock Finance의 인증된 신용점수 조회
+`200`과 응답 Contract도 검증합니다. Agent가 실제 Gateway를 통해 금융 API까지 호출하는
+성공 경로와 정책 BLOCK의 Downstream 미도달은 #62 통합 E2E에서 검증합니다.
+
+스모크는 추적 중인 빌드 입력의 작업 파일을 임시 Context로 복사한 뒤, 빌드 **전에**
+가짜 자격증명을 루트 `.env`·`gradle.properties`와 두 모듈 Resources의 `.env`·`.key`에
+심습니다. 원래 작업 폴더의 설정은 변경하지 않습니다. `docker image save`의 모든 Layer,
+이미지 Config, 압축된 JAR/중첩 JAR를 검사하므로 나중 Layer에서 삭제한 파일도 검사 대상입니다.
+이는 주입한 Canary의 유입 방지 회귀 검사이며, 임의의 모든 Secret을 탐지하는 스캐너는 아닙니다.
+
+Windows Git Bash에서는 Tmpfs 인자만 경로 변환에서 제외합니다. `MSYS_NO_PATHCONV=1`은
+curl의 응답 파일 경로 변환까지 막으므로 사용하지 않습니다.
+
+```bash
+MSYS2_ARG_CONV_EXCL='/tmp:rw,noexec,nosuid,size=64m' bash infrastructure/tests/service-container-smoke.sh
+```
 
 실제 HTTP 통합 테스트는 정상 Gateway 1회, 누락/null/공백 참조의 Gateway 0회, BLOCK 전달,
 4xx/5xx/Timeout/잘못된 응답의 실행 오류 및 재시도 없음을 검증합니다.

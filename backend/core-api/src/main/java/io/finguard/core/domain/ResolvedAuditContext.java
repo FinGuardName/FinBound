@@ -22,6 +22,7 @@ public record ResolvedAuditContext(
         AuditScopeStatus scopeStatus,
         BigDecimal promptRisk,
         PromptRiskEvaluationStatus promptRiskEvaluationStatus,
+        PromptRiskLevel promptRiskLevel,
         String promptModelVersion) {
 
     public ResolvedAuditContext {
@@ -39,6 +40,9 @@ public record ResolvedAuditContext(
             // 검사하지 않았음과 검사했고 음성은 반드시 구분한다(docs/04 §7).
             throw new IllegalArgumentException(
                     "Resolved audit context requires promptRiskEvaluationStatus");
+        }
+        if (promptRiskLevel == null) {
+            throw new IllegalArgumentException("Resolved audit context requires promptRiskLevel");
         }
         if (promptRisk != null
                 && (promptRisk.compareTo(BigDecimal.ZERO) < 0
@@ -62,6 +66,7 @@ public record ResolvedAuditContext(
                 && requestedData.equals(other.requestedData)
                 && scopeStatus.equals(other.scopeStatus)
                 && promptRiskEvaluationStatus == other.promptRiskEvaluationStatus
+                && promptRiskLevel == other.promptRiskLevel
                 && Objects.equals(promptModelVersion, other.promptModelVersion)
                 && sameAmount(promptRisk, other.promptRisk);
     }

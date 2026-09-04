@@ -26,6 +26,12 @@
           }
         ]
       },
+      "normalizedArtifacts": {
+        "test": {
+          "records": 116,
+          "sha256": "de0996d15cabd838d50a4925a8493062ba70c29f845601cd6a17412236614486"
+        }
+      },
       "decision": "APPROVED_BASELINE",
       "notes": "Small English binary baseline. Keep its upstream test separate from FinBound held-out data."
     },

@@ -95,11 +95,24 @@ public class AuditEvent {
     @Column(name = "prompt_risk_evaluation_status", length = 32)
     private PromptRiskEvaluationStatus promptRiskEvaluationStatus;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "prompt_risk_level", length = 16)
+    private PromptRiskLevel promptRiskLevel;
+
     @Column(name = "prompt_model_version", length = 64)
     private String promptModelVersion;
 
     @Column(name = "behavior_risk", precision = 5, scale = 4)
     private BigDecimal behaviorRisk;
+
+    /** OPA가 반환한 정책 중요도. 과거 기록과 정책 판정 전 시스템 오류에는 없을 수 있다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity", length = 16)
+    private Severity severity;
+
+    /** Prompt 또는 Behavior의 ALERT를 포함한 OPA 위험 표시 결과. */
+    @Column(name = "risk_flagged")
+    private Boolean riskFlagged;
 
     /** 판정 전에는 비어 있다. PROCESSING 상태의 감사 기록은 결론이 없는 것이 정상이다. */
     @Enumerated(EnumType.STRING)
@@ -212,6 +225,7 @@ public class AuditEvent {
         this.scopeStatus = context.scopeStatus();
         this.promptRisk = context.promptRisk();
         this.promptRiskEvaluationStatus = context.promptRiskEvaluationStatus();
+        this.promptRiskLevel = context.promptRiskLevel();
         this.promptModelVersion = context.promptModelVersion();
     }
 
@@ -231,6 +245,7 @@ public class AuditEvent {
                 scopeStatus,
                 promptRisk,
                 promptRiskEvaluationStatus,
+                promptRiskLevel,
                 promptModelVersion);
     }
 
@@ -256,6 +271,10 @@ public class AuditEvent {
 
     public PromptRiskEvaluationStatus getPromptRiskEvaluationStatus() {
         return promptRiskEvaluationStatus;
+    }
+
+    public PromptRiskLevel getPromptRiskLevel() {
+        return promptRiskLevel;
     }
 
     public String getPromptModelVersion() {
@@ -296,6 +315,14 @@ public class AuditEvent {
 
     public BigDecimal getBehaviorRisk() {
         return behaviorRisk;
+    }
+
+    public Severity getSeverity() {
+        return severity;
+    }
+
+    public Boolean getRiskFlagged() {
+        return riskFlagged;
     }
 
     public PolicyDecision getDecision() {
@@ -364,6 +391,8 @@ public class AuditEvent {
         this.latencyMs = completion.latencyMs();
         this.errorLocation = completion.errorLocation();
         this.behaviorRisk = completion.behaviorRisk();
+        this.severity = completion.severity();
+        this.riskFlagged = completion.riskFlagged();
         this.policyVersion = completion.policyVersion();
         this.status = completion.systemOutcome();
         this.completedAt = completion.completedAt();

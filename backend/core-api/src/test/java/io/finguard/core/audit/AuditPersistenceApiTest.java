@@ -218,6 +218,8 @@ class AuditPersistenceApiTest {
                           "downstreamReached": false,
                           "responseReleased": false,
                           "behaviorRisk": 0.21,
+                          "severity": "CRITICAL",
+                          "riskFlagged": true,
                           "policyVersion": "loan-review-policy-1",
                           "completedAt": "%s"
                         }
@@ -228,13 +230,17 @@ class AuditPersistenceApiTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().get("status").asText()).isEqualTo("COMPLETED");
         assertThat(response.getBody().get("decision").asText()).isEqualTo("BLOCK");
+        assertThat(response.getBody().get("severity").asText()).isEqualTo("CRITICAL");
+        assertThat(response.getBody().get("riskFlagged").asBoolean()).isTrue();
         assertThat(response.getBody().get("downstreamReached").asBoolean()).isFalse();
         assertThat(
-                        jdbcTemplate.queryForObject(
-                                "select downstream_reached from audit_events where request_id = ?",
-                                Boolean.class,
+                        jdbcTemplate.queryForMap(
+                                "select severity, risk_flagged, downstream_reached"
+                                        + " from audit_events where request_id = ?",
                                 requestId))
-                .isFalse();
+                .containsEntry("severity", "CRITICAL")
+                .containsEntry("risk_flagged", true)
+                .containsEntry("downstream_reached", false);
         assertThat(
                         jdbcTemplate.queryForList(
                                 "select reason_code from audit_event_reason_codes"
@@ -263,6 +269,8 @@ class AuditPersistenceApiTest {
                           "responseReleased": true,
                           "success": true,
                           "behaviorRisk": 0.08,
+                          "severity": "LOW",
+                          "riskFlagged": false,
                           "policyVersion": "loan-review-policy-1",
                           "completedAt": "%s"
                         }
@@ -273,6 +281,8 @@ class AuditPersistenceApiTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().get("decision").asText()).isEqualTo("ALLOW");
         assertThat(response.getBody().get("status").asText()).isEqualTo("COMPLETED");
+        assertThat(response.getBody().get("severity").asText()).isEqualTo("LOW");
+        assertThat(response.getBody().get("riskFlagged").asBoolean()).isFalse();
         assertThat(response.getBody().get("downstreamReached").asBoolean()).isTrue();
         assertThat(response.getBody().get("responseReleased").asBoolean()).isTrue();
     }
@@ -301,6 +311,8 @@ class AuditPersistenceApiTest {
                           "recordsRead": 1,
                           "latencyMs": 120,
                           "behaviorRisk": 0.08,
+                          "severity": "LOW",
+                          "riskFlagged": false,
                           "policyVersion": "loan-review-policy-1",
                           "completedAt": "%s"
                         }
@@ -341,6 +353,8 @@ class AuditPersistenceApiTest {
                           "responseReleased": false,
                           "success": false,
                           "errorLocation": "MOCK_FINANCE",
+                          "severity": "LOW",
+                          "riskFlagged": false,
                           "policyVersion": "loan-review-policy-1",
                           "completedAt": "%s"
                         }
@@ -563,6 +577,8 @@ class AuditPersistenceApiTest {
                   "reasonCodes": ["CASE_SCOPE_VIOLATION"],
                   "downstreamReached": false,
                   "responseReleased": false,
+                  "severity": "CRITICAL",
+                  "riskFlagged": true,
                   "completedAt": "%s"
                 }
                 """
