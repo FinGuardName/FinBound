@@ -7,16 +7,16 @@ WORKDIR /workspace
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle gradle
 COPY naver-checkstyle.xml naver-checkstyle-suppressions.xml ./
-RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle \
+RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle,sharing=locked \
     ./gradlew --version --no-daemon >/dev/null
 
 COPY backend/mock-finance/build.gradle.kts backend/mock-finance/
-RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle \
+RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle,sharing=locked \
     ./gradlew :backend:mock-finance:dependencies \
         --configuration runtimeClasspath --no-daemon --quiet >/dev/null
 
 COPY backend/mock-finance/src backend/mock-finance/src
-RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle \
+RUN --mount=type=cache,id=finguard-gradle,target=/root/.gradle,sharing=locked \
     ./gradlew :backend:mock-finance:bootJar --no-daemon \
     && cp backend/mock-finance/build/libs/*.jar /workspace/mock-finance.jar
 
