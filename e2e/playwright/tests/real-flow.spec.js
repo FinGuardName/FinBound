@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 const operatorCredential = process.env.E2E_OPERATOR_CREDENTIAL
+const gatewayBaseUrl = process.env.GATEWAY_BASE_URL
+const authFailureRequestId = '00000000-0000-4000-8000-00000000e2e0'
+const snapshotReuseInput = 'FinGuard E2E snapshot reuse verification'
 const headers = () => ({
   Authorization: `Bearer ${operatorCredential}`,
   'Content-Type': 'application/json',
@@ -120,6 +123,44 @@ test('real Core-Agent-Gateway-AI-OPA flow preserves ALLOW and BLOCK boundaries',
     promptRiskEvaluationStatus: 'EVALUATED',
     promptRiskLevel: 'CRITICAL',
   })
+})
+
+test('invalid Gateway credential creates a SecurityAuthEvent without a business audit', async ({ request }) => {
+  const response = await request.post(`${gatewayBaseUrl}/gateway/v1/tool-calls`, {
+    headers: {
+      Authorization: 'Bearer invalid-e2e-agent-credential',
+      'Content-Type': 'application/json',
+      'X-Request-Id': authFailureRequestId,
+    },
+    data: {
+      agentRunId: 'RUN-E2E-AUTH-FAILURE',
+      passportId: 'PASS-E2E-AUTH-FAILURE',
+      tool: 'CREDIT_SCORE_READ',
+      targetConsumerId: 'CUST-1001',
+      requestedData: ['CREDIT_SCORE'],
+      action: 'READ',
+    },
+  })
+  expect(response.status()).toBe(401)
+})
+
+test('the same Prompt Snapshot is reused for two AgentRuns', async ({ request }) => {
+  const first = await completedAudit(request, await startRun(request, {
+    scenario: 'NORMAL_CREDIT_SCORE',
+    inputText: snapshotReuseInput,
+  }))
+  const second = await completedAudit(request, await startRun(request, {
+    scenario: 'NORMAL_CREDIT_SCORE',
+    inputText: snapshotReuseInput,
+  }))
+
+  for (const audit of [first, second]) {
+    expect(audit).toMatchObject({
+      decision: 'ALLOW',
+      systemOutcome: 'COMPLETED',
+      promptRiskEvaluationStatus: 'EVALUATED',
+    })
+  }
 })
 
 test('SPA bundle and runtime storage do not contain credentials', async ({ page, request }) => {

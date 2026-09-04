@@ -179,15 +179,16 @@ PR·`main`·`develop` Push에서 자동 실행하며, 수동 실행은 `full_sta
 `frontend-ai-e2e.ps1`는 고유한 `finguard-72-<random>` 프로젝트에서 8개 서비스를 빌드하고,
 실제 브라우저 연결과 Core→Agent→Gateway→AI→OPA→Mock Finance 흐름을 검사합니다.
 정상 ALLOW, 범위 BLOCK, Prompt Risk BLOCK, AI 중단 fail-closed와 downstream 미도달,
-브라우저 저장소·정적 번들·서비스 로그의 Credential/원문/금융 응답 비노출을 검증합니다.
+인증 실패의 SecurityAuthEvent 격리, 동일 Prompt Snapshot 재사용, 실제 AI Behavior CRITICAL의
+OPA 차단, 브라우저 저장소·정적 번들·서비스 로그의 Credential/원문/금융 응답 비노출을 검증합니다.
 테스트 Credential은 매번 무작위로 만들며 종료 시 해당 프로젝트와 DB 볼륨만 삭제합니다.
 
 ## 업무 E2E 범위
 
 외부 API/DTO/Scope/Policy Contract는 변경하지 않습니다. Frontend는 문서화된
-`GET /api/v1/audit-events`의 최신 결과에서 `agentRunId`가 같은 기록을 찾아 실행 완료를 표시합니다.
+`GET /api/v1/agent-runs/{agentRunId}/execution`에서 해당 실행의 완료 상태와 시도를 조회합니다.
 AI는 위험 신호만 반환하며 최종 ALLOW/BLOCK은 계속 OPA가 결정합니다.
 
 AI 모델 artifact digest·누락 시 readiness 실패는 `ai-risk` 단위/컨테이너 테스트와
 `AI Risk container image` CI가 담당하고, 이 E2E는 검증된 artifact로 `/ready` 성공을 확인합니다.
-기능/인수 조건 ID: **F07, F18, F21, AC-01, AC-02, AC-14, AC-16, AC-19**.
+기능/인수 조건 ID: **F07, F18, F21, AC-01, AC-02, AC-03, AC-04, AC-10, AC-12, AC-14, AC-16, AC-19**.

@@ -7,7 +7,9 @@ services:
     environment:
       CI: "1"
       FRONTEND_BASE_URL: http://frontend:8080
+      GATEWAY_BASE_URL: http://gateway:8081
       AI_RISK_BASE_URL: http://ai-risk:8000
+      OPA_BASE_URL: http://opa:8181
       FINGUARD_REQUIRED_SECRETS: E2E_OPERATOR_CREDENTIAL E2E_AI_CREDENTIAL
     secrets:
       - source: operator-credential
