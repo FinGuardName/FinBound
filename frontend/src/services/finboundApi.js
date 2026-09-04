@@ -225,15 +225,39 @@ function validateExecution(execution, agentRunId) {
       code: 'CORE_API_INVALID_RESPONSE',
     })
   }
-  if ((execution.attempts ?? []).some((attempt) => (
-    !['ALLOW', 'BLOCK'].includes(attempt?.decision)
-    || !['COMPLETED', 'ERROR'].includes(attempt?.systemOutcome)
-  ))) {
+  if ((execution.attempts ?? []).some((attempt) => !isContractualAttempt(attempt))) {
     throw new FinboundApiError('Agent execution attempt did not preserve decision and system outcome', {
       code: 'CORE_API_INVALID_RESPONSE',
     })
   }
   return execution
+}
+
+/**
+ * systemOutcome 은 언제나 있어야 하지만 decision 은 그렇지 않다.
+ *
+ * 정책 판정에 닿기 전에 시스템 장애로 차단된 실행은 decision 을 생략한다.
+ * contracts/audit/execution-outcome.schema.json 이 systemOutcome=COMPLETED 일 때만
+ * decision 을 요구하며, docs/06 §11 이 "시스템 장애는 Decision Enum 이 아니라
+ * Audit/System Outcome 으로 표현한다"고 정했다.
+ *
+ * decision 을 늘 요구하면 Core·AI·OPA 장애로 막힌 실행을 통째로 버리게 된다.
+ * 그러면 담당자는 "왜 막혔는지"가 아니라 "확인할 수 없습니다"만 본다 —
+ * 기록이 가장 필요한 순간에 화면에서 사라진다.
+ *
+ * ERROR 가 decision 을 가질 수도 있다. Downstream 실패는 ALLOW + ERROR 다
+ * (execution-outcome.error.valid.json). 그래서 부재를 허용하되 값이 오면 검사한다.
+ *
+ * 다만 BLOCK + ERROR 는 받지 않는다. 스키마가 표현할 수 없는 상태다 —
+ * ERROR 절은 success 를 필수로 요구하고 BLOCK 절은 success 의 존재 자체를 금지한다
+ * (execution-outcome.schema.json 의 두 조건부 절). 어느 값을 넣어도 통과하지 못한다.
+ */
+function isContractualAttempt(attempt) {
+  if (!['COMPLETED', 'ERROR'].includes(attempt?.systemOutcome)) return false
+  if (attempt.systemOutcome === 'ERROR') {
+    return attempt.decision === undefined || attempt.decision === 'ALLOW'
+  }
+  return ['ALLOW', 'BLOCK'].includes(attempt.decision)
 }
 
 async function getAgentExecution(agentRunId) {
