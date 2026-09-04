@@ -4,6 +4,7 @@ import io.finguard.core.domain.AgentSimulationScenario;
 import io.finguard.core.domain.TaskType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 /**
  * AgentRun 생성 요청. {@code docs/04-api-contract.md} §3.
@@ -14,7 +15,10 @@ public record AgentRunCreateRequest(
         @NotBlank String employeeId,
         @NotBlank String consumerId,
         @NotNull TaskType taskType,
-        @NotBlank String inputText,
+        // ai-risk는 4096자를 넘으면 422로 거부한다(ai-risk/app/schemas/prompt.py:33).
+        // 여기서 막지 않으면 "성공했지만 반드시 막힐 실행"이 생긴다 — Detector가 평가하지
+        // 못한 입력은 스냅샷이 NOT_EVALUATED로 남고 Gateway가 전부 fail-closed한다.
+        @NotBlank @Size(max = 4096) String inputText,
         AgentSimulationScenario scenario) {
 
     /**

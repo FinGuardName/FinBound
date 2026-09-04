@@ -56,6 +56,10 @@ class AgentRunServiceTest {
     @Autowired
     private AgentRunService service;
 
+    /** 식별자 생성과 Prompt Risk 평가는 트랜잭션 밖이다 — AgentRunPreparer 참조. */
+    @Autowired
+    private AgentRunPreparer preparer;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -74,7 +78,7 @@ class AgentRunServiceTest {
                         "EMP-101",
                         consumerId,
                         TaskType.LOAN_REVIEW,
-                        inputText,
+                        preparer.prepare(inputText, io.finguard.core.risk.RequestTrace.of(null, null)),
                         AgentSimulationScenario.NORMAL_CREDIT_SCORE);
         entityManager.flush();
         return started;
@@ -200,7 +204,7 @@ class AgentRunServiceTest {
                                         "EMP-101",
                                         "CUST-9999",
                                         TaskType.LOAN_REVIEW,
-                                        "대출심사 진행",
+                                        preparer.prepare("대출심사 진행", io.finguard.core.risk.RequestTrace.of(null, null)),
                                         AgentSimulationScenario.NORMAL_CREDIT_SCORE))
                 .isInstanceOf(PermissionNotIssuableException.class)
                 .extracting("reasonCode")
@@ -214,7 +218,7 @@ class AgentRunServiceTest {
                         "EMP-101",
                         "CUST-1001",
                         TaskType.LOAN_REVIEW,
-                        "CUST-1001의 대출심사를 진행해줘.",
+                        preparer.prepare("CUST-1001의 대출심사를 진행해줘.", io.finguard.core.risk.RequestTrace.of(null, null)),
                         AgentSimulationScenario.CASE_SCOPE_ATTACK);
 
         // 이 이벤트가 없으면 AgentRun 은 만들어지고도 아무도 실행하지 않아 영원히 RUNNING 으로 남는다.
@@ -248,7 +252,7 @@ class AgentRunServiceTest {
                         "EMP-101",
                         "CUST-1001",
                         TaskType.LOAN_REVIEW,
-                        "CUST-1001의 대출심사를 진행해줘.",
+                        preparer.prepare("CUST-1001의 대출심사를 진행해줘.", io.finguard.core.risk.RequestTrace.of(null, null)),
                         scenario);
 
         assertThat(events.stream(AgentRunCreated.class)).hasSize(1);

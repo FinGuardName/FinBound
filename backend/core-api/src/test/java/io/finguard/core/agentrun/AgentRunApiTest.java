@@ -97,6 +97,30 @@ class AgentRunApiTest {
     }
 
     @Test
+    void rejectsAnInputLongerThanTheDetectorAccepts() {
+        // ai-risk 는 4096자를 넘으면 422로 거부한다(ai-risk/app/schemas/prompt.py:33).
+        // Core 가 먼저 막지 않으면 평가되지 못한 입력으로 실행이 만들어지고, 그 스냅샷은
+        // NOT_EVALUATED 로 남아 Gateway 가 모든 Tool Call 을 막는다 — 성공했지만 반드시 막힐 실행이다.
+        ResponseEntity<String> response =
+                restTemplate.exchange(
+                        URI.create(base() + "/api/v1/agent-runs"),
+                        org.springframework.http.HttpMethod.POST,
+                        jsonEntity(
+                                """
+                                {
+                                  "employeeId": "EMP-101",
+                                  "consumerId": "CUST-1001",
+                                  "taskType": "LOAN_REVIEW",
+                                  "inputText": "%s"
+                                }
+                                """
+                                        .formatted("가".repeat(4097))),
+                        String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void refusesWhenTheConsumerGaveNoMandate() {
         ResponseEntity<JsonNode> response =
                 post(

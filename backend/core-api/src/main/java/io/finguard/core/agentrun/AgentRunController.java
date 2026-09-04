@@ -4,9 +4,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.finguard.core.domain.ReasonCode;
+import io.finguard.core.risk.RequestTrace;
 import io.finguard.core.security.CoreApiAccessDeniedException;
 import io.finguard.core.security.CoreApiPrincipal;
 import io.finguard.core.security.CoreApiRole;
@@ -23,9 +25,11 @@ import jakarta.validation.Valid;
 public class AgentRunController {
 
     private final AgentRunService agentRunService;
+    private final AgentRunPreparer preparer;
 
-    public AgentRunController(AgentRunService agentRunService) {
+    public AgentRunController(AgentRunService agentRunService, AgentRunPreparer preparer) {
         this.agentRunService = agentRunService;
+        this.preparer = preparer;
     }
 
     /**
@@ -39,7 +43,10 @@ public class AgentRunController {
     @PostMapping("/api/v1/agent-runs")
     @RequiresRole(CoreApiRole.OPERATOR)
     public ResponseEntity<AgentRunResponse> create(
-            @Valid @RequestBody AgentRunCreateRequest request, CoreApiPrincipal principal) {
+            @Valid @RequestBody AgentRunCreateRequest request,
+            CoreApiPrincipal principal,
+            @RequestHeader(value = "X-Request-Id", required = false) String requestId,
+            @RequestHeader(value = "Traceparent", required = false) String traceparent) {
         if (!principal.employeeId().equals(request.employeeId())) {
             // 어느 쪽 값도 메시지에 담지 않는다 — docs/06 §26.
             throw new CoreApiAccessDeniedException(
@@ -47,12 +54,21 @@ public class AgentRunController {
                     "요청한 Employee가 Credential에 묶인 Employee와 다릅니다.");
         }
 
+        // 식별자 생성과 Prompt Risk 평가는 쓰기 트랜잭션 밖이다. 느린 HTTP가 DB 커넥션을
+        // 붙잡으면 안 된다 — AgentRunPreparer 참조. 여기서 순서를 정하는 이유는 start가
+        // @Transactional 이라 자기 호출로는 프록시를 거치지 않기 때문이다.
+        //
+        // 추적 헤더는 들어온 값을 그대로 이어 붙인다 — docs/04 §2. 없으면 X-Request-Id만 만들고
+        // Traceparent는 지어내지 않는다.
+        PreparedAgentRun prepared =
+                preparer.prepare(request.inputText(), RequestTrace.of(requestId, traceparent));
+
         AgentRunStarted started =
                 agentRunService.start(
                         request.employeeId(),
                         request.consumerId(),
                         request.taskType(),
-                        request.inputText(),
+                        prepared,
                         request.scenario());
 
         return ResponseEntity.status(HttpStatus.CREATED)
