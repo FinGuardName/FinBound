@@ -3,6 +3,7 @@ package io.finguard.gateway.enforcement;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -139,7 +140,7 @@ class ToolCallEnforcementServiceTest {
             authorizationService, coreClient, downstreamClient, advancingClock);
         when(authorizationService.decide(any(), any(), any(), any(), any()))
             .thenReturn(allowOutcome());
-        org.mockito.Mockito.doThrow(new DownstreamTimeoutException("timeout", new RuntimeException()))
+        doThrow(new DownstreamTimeoutException("timeout", new RuntimeException()))
             .when(downstreamClient).execute(any(), any(), any());
 
         advancingService.enforce(identity, request, "REQ-DOWNSTREAM-TIME", "trace");

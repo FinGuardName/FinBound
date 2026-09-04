@@ -106,8 +106,9 @@ class AgentExecutionServiceTest {
     @Test
     void missingRunReturnsTheSameNotFoundShapeRegardlessOfIdentifier() {
         when(agentRuns.findById("RUN-UNKNOWN")).thenReturn(Optional.empty());
+        CoreApiPrincipal principal = viewer();
 
-        assertThatThrownBy(() -> service.find("RUN-UNKNOWN", viewer()))
+        assertThatThrownBy(() -> service.find("RUN-UNKNOWN", principal))
                 .isInstanceOf(AgentExecutionNotFoundException.class)
                 .hasMessage("Agent execution was not found");
     }
