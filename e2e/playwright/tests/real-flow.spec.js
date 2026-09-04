@@ -60,7 +60,7 @@ test('real UI creates an AgentRun and renders the verified execution', async ({ 
   const newestEvent = page.locator('.event-row').first()
   await expect(newestEvent).toBeVisible({ timeout: 20_000 })
   await expect(newestEvent).toContainText('신용정보 확인')
-  await expect(newestEvent).toContainText('허용')
+  await expect(newestEvent).toContainText('정상 처리')
   await expect(page.locator('.event-detail')).toContainText('COMPLETED')
   await expect(page.locator('.event-detail')).toContainText('EVALUATED')
 })
