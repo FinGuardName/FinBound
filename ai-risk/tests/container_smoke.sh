@@ -118,6 +118,9 @@ port="$(host_port "$container")"
     || fail "application files are not root-owned"
 [[ "$(docker exec "$container" stat -c '%u:%g' /app/models)" == "0:0" ]] \
     || fail "model files are not root-owned"
+docker exec "$container" python -c \
+    "import importlib.util; assert all(importlib.util.find_spec(name) is None for name in ('pandas', 'pyarrow', 'pytest', 'ruff'))" \
+    || fail "runtime image contains development or data-only packages"
 if docker exec "$container" sh -c 'touch /app/app/.write-test || touch /app/models/.write-test'; then
     fail "runtime user can modify application or model files"
 fi

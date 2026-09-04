@@ -9,9 +9,9 @@ RUN python -m venv "$VIRTUAL_ENV"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 WORKDIR /build
-COPY requirements.lock ./requirements.lock
+COPY requirements.runtime.lock ./requirements.runtime.lock
 RUN --mount=type=cache,id=finbound-ai-risk-pip,target=/root/.cache/pip \
-    python -m pip install --requirement requirements.lock
+    python -m pip install --requirement requirements.runtime.lock
 
 
 # Network access and Hugging Face cache exist only in this disposable stage.
@@ -41,6 +41,7 @@ WORKDIR /app
 COPY --from=dependencies /opt/venv /opt/venv
 COPY app ./app
 COPY models/behavior_iforest.joblib \
+    models/behavior_iforest.json \
     models/prompt_detector.json \
     models/prompt_domain_adapter.joblib \
     ./models/

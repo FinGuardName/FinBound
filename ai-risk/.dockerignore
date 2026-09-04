@@ -1,10 +1,11 @@
 **
 !Dockerfile
-!requirements.lock
+!requirements.runtime.lock
 !app/
 !app/**
 !models/
 !models/behavior_iforest.joblib
+!models/behavior_iforest.json
 !models/download_prompt_model.py
 !models/prompt_detector.json
 !models/prompt_domain_adapter.joblib
