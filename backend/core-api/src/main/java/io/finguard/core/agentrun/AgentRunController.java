@@ -23,9 +23,11 @@ import jakarta.validation.Valid;
 public class AgentRunController {
 
     private final AgentRunService agentRunService;
+    private final AgentRunPreparer preparer;
 
-    public AgentRunController(AgentRunService agentRunService) {
+    public AgentRunController(AgentRunService agentRunService, AgentRunPreparer preparer) {
         this.agentRunService = agentRunService;
+        this.preparer = preparer;
     }
 
     /**
@@ -47,12 +49,18 @@ public class AgentRunController {
                     "요청한 Employee가 Credential에 묶인 Employee와 다릅니다.");
         }
 
+        // 식별자 생성과 Prompt Risk 평가는 쓰기 트랜잭션 밖이다. 느린 HTTP가 DB 커넥션을
+        // 붙잡으면 안 된다 — AgentRunPreparer 참조. 여기서 순서를 정하는 이유는 start가
+        // @Transactional 이라 자기 호출로는 프록시를 거치지 않기 때문이다.
+        PreparedAgentRun prepared = preparer.prepare(request.inputText());
+
         AgentRunStarted started =
                 agentRunService.start(
                         request.employeeId(),
                         request.consumerId(),
                         request.taskType(),
                         request.inputText(),
+                        prepared,
                         request.scenario());
 
         return ResponseEntity.status(HttpStatus.CREATED)

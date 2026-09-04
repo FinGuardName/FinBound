@@ -100,6 +100,7 @@ public class AgentRunService {
             String consumerId,
             TaskType taskType,
             String inputText,
+            PreparedAgentRun prepared,
             AgentSimulationScenario scenario) {
         Instant now = clock.instant();
 
@@ -165,11 +166,13 @@ public class AgentRunService {
                                 mandate.getVersion()));
         taskPassports.save(passport);
 
-        String inputRef = Identifiers.inputRef();
-        String inputHash = Identifiers.inputHash(inputText);
+        // 식별자는 트랜잭션 밖에서 이미 만들어졌다. ai-risk 요청에 실은 값과 같아야 한다 —
+        // 다르면 Detector 쪽 기록과 Core 기록을 맞춰 볼 수 없다(AgentRunPreparer 참조).
+        String inputRef = prepared.inputRef();
+        String inputHash = prepared.inputHash();
         AgentRun agentRun =
                 new AgentRun(
-                        Identifiers.agentRunId(),
+                        prepared.agentRunId(),
                         passport.getAgentId(),
                         employeeId,
                         financialCase.getCaseId(),
@@ -186,15 +189,26 @@ public class AgentRunService {
 
         // 같은 입력·같은 모델이면 기존 스냅샷을 재사용한다 — docs/06 §24.2.
         // Prompt Risk는 실행마다 새로 계산하는 값이 아니라 입력 버전에 붙은 스냅샷이다.
+        //
+        // 자리는 항상 확보한다. 같은 입력으로 두 실행이 동시에 시작되면 삽입이 하나만 살아야 하는데,
+        // JPA save로는 유니크 위반이 커밋 시점에 터져 이 실행의 Case·Passport·AgentRun까지
+        // 통째로 롤백된다 — PromptRiskSnapshotRepository.insertIfAbsent 참조.
+        //
         // 새로 만들 때는 NOT_EVALUATED다. false로 적으면 "검사했고 음성"이 되어 감사 기록이
         // 거짓이 된다 — docs/04 §7.
-        if (promptRiskSnapshots
-                .findByInputHashAndModelVersion(inputHash, PromptRiskModel.CURRENT_VERSION)
-                .isEmpty()) {
-            promptRiskSnapshots.save(
-                    PromptRiskSnapshot.notEvaluated(
-                            inputRef, inputHash, PromptRiskModel.CURRENT_VERSION, now));
-        }
+        promptRiskSnapshots.insertIfAbsent(
+                inputRef, inputHash, PromptRiskModel.CURRENT_VERSION, now);
+
+        // 새로 평가한 결과가 있으면 승격한다. 이미 EVALUATED면 promote가 거절한다 —
+        // 재평가가 기존 판정을 사후에 바꾸면 그 스냅샷을 근거로 남은 Audit이 거짓이 된다.
+        prepared
+                .evaluation()
+                .ifPresent(
+                        evaluation ->
+                                promptRiskSnapshots
+                                        .findByInputHashAndModelVersion(
+                                                inputHash, PromptRiskModel.CURRENT_VERSION)
+                                        .ifPresent(snapshot -> snapshot.promote(evaluation, now)));
 
         // 실행 지시는 커밋 이후다. 여기서 직접 부르면 Agent가 Gateway를 거쳐 되돌아왔을 때
         // 이 트랜잭션이 아직 안 닫혀 있어 Passport를 찾지 못한다 — AgentRunLauncher 참조.
