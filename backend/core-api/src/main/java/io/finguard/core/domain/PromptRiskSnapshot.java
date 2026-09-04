@@ -103,6 +103,34 @@ public class PromptRiskSnapshot {
         return snapshot;
     }
 
+    /**
+     * 아직 평가되지 않았다면 승격한다. 이미 {@code EVALUATED} 면 아무것도 바꾸지 않고 {@code false}.
+     *
+     * <p>승격은 한 방향이다. 같은 입력·같은 모델이면 결과가 같아야 하지만 그 가정을 코드로 강제한다 —
+     * 재평가가 기존 판정을 사후에 바꾸면 이미 그 스냅샷을 근거로 남은 Audit 이 거짓이 된다.
+     *
+     * <p>{@code docs/07} §10 이 금지하는 것은 <strong>Tool Call 마다의 재평가</strong>다. Core 는
+     * AgentRun 생성 시점에만 Detector 를 부르므로 그 조건과 어긋나지 않는다.
+     */
+    public boolean promote(io.finguard.core.risk.PromptRiskEvaluation evaluation, Instant evaluatedAt) {
+        if (evaluationStatus == PromptRiskEvaluationStatus.EVALUATED) {
+            return false;
+        }
+        this.evaluationStatus = PromptRiskEvaluationStatus.EVALUATED;
+        this.detected = evaluation.detected();
+        this.promptRisk = evaluation.promptRisk();
+        this.riskLevel = evaluation.riskLevel();
+        this.attackType = evaluation.attackType();
+        this.matchedRules.clear();
+        this.matchedRules.addAll(evaluation.matchedRules());
+        this.evaluatedAt = evaluatedAt;
+        return true;
+    }
+
+    public boolean isEvaluated() {
+        return evaluationStatus == PromptRiskEvaluationStatus.EVALUATED;
+    }
+
     public Long getSnapshotId() {
         return snapshotId;
     }
