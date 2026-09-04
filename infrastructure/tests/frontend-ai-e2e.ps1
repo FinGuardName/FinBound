@@ -32,11 +32,27 @@ function Assert-SafeOutput([string]$Output) {
     }
 }
 
+function Protect-DiagnosticOutput([string]$Output) {
+    $safeOutput = $Output
+    foreach ($marker in $forbiddenOutputMarkers) {
+        $safeOutput = $safeOutput.Replace($marker, '[REDACTED_BUSINESS_DATA]')
+    }
+    foreach ($name in $secretNames) {
+        $value = [Environment]::GetEnvironmentVariable($name)
+        if ($value) { $safeOutput = $safeOutput.Replace($value, '[REDACTED_CREDENTIAL]') }
+    }
+    $lines = @($safeOutput -split "`r?`n")
+    return ($lines | Select-Object -Last 120) -join "`n"
+}
+
 function Run-Docker([string[]]$Arguments) {
     $output = (& docker @Arguments 2>&1) -join "`n"
     $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        $safeOutput = Protect-DiagnosticOutput $output
+        throw "Docker command failed with exit code $exitCode (sanitized tail follows):`n$safeOutput"
+    }
     Assert-SafeOutput $output
-    if ($exitCode -ne 0) { throw "Docker command failed with exit code $exitCode (output withheld)" }
     return $output
 }
 
