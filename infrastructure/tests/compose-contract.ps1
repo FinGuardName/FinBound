@@ -98,6 +98,35 @@ try {
     $overrides = $combined | ConvertFrom-Json -AsHashtable
     Assert-Contract ($overrides.services['core-api'].environment.SPRING_PROFILES_ACTIVE -eq 'local') 'demo seed must remain opt-in'
     Assert-Contract ($overrides.services['core-api'].ports[0].host_ip -eq '127.0.0.1') 'Core exposure must be loopback only'
+
+    $fullRaw = (& docker @compose -f "$RepositoryRoot/infrastructure/docker-compose.demo.yml" -f "$RepositoryRoot/infrastructure/docker-compose.frontend-ai.yml" config --format json 2>&1) -join "`n"
+    Assert-Contract ($LASTEXITCODE -eq 0) 'frontend/AI override failed'
+    foreach ($name in $secretNames) {
+        Assert-Contract (-not $fullRaw.Contains([Environment]::GetEnvironmentVariable($name))) 'frontend/AI config leaked a secret'
+    }
+    $full = $fullRaw | ConvertFrom-Json -AsHashtable
+    foreach ($service in @('ai-risk', 'frontend')) {
+        Assert-Contract ($full.services[$service].restart -eq 'unless-stopped') "$service restart policy missing"
+        Assert-Contract ($full.services[$service].security_opt -contains 'no-new-privileges:true') "$service privilege escalation enabled"
+        Assert-Contract ($full.services[$service].mem_limit -gt 0) "$service memory limit missing"
+    }
+    Assert-Contract ($full.services['ai-risk'].networks.ContainsKey('internal-zone')) 'AI internal zone missing'
+    Assert-Contract (-not $full.services['ai-risk'].networks.ContainsKey('public-zone')) 'AI joined public zone'
+    Assert-Contract (-not $full.services['ai-risk'].ports) 'AI exposes a host port'
+    Assert-Contract ($full.services.frontend.networks.ContainsKey('public-zone')) 'Frontend public zone missing'
+    Assert-Contract ($full.services.frontend.networks.ContainsKey('internal-zone')) 'Frontend Core network missing'
+    Assert-Contract ($full.services.frontend.ports[0].host_ip -eq '127.0.0.1') 'Frontend exposure must be loopback only'
+    Assert-Contract ($full.services.frontend.environment.CORE_API_UPSTREAM -eq 'http://core-api:8080') 'wrong Frontend Core URL'
+    Assert-Contract ($full.services['core-api'].environment.AI_RISK_URL -eq 'http://ai-risk:8000') 'wrong Core AI URL'
+    Assert-Contract ($full.services.gateway.environment.AI_URL -eq 'http://ai-risk:8000') 'wrong Gateway AI URL'
+    Assert-Contract ($full.services.gateway.environment.SPRING_PROFILES_ACTIVE -eq 'real-core,real-ai,real-downstream') 'Gateway real AI profile missing'
+    foreach ($service in @('core-api', 'gateway')) {
+        Assert-Contract ($full.services[$service].depends_on['ai-risk'].condition -eq 'service_healthy') "$service AI readiness ordering missing"
+    }
+    $aiSecret = @($full.services['ai-risk'].secrets | Where-Object target -eq 'FINGUARD_INTERNAL_CREDENTIAL')
+    Assert-Contract ($aiSecret.Count -eq 1 -and $aiSecret[0].source -eq 'internal-credential') 'AI credential wiring mismatch'
+    Assert-Contract ($full.services['ai-risk'].environment.FINGUARD_REQUIRED_SECRETS -eq 'FINGUARD_INTERNAL_CREDENTIAL') 'AI credential not required at startup'
+    Assert-Contract ($full.services['ai-risk'].entrypoint -contains '/opt/finguard/with-secrets.sh') 'AI secret validation bypassed'
     Write-Output 'PASS: Compose services, URLs, credentials, readiness, network isolation and redacted config'
 } finally {
     foreach ($name in $saved.Keys) {

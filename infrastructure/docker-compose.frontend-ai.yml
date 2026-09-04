@@ -1,0 +1,64 @@
+# Real AI and browser UI overlay for the P0 topology.
+#
+#   docker compose --env-file ../.env \
+#     -f docker-compose.yml -f docker-compose.demo.yml \
+#     -f docker-compose.frontend-ai.yml up -d --build --wait
+services:
+  ai-risk:
+    build:
+      context: ../ai-risk
+    entrypoint:
+      - /bin/sh
+      - /opt/finguard/with-secrets.sh
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --no-access-log
+    environment:
+      FINGUARD_REQUIRED_SECRETS: FINGUARD_INTERNAL_CREDENTIAL
+    secrets:
+      - source: internal-credential
+        target: FINGUARD_INTERNAL_CREDENTIAL
+    volumes:
+      - ./docker/with-secrets.sh:/opt/finguard/with-secrets.sh:ro
+    expose: ["8000"]
+    mem_limit: ${AI_RISK_MEM_LIMIT:-1g}
+    restart: unless-stopped
+    networks: [internal-zone]
+    security_opt: [no-new-privileges:true]
+
+  core-api:
+    environment:
+      AI_RISK_URL: http://ai-risk:8000
+    depends_on:
+      ai-risk:
+        condition: service_healthy
+
+  gateway:
+    environment:
+      AI_URL: http://ai-risk:8000
+      SPRING_PROFILES_ACTIVE: real-core,real-ai,real-downstream
+    depends_on:
+      ai-risk:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_FINBOUND_API_MODE: real
+        VITE_FINBOUND_API_BASE_URL: /core-api
+    environment:
+      CORE_API_UPSTREAM: http://core-api:8080
+    depends_on:
+      core-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-8088}:8080"
+    mem_limit: ${FRONTEND_MEM_LIMIT:-256m}
+    restart: unless-stopped
+    networks: [public-zone, internal-zone]
+    security_opt: [no-new-privileges:true]

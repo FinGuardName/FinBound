@@ -132,7 +132,7 @@ services:
       CORE_URL: http://core-api:8080
       OPA_URL: http://opa:8181
       MOCK_FINANCE_URL: http://mock-finance:8083
-      # AI service is supplied by the #73 override. Keep MockAiClient until that
+      # AI service is supplied by the #72 override. Keep MockAiClient until that
       # service is present so the six-service base stack can exercise ALLOW paths.
       SPRING_PROFILES_ACTIVE: real-core,real-downstream
       FINGUARD_REQUIRED_SECRETS: FINGUARD_CREDENTIALS_VALIDAGENTTOKENS FINGUARD_CREDENTIALS_INTERNALSERVICE
@@ -212,7 +212,7 @@ services:
       start_period: 30s
     networks: [finance-zone]
 
-  # ai-risk is added by the #73 override together with the real-ai profile.
+  # ai-risk is added by the #72 override together with the real-ai profile.
   # ai-risk:
   #   build:
   #     context: ../ai-risk

@@ -49,7 +49,8 @@ cp .env.example .env
 docker compose -f infrastructure/docker-compose.yml up -d
 ```
 
-서비스 구현이 진행되기 전 초기 Compose는 PostgreSQL과 OPA만 기동합니다. 각 서비스가 준비되면 동일 파일의 주석 처리된 통합 지점을 활성화합니다.
+기본 Compose는 PostgreSQL, Core API, OPA, Gateway, LoanAgent, Mock Finance의 6개 서비스를 기동합니다.
+Frontend와 AI Risk까지 포함한 8개 서비스 검증은 `infrastructure/tests/frontend-ai-e2e.ps1`을 실행합니다.
 
 ## 협업
 

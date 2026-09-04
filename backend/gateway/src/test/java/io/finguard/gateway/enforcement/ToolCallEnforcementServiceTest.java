@@ -3,6 +3,7 @@ package io.finguard.gateway.enforcement;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -69,6 +70,82 @@ class ToolCallEnforcementServiceTest {
         verify(coreClient).createAudit(eq(identity), any(AuditStart.class), eq("trace"));
         verify(downstreamClient).execute(request, "REQ-1", "trace");
         verify(coreClient).updateAuditOutcome(eq(identity), eq("REQ-1"), any(AuditOutcome.class), eq("trace"));
+    }
+
+    @Test
+    void completionUsesThePostExecutionTimeInsteadOfTheRequestTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00.000000499Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(
+            requestedAt,
+            requestedAt,
+            completedAt,
+            completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any()))
+            .thenReturn(allowOutcome());
+        when(downstreamClient.execute(any(), any(), any())).thenReturn(
+            new DownstreamToolResult("REQ-TIME", FinancialTool.CREDIT_SCORE_READ, "CUST-1001",
+                Map.of("creditScore", 812)));
+
+        advancingService.enforce(identity, request, "REQ-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-TIME").completedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void policyBlockUsesThePostDecisionTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(requestedAt, completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
+            new AuthorizationOutcome(
+                new PolicyDecisionResult(PolicyDecision.BLOCK, "HIGH", true,
+                    List.of("CASE_SCOPE_VIOLATION"), "policy-1"),
+                0.10));
+
+        advancingService.enforce(identity, request, "REQ-BLOCK-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-BLOCK-TIME").completedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void failClosedUsesThePostFailureTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(requestedAt, completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any()))
+            .thenReturn(AuthorizationOutcome.failClosed("POLICY_ENGINE_UNAVAILABLE"));
+
+        advancingService.enforce(identity, request, "REQ-FAIL-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-FAIL-TIME").completedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void downstreamErrorUsesThePostExecutionTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(requestedAt, requestedAt, completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any()))
+            .thenReturn(allowOutcome());
+        doThrow(new DownstreamTimeoutException("timeout", new RuntimeException()))
+            .when(downstreamClient).execute(any(), any(), any());
+
+        advancingService.enforce(identity, request, "REQ-DOWNSTREAM-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-DOWNSTREAM-TIME").completedAt()).isEqualTo(completedAt);
     }
 
     @Test

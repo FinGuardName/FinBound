@@ -1,0 +1,22 @@
+services:
+  e2e:
+    build:
+      context: ../e2e/playwright
+    entrypoint: ["/bin/sh", "/opt/finguard/with-secrets.sh"]
+    command: ["pnpm", "test"]
+    environment:
+      CI: "1"
+      FRONTEND_BASE_URL: http://frontend:8080
+      GATEWAY_BASE_URL: http://gateway:8081
+      AI_RISK_BASE_URL: http://ai-risk:8000
+      OPA_BASE_URL: http://opa:8181
+      FINGUARD_REQUIRED_SECRETS: E2E_OPERATOR_CREDENTIAL E2E_AI_CREDENTIAL
+    secrets:
+      - source: operator-credential
+        target: E2E_OPERATOR_CREDENTIAL
+      - source: internal-credential
+        target: E2E_AI_CREDENTIAL
+    volumes:
+      - ./docker/with-secrets.sh:/opt/finguard/with-secrets.sh:ro
+    networks: [public-zone, internal-zone]
+    security_opt: [no-new-privileges:true]

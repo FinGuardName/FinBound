@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('real Core API adapter', () => {
-  it('creates an AgentRun and reads its result only through the Core Public execution API', async () => {
+  it('creates an AgentRun and reads its result through the public execution API', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse({
         agentRunId: 'RUN-REAL-1',
@@ -78,7 +78,7 @@ describe('real Core API adapter', () => {
       inputText: '현재 고객의 신규 대출 심사자료 확인',
     })
     expect(fetchImpl.mock.calls[1][0]).toContain('/api/v1/agent-runs/RUN-REAL-1/permission-comparison')
-    expect(fetchImpl.mock.calls[2][0]).toBe('http://localhost:8080/api/v1/agent-runs/RUN-REAL-1/execution')
+    expect(fetchImpl.mock.calls[2][0]).toContain('/api/v1/agent-runs/RUN-REAL-1/execution')
     expect(fetchImpl.mock.calls.every(([url]) => !url.includes('/internal/'))).toBe(true)
     expect(result.status).toBe('COMPLETED')
     expect(result.attempts[0]).toMatchObject({
@@ -102,7 +102,7 @@ describe('real Core API adapter', () => {
     })
   })
 
-  it('polls a running Agent execution without calling an internal endpoint', async () => {
+  it('polls the public execution resource until the Agent execution completes', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ agentRunId: 'RUN-POLL-1', status: 'RUNNING' }))
       .mockResolvedValueOnce(jsonResponse({
@@ -137,7 +137,7 @@ describe('real Core API adapter', () => {
     const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
 
     expect(sleepImpl).toHaveBeenCalledTimes(1)
-    expect(fetchImpl.mock.calls.filter(([url]) => url.endsWith('/execution'))).toHaveLength(2)
+    expect(fetchImpl.mock.calls.filter(([url]) => url.includes('/execution'))).toHaveLength(2)
     expect(fetchImpl.mock.calls.every(([url]) => !url.includes('/internal/'))).toBe(true)
     expect(result.attempts[0]).toMatchObject({
       decision: 'BLOCK',
@@ -145,6 +145,32 @@ describe('real Core API adapter', () => {
       downstreamReached: false,
       responseReleased: false,
     })
+  })
+
+  it('shows a terminal Agent failure even when no Gateway audit attempt exists', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-PRE-AUDIT-FAILURE',
+        passportId: 'PASS-PRE-AUDIT-FAILURE',
+        status: 'RUNNING',
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentEffectivePermission: { allowedTools: [], allowedData: [] },
+        withheldTools: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        agentRunId: 'RUN-PRE-AUDIT-FAILURE',
+        status: 'FAILED',
+        reasonCodes: [],
+        attempts: [],
+      }))
+    configureFinboundApi({ mode: 'real', credential: 'operator', fetchImpl })
+
+    const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
+
+    expect(result.status).toBe('ERROR')
+    expect(result.attempts).toEqual([])
+    expect(result.resultItems).toContain('처리 오류 1건')
   })
 
   it('preserves verified AgentRun and permission context when execution lookup fails', async () => {
@@ -330,7 +356,8 @@ describe('real Core API adapter', () => {
       }))
       .mockResolvedValueOnce(jsonResponse({
         agentRunId: 'RUN-FAILCLOSED',
-        status: 'COMPLETED',
+        status: 'FAILED',
+        reasonCodes: ['CONTEXT_SERVICE_UNAVAILABLE'],
         attempts: [{
           requestId: '00000000-0000-4000-8000-00000000f001',
           requestedTool: 'CREDIT_SCORE_READ',
@@ -364,7 +391,7 @@ describe('real Core API adapter', () => {
       }))
       .mockResolvedValueOnce(jsonResponse({
         agentRunId: 'RUN-BLOCKERROR',
-        status: 'COMPLETED',
+        status: 'FAILED',
         attempts: [{
           requestId: '00000000-0000-4000-8000-00000000f003',
           requestedTool: 'CREDIT_SCORE_READ',

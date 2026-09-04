@@ -23,6 +23,8 @@ public interface AuditEventRepository
 
     boolean existsByRequestId(String requestId);
 
+    List<AuditEvent> findByAgentRunIdOrderByRequestedAtAscAuditEventIdAsc(String agentRunId);
+
     List<AuditEvent> findByAgentIdAndStatusAndRequestedAtGreaterThanEqualOrderByRequestedAtDesc(
             String agentId, AuditStatus status, Instant requestedAt);
 }
