@@ -1,8 +1,9 @@
 import hashlib
+import io
 import json
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 import numpy as np
@@ -32,6 +33,7 @@ class PromptDetectorConfig:
     model_artifact_path: str
     model_artifact_sha256: str
     tokenizer_path: str
+    tokenizer_artifacts: tuple[tuple[str, str], ...]
     injection_label_id: int
     max_tokens: int
     rule_alert_risk: float
@@ -59,6 +61,7 @@ class PromptDetectorConfig:
                 model_artifact_path=payload["modelArtifactPath"],
                 model_artifact_sha256=payload["modelArtifactSha256"],
                 tokenizer_path=payload["tokenizerPath"],
+                tokenizer_artifacts=tuple(sorted(payload["tokenizerArtifactSha256"].items())),
                 injection_label_id=payload["injectionLabelId"],
                 max_tokens=payload["maxTokens"],
                 rule_alert_risk=payload["ruleAlertRisk"],
@@ -73,7 +76,14 @@ class PromptDetectorConfig:
                 dataset_version=payload["datasetVersion"],
                 approved_dataset_sha256=payload["approvedDatasetSha256"],
             )
-        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        except (
+            AttributeError,
+            OSError,
+            KeyError,
+            TypeError,
+            ValueError,
+            json.JSONDecodeError,
+        ) as error:
             raise PromptModelError("Prompt detector configuration is invalid") from error
         if not config.model_version or not config.model_id or not config.model_revision:
             raise PromptModelError("Prompt detector identity is invalid")
@@ -85,10 +95,11 @@ class PromptDetectorConfig:
             raise PromptModelError("Prompt detector ruleAlertRisk is invalid")
         if not 0 < config.pretrained_score_threshold <= 1:
             raise PromptModelError("Prompt detector pretrainedScoreThreshold is invalid")
-        if not config.domain_adapter_artifact_path:
-            raise PromptModelError("Prompt detector domain adapter path is invalid")
-        if len(config.domain_adapter_artifact_sha256) != 64:
+        _validate_relative_artifact_path(config.domain_adapter_artifact_path)
+        if not _is_sha256(config.domain_adapter_artifact_sha256):
             raise PromptModelError("Prompt detector domain adapter digest is invalid")
+        if not _is_sha256(config.approved_dataset_sha256):
+            raise PromptModelError("Prompt detector dataset digest is invalid")
         if not 0 < config.domain_adapter_score_threshold <= 1:
             raise PromptModelError("Prompt detector domainAdapterScoreThreshold is invalid")
         if not 0 < config.model_support_threshold < config.model_high_threshold <= 1:
@@ -101,9 +112,48 @@ class PromptDetectorConfig:
             < config.prompt_block_threshold
         ):
             raise PromptModelError("Prompt detector ruleAlertRisk must remain in ALERT range")
-        if len(config.model_artifact_sha256) != 64:
+        if not _is_sha256(config.model_artifact_sha256):
             raise PromptModelError("Prompt detector artifact digest is invalid")
+        model_path = _validate_relative_artifact_path(config.model_artifact_path)
+        tokenizer_root = _validate_relative_artifact_path(config.tokenizer_path)
+        if not model_path.is_relative_to(tokenizer_root) or model_path == tokenizer_root:
+            raise PromptModelError("Prompt model artifact path is invalid")
+        if not config.tokenizer_artifacts:
+            raise PromptModelError("Prompt tokenizer artifact manifest is empty")
+        for artifact_path, artifact_digest in config.tokenizer_artifacts:
+            candidate = _validate_relative_artifact_path(artifact_path)
+            if not candidate.is_relative_to(tokenizer_root) or candidate == tokenizer_root:
+                raise PromptModelError("Prompt tokenizer artifact path is invalid")
+            if not _is_sha256(artifact_digest):
+                raise PromptModelError("Prompt tokenizer artifact digest is invalid")
         return config
+
+
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _validate_relative_artifact_path(value: object) -> PurePosixPath:
+    if not isinstance(value, str) or not value or "\\" in value:
+        raise PromptModelError("Prompt artifact path is invalid")
+    path = PurePosixPath(value)
+    if path.is_absolute() or path == PurePosixPath(".") or ".." in path.parts:
+        raise PromptModelError("Prompt artifact path is invalid")
+    return path
+
+
+def read_verified_artifact(path: Path, expected_sha256: str, label: str) -> bytes:
+    try:
+        artifact_bytes = path.read_bytes()
+    except OSError as error:
+        raise PromptModelError(f"{label} is unavailable") from error
+    if hashlib.sha256(artifact_bytes).hexdigest() != expected_sha256:
+        raise PromptModelError(f"{label} digest does not match")
+    return artifact_bytes
 
 
 class OnnxPromptClassifier:
@@ -121,24 +171,29 @@ class OnnxPromptClassifier:
     def _load(self) -> None:
         if self._session is not None and self._tokenizer is not None:
             return
-        model_root = self._model_dir / self._config.tokenizer_path
         model_path = self._model_dir / self._config.model_artifact_path
-        if not model_path.is_file():
-            raise PromptModelError("Prompt model artifact is unavailable")
-        digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
-        if digest != self._config.model_artifact_sha256:
-            raise PromptModelError("Prompt model artifact digest does not match")
+        model_bytes = read_verified_artifact(
+            model_path,
+            self._config.model_artifact_sha256,
+            "Prompt model artifact",
+        )
+        for artifact_path, artifact_sha256 in self._config.tokenizer_artifacts:
+            read_verified_artifact(
+                self._model_dir / artifact_path,
+                artifact_sha256,
+                "Prompt tokenizer artifact",
+            )
         try:
             import onnxruntime as ort
             from transformers import AutoTokenizer
 
             tokenizer = AutoTokenizer.from_pretrained(
-                model_root,
+                self._model_dir / self._config.tokenizer_path,
                 local_files_only=True,
                 fix_mistral_regex=True,
             )
             session = ort.InferenceSession(
-                str(model_path),
+                model_bytes,
                 providers=["CPUExecutionProvider"],
             )
         except Exception as error:
@@ -185,15 +240,15 @@ class DomainPromptClassifier:
             if configured
             else DEFAULT_CONFIG_PATH.parent / self._config.domain_adapter_artifact_path
         )
-        if not artifact.is_file():
-            raise PromptModelError("Prompt domain adapter artifact is unavailable")
-        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        if digest != self._config.domain_adapter_artifact_sha256:
-            raise PromptModelError("Prompt domain adapter artifact digest does not match")
+        artifact_bytes = read_verified_artifact(
+            artifact,
+            self._config.domain_adapter_artifact_sha256,
+            "Prompt domain adapter artifact",
+        )
         try:
             import joblib
 
-            bundle = joblib.load(artifact)
+            bundle = joblib.load(io.BytesIO(artifact_bytes))
             if bundle["datasetSha256"] != self._config.approved_dataset_sha256:
                 raise PromptModelError("Prompt domain adapter dataset digest does not match")
             classifier = bundle["classifier"]

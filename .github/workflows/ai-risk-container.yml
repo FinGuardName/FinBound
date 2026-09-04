@@ -1,0 +1,27 @@
+name: AI Risk container image
+
+on:
+  pull_request:
+    paths:
+      - "ai-risk/**"
+      - ".github/workflows/ai-risk-container.yml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "ai-risk/**"
+      - ".github/workflows/ai-risk-container.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build and verify AI Risk image
+        run: bash ai-risk/tests/container_smoke.sh

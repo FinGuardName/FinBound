@@ -1,3 +1,5 @@
+import hashlib
+import io
 import json
 from pathlib import Path
 
@@ -19,6 +21,17 @@ from datasets.synthetic_behavior import (
 from train.train_behavior import train_bundle
 
 AI_RISK_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_artifact_metadata(
+    metadata_path: Path,
+    model_bytes: bytes,
+    artifact_sha256: str | None = None,
+) -> None:
+    metadata_path.write_text(
+        json.dumps({"artifactSha256": artifact_sha256 or hashlib.sha256(model_bytes).hexdigest()}),
+        encoding="utf-8",
+    )
 
 
 def test_training_is_reproducible_for_fixed_seed() -> None:
@@ -129,6 +142,45 @@ def test_missing_model_is_an_explicit_error(tmp_path: Path) -> None:
         service._load_bundle()
 
 
+def test_behavior_model_loads_the_exact_bytes_that_were_verified(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_bytes = b"verified-behavior-model"
+    model_path = tmp_path / "behavior.joblib"
+    metadata_path = tmp_path / "behavior.json"
+    model_path.write_bytes(model_bytes)
+    _write_artifact_metadata(metadata_path, model_bytes)
+    bundle, _ = train_bundle(42)
+
+    def load_bundle(source: io.BytesIO) -> BehaviorModelBundle:
+        assert isinstance(source, io.BytesIO)
+        assert source.read() == model_bytes
+        return bundle
+
+    monkeypatch.setattr(joblib, "load", load_bundle)
+
+    loaded = BehaviorRiskService(
+        model_path=model_path,
+        metadata_path=metadata_path,
+    )._load_bundle()
+
+    assert loaded is bundle
+
+
+def test_behavior_model_rejects_wrong_artifact_digest(tmp_path: Path) -> None:
+    model_bytes = b"modified-behavior-model"
+    model_path = tmp_path / "behavior.joblib"
+    metadata_path = tmp_path / "behavior.json"
+    model_path.write_bytes(model_bytes)
+    _write_artifact_metadata(metadata_path, model_bytes, artifact_sha256="0" * 64)
+
+    service = BehaviorRiskService(model_path=model_path, metadata_path=metadata_path)
+
+    with pytest.raises(BehaviorModelError, match="artifact digest does not match"):
+        service._load_bundle()
+
+
 def test_training_samples_use_runtime_feature_builder(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
     runtime_builder = synthetic_behavior.build_feature_vector
@@ -153,8 +205,10 @@ def test_invalid_model_thresholds_are_rejected(tmp_path: Path) -> None:
     bundle.critical_threshold = 0.90
     model_path = tmp_path / "invalid-thresholds.joblib"
     joblib.dump(bundle, model_path)
+    metadata_path = tmp_path / "invalid-thresholds.json"
+    _write_artifact_metadata(metadata_path, model_path.read_bytes())
 
-    service = BehaviorRiskService(model_path=model_path)
+    service = BehaviorRiskService(model_path=model_path, metadata_path=metadata_path)
 
     with pytest.raises(BehaviorModelError, match="thresholds are invalid"):
         service._load_bundle()
@@ -170,6 +224,12 @@ def test_committed_artifact_and_metadata_are_consistent() -> None:
         (AI_RISK_ROOT / "evaluate" / "behavior_metrics.json").read_text(encoding="utf-8")
     )
 
+    assert (
+        metadata["artifactSha256"]
+        == hashlib.sha256(
+            (AI_RISK_ROOT / "models" / "behavior_iforest.joblib").read_bytes()
+        ).hexdigest()
+    )
     assert metadata["modelVersion"] == bundle.model_version == metrics["modelVersion"]
     assert metadata["featureVersion"] == bundle.feature_version == metrics["featureVersion"]
     assert metadata["datasetVersion"] == bundle.dataset_version == metrics["datasetVersion"]

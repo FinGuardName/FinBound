@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -410,6 +411,7 @@ def main() -> None:
 
     metadata = {
         "modelVersion": bundle.model_version,
+        "artifactSha256": hashlib.sha256(args.model_output.read_bytes()).hexdigest(),
         "featureVersion": bundle.feature_version,
         "datasetVersion": bundle.dataset_version,
         "randomSeed": bundle.random_seed,
