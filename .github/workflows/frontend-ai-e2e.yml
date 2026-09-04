@@ -9,6 +9,13 @@ on:
       - policy/**
       - infrastructure/**
       - e2e/**
+      - contracts/**
+      - gradle/**
+      - build.gradle.kts
+      - settings.gradle.kts
+      - gradlew
+      - gradlew.bat
+      - .dockerignore
       - .env.example
       - .github/workflows/frontend-ai-e2e.yml
   push:
@@ -20,6 +27,13 @@ on:
       - policy/**
       - infrastructure/**
       - e2e/**
+      - contracts/**
+      - gradle/**
+      - build.gradle.kts
+      - settings.gradle.kts
+      - gradlew
+      - gradlew.bat
+      - .dockerignore
       - .env.example
       - .github/workflows/frontend-ai-e2e.yml
   workflow_dispatch:

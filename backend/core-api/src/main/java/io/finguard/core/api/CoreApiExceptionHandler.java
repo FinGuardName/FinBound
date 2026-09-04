@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import io.finguard.core.agentrun.AgentExecutionNotFoundException;
 import io.finguard.core.audit.AuditEvidenceRejectedException;
 import io.finguard.core.audit.AuditOperationException;
 import io.finguard.core.context.ContextLookupException;
@@ -117,7 +118,11 @@ public class CoreApiExceptionHandler {
      * Runtime 집행의 거부 사유를 정의하며 읽기 조회 실패에 해당하는 값이 없다. 억지로 가장 비슷한 값을
      * 넣으면 대시보드가 집행 사유를 표시하게 되고, 그건 사실이 아니다.
      */
-    @ExceptionHandler({AuditEventNotFoundException.class, PermissionComparisonNotFoundException.class})
+    @ExceptionHandler({
+        AgentExecutionNotFoundException.class,
+        AuditEventNotFoundException.class,
+        PermissionComparisonNotFoundException.class
+    })
     ResponseEntity<ProblemDetail> handleDashboardLookup(RuntimeException exception) {
         ProblemDetail body = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
         body.setDetail("요청한 기록을 찾을 수 없습니다.");

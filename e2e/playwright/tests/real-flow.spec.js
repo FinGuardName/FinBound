@@ -54,20 +54,46 @@ test('real UI creates an AgentRun and renders the verified execution', async ({ 
   }))
   expect(storage).toEqual({ local: {}, session: {} })
   expect(await page.locator('body').innerText()).not.toContain(operatorCredential)
+
+  await page.locator('[data-screen="dashboard"]').click()
+  await expect(page.getByRole('heading', { name: 'AI 업무 보호 결과' })).toBeVisible()
+  const newestEvent = page.locator('.event-row').first()
+  await expect(newestEvent).toBeVisible({ timeout: 20_000 })
+  await expect(newestEvent).toContainText('신용정보 확인')
+  await expect(newestEvent).toContainText('허용')
+  await expect(page.locator('.event-detail')).toContainText('COMPLETED')
+  await expect(page.locator('.event-detail')).toContainText('EVALUATED')
 })
 
 test('real Core-Agent-Gateway-AI-OPA flow preserves ALLOW and BLOCK boundaries', async ({ request }) => {
   const nonce = crypto.randomUUID()
-  const allowed = await completedAudit(request, await startRun(request, {
+  const allowedRun = await startRun(request, {
     scenario: 'NORMAL_CREDIT_SCORE',
     inputText: '현재 고객의 신규 대출 심사자료 확인',
-  }))
+  })
+  const allowed = await completedAudit(request, allowedRun)
   expect(allowed).toMatchObject({
     decision: 'ALLOW',
     systemOutcome: 'COMPLETED',
     downstreamReached: true,
     responseReleased: true,
     promptRiskEvaluationStatus: 'EVALUATED',
+  })
+
+  const executionResponse = await request.get(
+    `/core-api/api/v1/agent-runs/${allowedRun.agentRunId}/execution`,
+    { headers: headers() },
+  )
+  expect(executionResponse.ok()).toBeTruthy()
+  const execution = await executionResponse.json()
+  expect(execution).toMatchObject({
+    agentRunId: allowedRun.agentRunId,
+    status: 'COMPLETED',
+  })
+  expect(execution.attempts).toHaveLength(1)
+  expect(execution.attempts[0]).toMatchObject({
+    decision: 'ALLOW',
+    systemOutcome: 'COMPLETED',
   })
 
   const scopeBlocked = await completedAudit(request, await startRun(request, {

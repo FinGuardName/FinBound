@@ -150,6 +150,65 @@ PR #75의 커밋 후 비동기 실행과 선택적 `scenario` 필드는 해당 P
 생성 실패로 Simulator를 호출하지 않은 요청은 Gateway로 진행하지 않는다.
 Simulator 호출 이후 Timeout은 이미 시작된 금융 실행의 취소나 미도달을 보장하지 않는다.
 
+### Public 실행 조회
+
+PR #65와 이슈 #74에서 합의한 Frontend Consumer 계약이다. AgentRun 상태의 원장은 Core이며,
+Frontend가 Dashboard의 최근 AuditEvent 페이지에서 상태를 역추론하지 않는다.
+
+```http
+GET /api/v1/agent-runs/{agentRunId}/execution
+Authorization: Bearer <viewer-or-operator-credential>
+```
+
+Viewer와 Operator가 호출할 수 있다. Operator는 Credential에 연결된 Employee의 AgentRun만
+조회할 수 있으며, 다른 Employee의 실행은 `403 EMPLOYEE_IDENTITY_MISMATCH`로 거부한다.
+Viewer는 Dashboard와 같은 읽기 전용 범위에서 전체 실행을 조회할 수 있다.
+
+```json
+{
+  "agentRunId": "RUN-001",
+  "status": "COMPLETED",
+  "reasonCodes": [],
+  "attempts": [
+    {
+      "requestId": "REQ-001",
+      "requestedTool": "CREDIT_SCORE_READ",
+      "targetConsumerId": "CUST-1001",
+      "requestedData": ["CREDIT_SCORE"],
+      "decision": "ALLOW",
+      "systemOutcome": "COMPLETED",
+      "reasonCodes": [],
+      "downstreamReached": true,
+      "responseReleased": true,
+      "scopeStatus": {
+        "employeeAuthority": "OK",
+        "permissionTemplate": "OK",
+        "caseStatus": "OK",
+        "mandate": "OK",
+        "passportStatus": "OK",
+        "agentBinding": "OK",
+        "customerScope": "OK",
+        "toolScope": "OK",
+        "dataScope": "OK"
+      },
+      "requestedAt": "2026-08-17T21:30:10+09:00",
+      "completedAt": "2026-08-17T21:30:11+09:00"
+    }
+  ]
+}
+```
+
+- `status`는 `RUNNING | COMPLETED | FAILED` 중 하나다. 저장소의 실행 준비 상태 `CREATED`는
+  Public 응답에서 `RUNNING`으로 표현한다.
+- `FAILED`는 AuditEvent가 없어도 반환한다. Core가 Agent를 호출하지 못한 실패를 화면에서
+  영구 `RUNNING`으로 오인하지 않기 위해서다.
+- `RUNNING`에서는 완료되지 않은 PROCESSING AuditEvent를 `attempts`에 싣지 않는다.
+- 정책 판정 전 시스템 오류는 `systemOutcome=ERROR`이고 `decision`을 생략할 수 있다.
+- Downstream 오류는 `decision=ALLOW`, `systemOutcome=ERROR`가 될 수 있다.
+- 응답은 식별자·권한 증거·판정·시각만 포함한다. 원본 Prompt, 금융 문서, 금융 응답,
+  Credential은 포함하지 않는다.
+- AgentRun이 없으면 존재 여부를 더 설명하지 않는 `404`를 반환한다.
+
 ---
 
 ## 3.1 Agent Simulator — P0 Runtime Contract
@@ -1036,6 +1095,7 @@ Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 �
 | `GET /api/v1/audit-events` | Viewer 또는 Operator |
 | `GET /api/v1/audit-events/{auditEventId}` | Viewer 또는 Operator |
 | `GET /api/v1/dashboard/summary` | Viewer 또는 Operator |
+| `GET /api/v1/agent-runs/{agentRunId}/execution` | Viewer 또는 Operator. Operator는 본인 실행만 |
 | `GET /api/v1/agent-runs/{agentRunId}/permission-comparison` | Viewer 또는 Operator |
 
 Vue는 PostgreSQL을 직접 조회하지 않는다.

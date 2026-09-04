@@ -2,6 +2,8 @@ package io.finguard.core.agentrun;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -26,10 +28,15 @@ public class AgentRunController {
 
     private final AgentRunService agentRunService;
     private final AgentRunPreparer preparer;
+    private final AgentExecutionService executionService;
 
-    public AgentRunController(AgentRunService agentRunService, AgentRunPreparer preparer) {
+    public AgentRunController(
+            AgentRunService agentRunService,
+            AgentRunPreparer preparer,
+            AgentExecutionService executionService) {
         this.agentRunService = agentRunService;
         this.preparer = preparer;
+        this.executionService = executionService;
     }
 
     /**
@@ -82,5 +89,13 @@ public class AgentRunController {
                                 started.inputRefs(),
                                 started.status(),
                                 started.startedAt()));
+    }
+
+    /** PR #65와 Issue #74에서 합의한 browser-facing 실행 상태 조회 계약. */
+    @GetMapping("/api/v1/agent-runs/{agentRunId}/execution")
+    @RequiresRole({CoreApiRole.VIEWER, CoreApiRole.OPERATOR})
+    public ResponseEntity<AgentExecutionResponse> execution(
+            @PathVariable String agentRunId, CoreApiPrincipal principal) {
+        return ResponseEntity.ok(executionService.find(agentRunId, principal));
     }
 }

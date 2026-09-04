@@ -120,15 +120,14 @@ public class ToolCallEnforcementService {
             return result;
         }
 
-        return executeAllowedDownstream(identity, request, requestId, traceparent, outcome, requestedAt);
+        return executeAllowedDownstream(identity, request, requestId, traceparent, outcome);
     }
 
     private EnforcementResult executeAllowedDownstream(VerifiedAgentIdentity identity,
                                                        ToolCallRequest request,
                                                        String requestId,
                                                        String traceparent,
-                                                       AuthorizationOutcome outcome,
-                                                       Instant requestedAt) {
+                                                       AuthorizationOutcome outcome) {
         Instant downstreamStarted = clock.instant();
         try {
             DownstreamToolResult downstream = downstreamClient.execute(request, requestId, traceparent);

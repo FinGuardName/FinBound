@@ -95,6 +95,59 @@ class ToolCallEnforcementServiceTest {
     }
 
     @Test
+    void policyBlockUsesThePostDecisionTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(requestedAt, completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
+            new AuthorizationOutcome(
+                new PolicyDecisionResult(PolicyDecision.BLOCK, "HIGH", true,
+                    List.of("CASE_SCOPE_VIOLATION"), "policy-1"),
+                0.10));
+
+        advancingService.enforce(identity, request, "REQ-BLOCK-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-BLOCK-TIME").completedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void failClosedUsesThePostFailureTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(requestedAt, completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any()))
+            .thenReturn(AuthorizationOutcome.failClosed("POLICY_ENGINE_UNAVAILABLE"));
+
+        advancingService.enforce(identity, request, "REQ-FAIL-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-FAIL-TIME").completedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void downstreamErrorUsesThePostExecutionTime() {
+        Instant requestedAt = Instant.parse("2026-08-17T12:00:00Z");
+        Instant completedAt = requestedAt.plusSeconds(1);
+        Clock advancingClock = mock(Clock.class);
+        when(advancingClock.instant()).thenReturn(requestedAt, requestedAt, completedAt);
+        ToolCallEnforcementService advancingService = new ToolCallEnforcementService(
+            authorizationService, coreClient, downstreamClient, advancingClock);
+        when(authorizationService.decide(any(), any(), any(), any(), any()))
+            .thenReturn(allowOutcome());
+        org.mockito.Mockito.doThrow(new DownstreamTimeoutException("timeout", new RuntimeException()))
+            .when(downstreamClient).execute(any(), any(), any());
+
+        advancingService.enforce(identity, request, "REQ-DOWNSTREAM-TIME", "trace");
+
+        assertThat(captureOutcome("REQ-DOWNSTREAM-TIME").completedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
     void policyBlockCompletesAuditAsBlockAndReturns403() {
         when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
             new AuthorizationOutcome(

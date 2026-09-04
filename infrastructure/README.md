@@ -13,7 +13,7 @@ Kubernetes는 P1입니다.
 | [#75](https://github.com/FinGuardName/FinBound/pull/75) | Core → Agent 실행 | `AGENT_URL=http://agent:8082` 연결 |
 | [#78](https://github.com/FinGuardName/FinBound/pull/78), [#79](https://github.com/FinGuardName/FinBound/pull/79) | Agent 발급 참조·공격 Scenario | 업무 E2E 선행 작업 |
 | [#56](https://github.com/FinGuardName/FinBound/pull/56) | Core Audit/Dashboard | Gateway Audit 계약 통합 확인 |
-| [#70](https://github.com/FinGuardName/FinBound/pull/70), #72 | AI 이미지·Frontend/AI Compose override·실제 E2E | `docker-compose.frontend-ai.yml`에서 통합 |
+| [#93](https://github.com/FinGuardName/FinBound/pull/93), #72 | AI 이미지·Frontend/AI Compose override·실제 E2E | `docker-compose.frontend-ai.yml`에서 통합 |
 
 이 PR들이 미병합인 checkout에서 #62 파일만으로 전체 업무 E2E가 완성되지는 않습니다.
 특히 #83 미반영 시 Dockerfile이 없어 빌드할 수 없습니다. 선행 코드를 자동 병합하거나
