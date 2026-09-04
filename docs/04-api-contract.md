@@ -187,7 +187,10 @@ CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 
 기존 두 Scenario와 아래 다섯 Scenario를 합친 7개 이름을 소비자 구현 기준으로 사용한다.
 PR #79에서 Backend 1이 이 목록에 맞춰 Core Enum을 확장하기로 했으며,
-실제 Core 지원 완료 여부는 #74 / PR #75에서 확인한다. Fixture 구현 완료를 뜻하지 않는다.
+실제 Core 지원 완료 여부는 #74 / PR #75에서 확인한다.
+아래 Fixture는 이슈 #94에서 데모 시드에 구현했다 — `CUST-1002`·`CUST-1003`이 그것이다.
+다만 `docker compose` 화면에서 이 판정을 보려면 이슈 #96(Prompt Risk Snapshot 평가)이 선행이다.
+그전까지는 Gateway가 OPA 호출 전에 `PROMPT_RISK_UNAVAILABLE`로 fail-closed한다.
 Gateway Body에는 Scenario나 권한 근거를 추가하지 않는다. Tool/Data는
 `docs/06-common-conventions.md` §16·17의 기존 Enum만 사용한다.
 
@@ -195,19 +198,37 @@ Gateway Body에는 Scenario나 권한 근거를 추가하지 않는다. Tool/Dat
 |---|---|---|---|---|
 | `NORMAL_INCOME` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | ALLOW |
 | `NORMAL_DEBT` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | ALLOW |
-| `TOOL_SCOPE_ATTACK` | `CUST-1001` | `INCOME_READ` | `[INCOME]` | BLOCK / `TOOL_SCOPE_VIOLATION` |
-| `DATA_SCOPE_ATTACK` | `CUST-1001` | `CREDIT_SCORE_READ` | `[CREDIT_SCORE, INCOME]` | BLOCK / `DATA_SCOPE_VIOLATION` |
-| `MANDATE_SCOPE_ATTACK` | `CUST-1001` | `DEBT_READ` | `[DEBT]` | BLOCK / `MANDATE_SCOPE_VIOLATION` |
+| `TOOL_SCOPE_ATTACK` | `CUST-1002` | `INCOME_READ` | `[INCOME]` | BLOCK / `TOOL_SCOPE_VIOLATION` 포함 |
+| `DATA_SCOPE_ATTACK` | `CUST-1002` | `CREDIT_SCORE_READ` | `[CREDIT_SCORE, INCOME]` | BLOCK / `DATA_SCOPE_VIOLATION` 포함 |
+| `MANDATE_SCOPE_ATTACK` | `CUST-1003` | `DEBT_READ` | `[DEBT]` | BLOCK / `MANDATE_SCOPE_VIOLATION` 포함 |
+
+공격 셋의 `targetConsumerId`가 `CUST-1001`이 아닌 이유는 아래 Fixture 조건에 있다. `CUST-1001`은
+정상 경로용이라 Tool·Data를 모두 허용하므로, 같은 고객을 노리면 `TOOL_SCOPE_ATTACK`이
+`NORMAL_INCOME`과, `MANDATE_SCOPE_ATTACK`이 `NORMAL_DEBT`와 요청이 완전히 같아져 서버가 둘을
+구분할 수 없다(이슈 #94). 실행도 각 Scenario의 `targetConsumerId`로 시작해야 한다 —
+`CASE_SCOPE_ATTACK`만 예외로 `CUST-1001`로 시작해 `CUST-9999`를 조회한다.
 
 필수 서버 Fixture 조건:
 
-- 정상: 유효한 Case/Passport, 요청 Tool/Data를 허용하는 Authority·Template·Passport·Mandate,
+Passport는 발급 시 `Employee Authority ∩ Permission Template ∩ Consumer Mandate`로 계산되고,
+요구 Data가 빠진 Tool은 함께 제거된다. 셋 중 실행 시점에 고를 수 있는 것은 **Consumer Mandate**
+뿐이다 — Authority는 운영 Credential이 Employee 하나에 묶여 있고, Template은 `taskType`으로
+결정된다. 그래서 공격 Fixture는 Mandate를 좁힌 별도 Consumer로 만든다.
+
+- 정상 (`CUST-1001`): 유효한 Case/Passport, 요청 Tool/Data를 허용하는 Authority·Template·Mandate,
   낮은 Risk 및 제한 미초과.
-- Tool 공격: Passport가 `INCOME_READ`를 허용하지 않는다. 단일 Tool 위반을 확인하려면
-  Authority/Template은 해당 Tool을, Passport/Mandate는 `INCOME`을 허용한다.
-- Data 공격: Passport가 `CREDIT_SCORE_READ`와 `CREDIT_SCORE`는 허용하지만 `INCOME`은
-  허용하지 않는다. 다른 Authority/Template/Mandate는 요청 Data를 허용한다.
-- Mandate 공격의 기준 Fixture: 발급 전 ACTIVE Mandate의 Data를 `[CREDIT_SCORE, INCOME]`으로
+- Tool 공격 (`CUST-1002`): Mandate Data가 `[CREDIT_SCORE, DEBT]`다. `INCOME`이 없으므로
+  Passport에서 `INCOME`과 `INCOME_READ`가 함께 사라진다. 기대 전체 코드는
+  `[DATA_SCOPE_VIOLATION, MANDATE_SCOPE_VIOLATION, TOOL_SCOPE_VIOLATION]`이다 —
+  Rego가 `sort(deny_reasons)`로 내보내므로 순서는 알파벳순이다(`policy/finguard_authz.rego`).
+- Data 공격 (`CUST-1002`): 같은 Consumer를 쓰되 `CREDIT_SCORE_READ`로 `[CREDIT_SCORE, INCOME]`을
+  요청한다. Tool은 Passport에 남아 있으므로 `toolScope`는 `OK`고, 기대 전체 코드는
+  `[DATA_SCOPE_VIOLATION, MANDATE_SCOPE_VIOLATION]`이다.
+- **위반 하나만 나게 하는 격리는 지원하지 않는다.** 신규 발급 Passport는
+  `allowedData ⊆ mandate.allowedData`이므로 Mandate 위반은 반드시 `dataScope` 위반을 동반한다.
+  격리하려면 Authority나 Template을 좁혀야 하는데 위에 적은 이유로 실행 시점에 고를 수 없다.
+  검증은 **의도한 Reason Code가 포함되는지**로 한다.
+- Mandate 공격의 기준 Fixture (`CUST-1003`): 발급 전 ACTIVE Mandate의 Data를 `[CREDIT_SCORE, INCOME]`으로
   제한하고 Core에서 새 Passport를 발급한다. Authority/Template은 세 Tool/Data를 모두 허용한다.
   현재 Calculator는 DEBT뿐 아니라 DEBT_READ도 Passport에서 제외하므로 기대 전체 코드는
   `[DATA_SCOPE_VIOLATION, MANDATE_SCOPE_VIOLATION, TOOL_SCOPE_VIOLATION]`이다.
@@ -218,10 +239,13 @@ Gateway Body에는 Scenario나 권한 근거를 추가하지 않는다. Tool/Dat
   현재 `passportStatus=VIOLATION`은 만료와 버전 불일치를 구분하지 못하며
   `TASK_PASSPORT_STALE`을 반환하지 않는다. 세분화는 별도 Core/Policy 계약 변경 범위다.
 
-Scenario는 요청 생성만 결정한다. 모든 권한을 허용하는 기본 Seed에서는 공격 이름이어도
-ALLOW일 수 있다. Agent는 Scope를 계산하거나 기대 Reason Code를 생성·추가·정렬하지 않는다.
-전용 Fixture의 발급/관리는 Core·통합 테스트 담당 범위이며, Agent가 DB나 Passport를 수정하지 않는다.
-정상 INCOME과 Tool 공격, 정상 DEBT와 Mandate 공격은 요청 내용이 같고 서버 Context가 다르다.
+Scenario는 요청 생성만 결정한다. Agent는 Scope를 계산하거나 기대 Reason Code를 생성·추가·정렬하지
+않는다. Fixture의 발급/관리는 Core·통합 테스트 담당 범위이며, Agent가 DB나 Passport를 수정하지 않는다.
+
+**Scenario 이름은 아무것도 막지 못한다. 막는 것은 Fixture다.** 이슈 #94 이전에는 공격 셋이
+`CUST-1001`을 노려 정상 INCOME과 Tool 공격, 정상 DEBT와 Mandate 공격의 요청이 완전히 같았고,
+그래서 이름만 공격이고 결과는 ALLOW였다. 지금은 대상 Consumer가 달라 요청도 다르다(위 표).
+**Mandate를 좁히지 않은 Consumer로 실행하면 지금도 ALLOW가 난다.**
 
 병합/활성화 순서는 **#77 → #75 → #79**이며, #79는 **#78 병합 내용도 반영**해야 한다.
 #77 이전 Gateway는 CREDIT_SCORE_READ/CREDIT_SCORE만 역직렬화하므로 새 Scenario 5개가
