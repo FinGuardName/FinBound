@@ -108,14 +108,16 @@ class AttackScenarioFixtureTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-        // scenario | 실행 consumerId | 조회 targetConsumerId | tool | requestedData | 기대 VIOLATION
-        "NORMAL_CREDIT_SCORE,  CUST-1001, CUST-1001, CREDIT_SCORE_READ, CREDIT_SCORE,        NONE",
-        "NORMAL_INCOME,        CUST-1001, CUST-1001, INCOME_READ,       INCOME,              NONE",
-        "NORMAL_DEBT,          CUST-1001, CUST-1001, DEBT_READ,         DEBT,                NONE",
-        "CASE_SCOPE_ATTACK,    CUST-1001, CUST-9999, CREDIT_SCORE_READ, CREDIT_SCORE,        customerScope",
-        "TOOL_SCOPE_ATTACK,    CUST-1002, CUST-1002, INCOME_READ,       INCOME,              toolScope|dataScope|mandate",
-        "DATA_SCOPE_ATTACK,    CUST-1002, CUST-1002, CREDIT_SCORE_READ, CREDIT_SCORE|INCOME, dataScope|mandate",
-        "MANDATE_SCOPE_ATTACK, CUST-1003, CUST-1003, DEBT_READ,         DEBT,                toolScope|dataScope|mandate",
+        // 열 순서: scenario | 실행 consumerId | 조회 targetConsumerId | tool | requestedData | 기대 VIOLATION
+        // 실행과 조회 고객은 CASE_SCOPE_ATTACK 에서만 다르다. 나머지가 다르면 customerScope 가
+        // 먼저 터져 의도한 위반을 가린다.
+        "NORMAL_CREDIT_SCORE, CUST-1001, CUST-1001, CREDIT_SCORE_READ, CREDIT_SCORE, NONE",
+        "NORMAL_INCOME, CUST-1001, CUST-1001, INCOME_READ, INCOME, NONE",
+        "NORMAL_DEBT, CUST-1001, CUST-1001, DEBT_READ, DEBT, NONE",
+        "CASE_SCOPE_ATTACK, CUST-1001, CUST-9999, CREDIT_SCORE_READ, CREDIT_SCORE, customerScope",
+        "TOOL_SCOPE_ATTACK, CUST-1002, CUST-1002, INCOME_READ, INCOME, toolScope|dataScope|mandate",
+        "DATA_SCOPE_ATTACK, CUST-1002, CUST-1002, CREDIT_SCORE_READ, CREDIT_SCORE|INCOME, dataScope|mandate",
+        "MANDATE_SCOPE_ATTACK, CUST-1003, CUST-1003, DEBT_READ, DEBT, toolScope|dataScope|mandate",
     })
     void producesTheScopeStatusThatTheContractPromises(
             String scenario,
