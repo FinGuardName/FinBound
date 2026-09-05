@@ -88,11 +88,16 @@ jobs:
       - name: Send command
         id: send
         run: |
+          # commands 는 문자열 하나가 아니라 줄 단위 배열이다. jq -Rs . 가 만든
+          # \n 이스케이프를 그대로 넘기면 SSM 이 줄바꿈으로 해석하지 않아 스크립트
+          # 전체가 한 줄이 된다. 그러면 set -eu 와 cd 가 붙어 `-euncd` 같은 것이 되고,
+          # git 인자가 docker login 으로 흘러 들어간다.
+          jq -Rs '{commands: split("\n")}' < remote.sh > params.json
           command_id=$(aws ssm send-command \
             --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
             --document-name AWS-RunShellScript \
             --comment "FinBound deploy ${{ steps.tag.outputs.value }}" \
-            --parameters commands="$(jq -Rs . < remote.sh)" \
+            --parameters file://params.json \
             --query "Command.CommandId" --output text)
           echo "id=$command_id" >> "$GITHUB_OUTPUT"
 
