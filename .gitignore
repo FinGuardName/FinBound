@@ -47,3 +47,7 @@ data/
 ai-risk/datasets/cache/
 coverage/
 htmlcov/
+
+# OpenTelemetry Java Agent — 로컬 추적 오버레이용. 25MB 라 받아서 쓴다.
+# 받는 명령은 infrastructure/docker-compose.tracing.yml 첫머리에 있다.
+infrastructure/otel/*.jar
