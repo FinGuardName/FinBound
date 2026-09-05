@@ -6,8 +6,17 @@
 **계정 번호와 리전은 자리표시자다.** 저장소가 public이라 계정 번호를 적어 두지 않는다.
 
 ```
-ACCOUNT_ID   →  실제 AWS 계정 번호
-AWS_REGION   →  ap-northeast-2
+ACCOUNT_ID       →  실제 AWS 계정 번호
+AWS_REGION       →  ap-northeast-2
+GITHUB_ORG_ID    →  조직의 불변 숫자 ID
+GITHUB_REPO_ID   →  저장소의 불변 숫자 ID
+```
+
+조직·저장소 ID는 이렇게 얻는다.
+
+```bash
+gh api orgs/FinGuardName --jq .id
+gh api repos/FinGuardName/FinBound --jq .id
 ```
 
 ## 파일
@@ -53,8 +62,30 @@ aws iam put-role-policy --role-name finbound-gha-deploy \
 ## 무엇을 허용하는가
 
 **신뢰 정책** — `FinGuardName/FinBound` 저장소의 워크플로만 이 역할을 맡을 수 있다.
-`sub` 를 와일드카드로 둔 이유는 발행이 브랜치 push(`ref:refs/heads/...`)에서, 배포가
+`sub` 끝을 와일드카드로 둔 이유는 발행이 브랜치 push(`ref:refs/heads/...`)에서, 배포가
 `production` 환경(`environment:production`)에서 돌아 값이 서로 다르기 때문이다.
+
+### ⚠️ `sub` 에 불변 ID가 붙는다 — 여기서 한 번 막혔다
+
+GitHub 가 발급하는 `sub` 는 이름만 쓰지 않는다. **조직과 저장소의 불변 숫자 ID를 함께 넣는다.**
+
+```
+repo:FinGuardName@316611907/FinBound@1337110461:ref:refs/heads/chore/aws-iam-policies
+```
+
+처음에 `repo:FinGuardName/FinBound:*` 로만 조건을 걸었더니 매칭이 안 돼
+`Not authorized to perform sts:AssumeRoleWithWebIdentity` 가 났다. **공급자·대상·역할이
+전부 정상인데도 나는 에러라 원인을 짐작하기 어렵다.**
+
+그래서 두 형식을 배열로 함께 둔다. 배열은 OR 이고, 범위는 여전히 이 저장소 하나다.
+
+막히면 추측하지 말고 토큰이 실제로 주장하는 값을 본다. 워크플로에서 이렇게 꺼낸다
+(**토큰 자체는 절대 출력하지 않는다 — 자격증명이다**).
+
+```bash
+token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN"   "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com"   | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
+printf '%s' "$token" | python3 -c 'import sys,base64,json; p=sys.stdin.read().split(".")[1]; p+="="*(-len(p)%4); print(json.loads(base64.urlsafe_b64decode(p)).get("sub"))'
+```
 
 **권한 정책** — 넷이다.
 

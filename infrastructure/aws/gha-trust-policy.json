@@ -12,7 +12,10 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:FinGuardName/FinBound:*"
+          "token.actions.githubusercontent.com:sub": [
+            "repo:FinGuardName@GITHUB_ORG_ID/FinBound@GITHUB_REPO_ID:*",
+            "repo:FinGuardName/FinBound:*"
+          ]
         }
       }
     }
