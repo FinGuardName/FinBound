@@ -1,0 +1,72 @@
+# 분산 추적 오버레이 — 요청 하나가 여섯 서비스를 지나는 순서와 소요를 눈으로 본다.
+#
+#   docker compose --env-file ../.env \
+#     -f docker-compose.yml -f docker-compose.demo.yml \
+#     -f docker-compose.frontend-ai.yml -f docker-compose.tracing.yml \
+#     up -d --wait
+#
+#   Jaeger UI  →  http://127.0.0.1:16686
+#
+# ⚠️ 로컬 전용이다. 배포에는 쓰지 않는다 — 추적 데이터는 메모리에만 쌓이고,
+# UI 에 인증이 없으며, Jaeger 컨테이너가 internal-zone 을 들여다본다.
+#
+# 코드를 고치지 않는다. JAVA_TOOL_OPTIONS 로 OpenTelemetry Java Agent 를 붙여
+# Spring MVC·WebClient·JDBC 호출을 자동 계측한다. 저장소는 이미 traceparent 를
+# 손으로 전파하고 있어서(AuthorizationService·CoreClientImpl 등) 서비스 경계가
+# 하나의 trace 로 이어진다.
+#
+# 에이전트 jar 는 저장소에 없다. 아래로 받는다(25MB, 커밋하지 않는다):
+#   curl -sSL -o infrastructure/otel/opentelemetry-javaagent.jar \
+#     https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
+x-otel: &otel-java
+  JAVA_TOOL_OPTIONS: "-javaagent:/otel/opentelemetry-javaagent.jar"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_TRACES_EXPORTER: otlp
+  # 추적만 본다. 메트릭·로그 내보내기는 켜면 노이즈만 는다.
+  OTEL_METRICS_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+  # 시연용이라 전부 수집한다. 운영이면 비율을 낮춘다.
+  OTEL_TRACES_SAMPLER: always_on
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.65.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      # UI 만 호스트에 연다. OTLP 수집 포트는 컨테이너 사이에서만 쓴다.
+      - "127.0.0.1:16686:16686"
+    mem_limit: 512m
+    restart: unless-stopped
+    networks: [internal-zone, finance-zone]
+    security_opt: [no-new-privileges:true]
+
+  core-api:
+    environment:
+      <<: *otel-java
+      OTEL_SERVICE_NAME: core-api
+    volumes:
+      - ./otel:/otel:ro
+
+  gateway:
+    environment:
+      <<: *otel-java
+      OTEL_SERVICE_NAME: gateway
+    volumes:
+      - ./otel:/otel:ro
+
+  agent:
+    environment:
+      <<: *otel-java
+      OTEL_SERVICE_NAME: agent
+    volumes:
+      - ./otel:/otel:ro
+
+  mock-finance:
+    environment:
+      <<: *otel-java
+      OTEL_SERVICE_NAME: mock-finance
+    volumes:
+      - ./otel:/otel:ro
