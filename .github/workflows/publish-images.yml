@@ -1,0 +1,81 @@
+# core-api 와 gateway 는 이 워크플로 이전에는 이미지를 만드는 경로가 아예 없었다.
+# 나머지 넷은 스모크 검사용으로만 빌드되고 버려졌다. 배포는 받아서 실행만 하므로
+# 여기서 만든 이미지가 유일한 산출물이다.
+name: Publish container images
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# 이미지를 GHCR에 밀려면 contents: read 만으로는 부족하다.
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  # GHCR 경로는 소문자만 받는다. 소유자 이름을 그대로 쓰면 실패한다.
+  OWNER: finguardname
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Spring 넷은 같은 Dockerfile을 SERVICE_MODULE 인자로 나눠 쓴다.
+          # Compose의 context 가 `..`(저장소 루트)이므로 여기서도 루트를 준다.
+          - name: core-api
+            context: .
+            dockerfile: infrastructure/docker/spring-service.Dockerfile
+            build-args: SERVICE_MODULE=core-api
+          - name: gateway
+            context: .
+            dockerfile: infrastructure/docker/spring-service.Dockerfile
+            build-args: SERVICE_MODULE=gateway
+          - name: agent
+            context: .
+            dockerfile: backend/agent/Dockerfile
+            build-args: ""
+          - name: mock-finance
+            context: .
+            dockerfile: backend/mock-finance/Dockerfile
+            build-args: ""
+          - name: ai-risk
+            context: ai-risk
+            dockerfile: ai-risk/Dockerfile
+            build-args: ""
+          # Vite는 빌드 시점에 값을 굽는다. Compose와 같은 값을 주지 않으면
+          # Mock Mode로 굳은 번들이 배포된다.
+          - name: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+            build-args: |
+              VITE_FINBOUND_API_MODE=real
+              VITE_FINBOUND_API_BASE_URL=/core-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 태그는 commit SHA 하나뿐이다. `latest` 를 만들지 않는 이유는 배포가
+      # 어떤 커밋을 올렸는지 사후에 확인할 수 없게 되기 때문이다.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build-args }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/finbound-${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
