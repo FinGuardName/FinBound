@@ -57,8 +57,14 @@ ssm:SendCommand                            대상 인스턴스 + AWS-RunShellScr
 ssm:GetCommandInvocation                   전체
 ```
 
+**정책 JSON은 `infrastructure/aws/` 에 파일로 있다.** 적용 절차와 각 권한의 근거는
+[`infrastructure/aws/README.md`](aws/README.md).
+
 **신뢰 정책의 `sub`를 저장소로 좁힌다.** 넓게 두면 다른 저장소가 이 역할을 맡는다.
 역할 ARN은 뒤에서 저장소 시크릿에 넣는다.
+
+> ⚠️ **긴 JSON을 CloudShell에 직접 붙여넣지 않는다.** 터미널이 긴 줄 중간에 줄바꿈을 끼워 넣어
+> 조용히 깨진다. 파일로 받아서 쓰거나 IAM 콘솔의 JSON 편집기를 쓴다.
 
 > **의도한 단순화:** 이미지 발행과 배포가 **같은 역할 하나**를 쓴다. 엄밀히는 발행용과
 > 배포용을 나누는 편이 최소 권한에 맞지만, 시연용 구성에서 IAM 설정을 두 배로 늘리는 값어치가
