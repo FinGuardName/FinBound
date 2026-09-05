@@ -2,7 +2,7 @@
 # IAM 신뢰 정책의 조건과 대조하기 위한 것이며, 확인이 끝나면 지운다.
 #
 # 토큰 자체는 절대 출력하지 않는다 — 그것은 자격증명이다. payload 에서
-# sub 와 aud 두 필드만 꺼낸다.
+# sub·aud·repository 세 필드만 꺼낸다.
 name: OIDC debug
 
 on:
@@ -20,17 +20,5 @@ jobs:
     steps:
       - name: Print sub and aud only
         run: |
-          token=$(curl -sS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-            | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
-          printf '%s' "$token" | python3 -c '
-import sys, base64, json
-payload = sys.stdin.read().split(".")[1]
-payload += "=" * (-len(payload) % 4)
-claims = json.loads(base64.urlsafe_b64decode(payload))
-print("sub =", claims.get("sub"))
-print("aud =", claims.get("aud"))
-print("iss =", claims.get("iss"))
-print("repository =", claims.get("repository"))
-'
+          token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
+          printf '%s' "$token" | python3 -c 'import sys,base64,json; p=sys.stdin.read().split(".")[1]; p+="="*(-len(p)%4); c=json.loads(base64.urlsafe_b64decode(p)); print("sub =",c.get("sub")); print("aud =",c.get("aud")); print("repository =",c.get("repository"))'
