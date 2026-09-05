@@ -1,0 +1,48 @@
+# 배포용 오버레이 — 소스에서 빌드하지 않고 ECR에서 받은 이미지를 실행한다.
+#
+#   aws ecr get-login-password --region "$AWS_REGION" \
+#     | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+#   ECR_REGISTRY=... IMAGE_TAG=<commit-sha> docker compose \
+#     --env-file /opt/finbound/.env \
+#     -f docker-compose.yml -f docker-compose.demo.yml \
+#     -f docker-compose.frontend-ai.yml -f docker-compose.deploy.yml \
+#     pull
+#   ... up -d --no-build --wait
+#
+# 기본 Compose 파일들은 여섯 서비스를 전부 `build:` 로 정의한다. 그대로 두면 배포 대상에서
+# Gradle 빌드와 ML 모델 내려받기가 다시 일어난다. 이 파일이 같은 서비스에 `image:` 를 얹어
+# `pull` 이 받을 대상을 만든다.
+#
+# `build:` 를 지우지는 않는다 — Compose 오버레이는 키를 제거하지 못한다. 대신 실행 시
+# `--no-build` 를 준다. 그래서 이 오버레이만으로는 부족하고, 위 명령을 그대로 써야 한다.
+#
+# ECR 인 이유: EC2 가 자기 인스턴스 역할로 인증하므로 호스트에 저장되는 자격증명이 없다.
+# GHCR private 은 수명이 긴 토큰을 호스트에 두게 만들고, 조직 정책이 public 패키지를 막는다.
+#
+# 두 변수 모두 기본값을 두지 않는다. 값이 없으면 조용히 엉뚱한 것을 띄우는 대신 실패한다.
+# ECR_REGISTRY 는 <account>.dkr.ecr.<region>.amazonaws.com 형태다. 계정 번호를 저장소에
+# 적어 두지 않으려고 환경변수로 받는다.
+services:
+  core-api:
+    image: ${ECR_REGISTRY:?ECR_REGISTRY must be set}/finbound-core-api:${IMAGE_TAG:?IMAGE_TAG must be set to a commit SHA}
+    pull_policy: always
+
+  gateway:
+    image: ${ECR_REGISTRY:?ECR_REGISTRY must be set}/finbound-gateway:${IMAGE_TAG:?IMAGE_TAG must be set to a commit SHA}
+    pull_policy: always
+
+  agent:
+    image: ${ECR_REGISTRY:?ECR_REGISTRY must be set}/finbound-agent:${IMAGE_TAG:?IMAGE_TAG must be set to a commit SHA}
+    pull_policy: always
+
+  mock-finance:
+    image: ${ECR_REGISTRY:?ECR_REGISTRY must be set}/finbound-mock-finance:${IMAGE_TAG:?IMAGE_TAG must be set to a commit SHA}
+    pull_policy: always
+
+  ai-risk:
+    image: ${ECR_REGISTRY:?ECR_REGISTRY must be set}/finbound-ai-risk:${IMAGE_TAG:?IMAGE_TAG must be set to a commit SHA}
+    pull_policy: always
+
+  frontend:
+    image: ${ECR_REGISTRY:?ECR_REGISTRY must be set}/finbound-frontend:${IMAGE_TAG:?IMAGE_TAG must be set to a commit SHA}
+    pull_policy: always
