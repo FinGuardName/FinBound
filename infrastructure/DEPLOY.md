@@ -204,7 +204,15 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://<호스트>/core-api/actuator/
 ## 알려진 제약
 
 - **단일 호스트다.** 이중화하지 않는다. 인스턴스가 죽으면 서비스가 죽는다.
-- **`ai-risk`가 자기 메모리 한도의 88%를 쓴다.** 인스턴스에 여유가 있어도 컨테이너 한도에
-  걸리면 OOM으로 죽는다. `.env`에 `AI_RISK_MEM_LIMIT=1280m`을 넣어 올린다.
+- **`ai-risk`에 `AI_RISK_MEM_LIMIT=2g`를 반드시 준다.** 기본 한도 1g로는 `/ready` 요청에서
+  모델을 적재하다 OOM으로 죽고 무한 재시작한다(실제 배포에서 122회 관측). 1280m도 부족했다.
+  `.env.example`의 기본값이 2g다.
+
+  **swap으로 대신하려 하지 않는다.** 죽은 원인이 호스트 메모리 부족이 아니라 cgroup 한도이고,
+  swap을 켜면 모델이 디스크로 밀려 시연이 견딜 수 없이 느려진다.
+
+- **t3.medium은 여유가 크지 않다.** `ai-risk` 2g + 나머지 7개 약 0.9g + OS 약 0.6g ≈ 3.5GiB이고
+  총 3.8GiB에 스왑이 없다. 배포 후 `free -m`의 `available`이 500MiB 아래면 t3.large로 올린다.
+  탄력적 IP를 쓰므로 유형을 바꿔도 주소는 그대로다.
 - **`RateLimitFilter`가 `X-Forwarded-For`를 그대로 믿는다.** 인터넷에 노출되면 Rate Limit을
   헤더로 우회할 수 있다. 별도 이슈 대상이다.
