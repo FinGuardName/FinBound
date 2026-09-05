@@ -1,6 +1,11 @@
 # core-api 와 gateway 는 이 워크플로 이전에는 이미지를 만드는 경로가 아예 없었다.
 # 나머지 넷은 스모크 검사용으로만 빌드되고 버려졌다. 배포는 받아서 실행만 하므로
 # 여기서 만든 이미지가 유일한 산출물이다.
+#
+# ⚠️ 여기서 나오는 이미지는 linux/amd64 하나뿐이다. 러너가 x86_64 이고 platform 을
+# 지정하지 않기 때문이다. 따라서 배포 대상 EC2 도 x86_64 여야 한다 — Graviton(t4g,
+# arm64)에서는 pull 은 되고 실행이 안 된다. arm64 를 쓰려면 여기에 멀티 플랫폼
+# 빌드를 먼저 넣어야 한다. 자세히는 infrastructure/DEPLOY.md.
 name: Publish container images
 
 on:

@@ -11,7 +11,7 @@
 # core-api 는 애초에 호스트 포트를 열지 않는다(`docker-compose.yml` 의 expose 주석 참조).
 services:
   caddy:
-    image: caddy:2.10.2-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     # 80 은 ACME HTTP-01 challenge 와 HTTPS 리다이렉트에 쓴다. 닫으면 인증서를 못 받는다.
     ports:
