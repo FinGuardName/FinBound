@@ -54,13 +54,21 @@ jobs:
         env:
           IMAGE_TAG: ${{ steps.tag.outputs.value }}
           PUBLIC_HOST: ${{ vars.FINBOUND_PUBLIC_HOST }}
+          ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
         run: |
           {
             printf "export IMAGE_TAG='%s'\n" "$IMAGE_TAG"
             printf "export FINBOUND_PUBLIC_HOST='%s'\n" "$PUBLIC_HOST"
+            printf "export ECR_REGISTRY='%s'\n" "$ECR_REGISTRY"
+            printf "export AWS_REGION='%s'\n" "$AWS_REGION"
             cat <<'REMOTE'
           set -eu
           cd /opt/finbound
+          # ECR 로그인은 인스턴스 역할로 한다. 토큰은 12시간짜리이고 여기서만 쓰인다 —
+          # 호스트에 수명이 긴 자격증명을 두지 않는 것이 ECR 을 고른 이유다.
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$ECR_REGISTRY"
           # GitHub 은 SHA 로 직접 fetch 하는 것을 허용한다. 브랜치를 거치지 않으므로
           # 배포 대상이 사이에 움직이지 않는다.
           git fetch --depth=1 origin "$IMAGE_TAG"

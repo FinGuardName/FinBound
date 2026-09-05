@@ -2,6 +2,10 @@
 # 나머지 넷은 스모크 검사용으로만 빌드되고 버려졌다. 배포는 받아서 실행만 하므로
 # 여기서 만든 이미지가 유일한 산출물이다.
 #
+# 레지스트리가 GHCR 이 아니라 ECR 인 이유: 조직 정책이 public 패키지를 막고 있고,
+# private GHCR 은 EC2 에 수명이 긴 토큰을 두게 만든다. ECR 은 EC2 가 자기 인스턴스
+# 역할로 인증하므로 호스트에 저장되는 자격증명이 없다. 자세히는 ADR 0004.
+#
 # ⚠️ 여기서 나오는 이미지는 linux/amd64 하나뿐이다. 러너가 x86_64 이고 platform 을
 # 지정하지 않기 때문이다. 따라서 배포 대상 EC2 도 x86_64 여야 한다 — Graviton(t4g,
 # arm64)에서는 pull 은 되고 실행이 안 된다. arm64 를 쓰려면 여기에 멀티 플랫폼
@@ -13,15 +17,11 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
-# 이미지를 GHCR에 밀려면 contents: read 만으로는 부족하다.
+# ECR 에 밀려면 AWS 역할을 맡아야 하고, 그러려면 OIDC 토큰이 필요하다.
+# 저장소에 AWS 장기 키를 두지 않는 것이 이 방식의 요점이다.
 permissions:
+  id-token: write
   contents: read
-  packages: write
-
-env:
-  REGISTRY: ghcr.io
-  # GHCR 경로는 소문자만 받는다. 소유자 이름을 그대로 쓰면 실패한다.
-  OWNER: finguardname
 
 jobs:
   publish:
@@ -66,11 +66,13 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
 
       # 태그는 commit SHA 하나뿐이다. `latest` 를 만들지 않는 이유는 배포가
       # 어떤 커밋을 올렸는지 사후에 확인할 수 없게 되기 때문이다.
@@ -81,6 +83,6 @@ jobs:
           file: ${{ matrix.dockerfile }}
           build-args: ${{ matrix.build-args }}
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/finbound-${{ matrix.name }}:${{ github.sha }}
+          tags: ${{ steps.ecr.outputs.registry }}/finbound-${{ matrix.name }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}

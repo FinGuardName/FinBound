@@ -6,8 +6,11 @@ date: 2026-09-05
 # 배포는 GitHub Actions가 빌드하고 SSM이 EC2 한 대에 밀어 넣는다. Frontend를 Vercel로 떼지 않는다
 
 여덟 서비스를 **EC2 한 대**에 `docker compose`로 모아 올린다. 이미지는 **GitHub Actions**가 빌드해
-GHCR에 밀고, EC2는 받아서 실행한다. Actions가 EC2에 닿는 경로는 SSH가 아니라 **AWS SSM
+컨테이너 레지스트리에 밀고, EC2는 받아서 실행한다. Actions가 EC2에 닿는 경로는 SSH가 아니라 **AWS SSM
 Send-Command**다. **Frontend를 Vercel로 분리하는 안은 검토했고 채택하지 않았다.**
+
+**레지스트리 선택은 이 문서에서 갈라져 나갔다** — 처음에는 GHCR로 정했으나 조직 정책에 막혀
+Amazon ECR로 바꿨다. 그 결정은 [ADR 0005](0005-images-live-in-ecr-not-ghcr.md)에 있다.
 
 네 개의 독립된 판단이 한 문서에 있다. **따로 뒤집을 수 있다** — Vercel을 다시 고른다고 SSM까지
 버릴 이유는 없다.
@@ -39,7 +42,7 @@ Send-Command**다. **Frontend를 Vercel로 분리하는 안은 검토했고 채�
 (`docker-compose.yml:61,126,165,196`, `docker-compose.frontend-ai.yml:8`).
 `infrastructure/README.md:47`은 대상 호스트에서 빌드하는 것을 전제로 쓰여 있다.
 
-**따라서 GHCR 기반 배포는 "push 한 줄"이 아니라 다음을 새로 만드는 일이다:**
+**따라서 레지스트리 기반 배포는 "push 한 줄"이 아니라 다음을 새로 만드는 일이다:**
 core-api·gateway 이미지 생산 워크플로, 다이제스트 태그 체계(`latest` 금지),
 `image:`를 참조하는 배포용 compose 오버레이.
 
@@ -128,7 +131,7 @@ Vercel로 옮기면 이 검사들은 저장소에 남아 계속 통과하는데 
 듣는다"고 쓴 것은 부정확했다 — 실제로는 그보다 더 닫혀 있다.
 
 **"CI E2E 형상 = 배포 형상"이라고 초안에 썼는데 이것도 과장이다.** `frontend-ai-e2e.ps1:79`는
-소스에서 `up --build`를 한다. GHCR도 SSM도 Caddy도 TLS도 없다. 정확히는 **애플리케이션 토폴로지는
+소스에서 `up --build`를 한다. 레지스트리도 SSM도 Caddy도 TLS도 없다. 정확히는 **애플리케이션 토폴로지는
 같고 전달 경로는 다르다.**
 
 E2E 8개 중 `ai-risk.spec.js` 2건은 AI Risk를 직접 호출해 Frontend를 거치지 않는다. 나머지는
@@ -160,15 +163,17 @@ E2E 8개 중 `ai-risk.spec.js` 2건은 AI Risk를 직접 호출해 Frontend를 �
    > `core-api`에 `forward-headers-strategy` 설정이 없고 `X-Forwarded-*`를 읽는 코드도 없다.
    > 읽지 않는 헤더가 틀리는 것은 결함이 아니다. 나중에 Core가 이 헤더를 쓰기 시작하면
    > 그때 되살아난다.
-2. **GHCR 인증** — 워크플로 권한이 `contents: read`라 `packages: write`가 필요하고, EC2가 비공개
-   패키지를 받으려면 토큰이 필요하다. **"OIDC라 장기 자격증명이 없다"는 주장과 부딪힌다.**
+2. ~~**GHCR 인증**~~ — **해소됐다.** 이 지뢰가 실제로 터졌고, 그 결과 레지스트리를 GHCR에서
+   **Amazon ECR로 바꿨다.** EC2가 자기 인스턴스 역할로 인증하므로 호스트에 저장되는 자격증명이
+   없다. 경위와 버린 대안은 [ADR 0005](0005-images-live-in-ecr-not-ghcr.md).
 3. **런타임 비밀값 전달** — `docker-compose.yml:16-27`의 secrets가 호스트 환경값 5개를
    그대로 읽는다(`POSTGRES_PASSWORD`·`FINGUARD_INTERNAL_CREDENTIAL` 외 3개). SendCommand
    파라미터나 로그로 흐르면 안 된다. `infrastructure/README.md:40` — `POSTGRES_PASSWORD`를 바꿔도
    기존 볼륨에는 반영되지 않는다.
 4. **Flyway가 기동 시 자동 실행된다**(`application.yml:12`). 배포가 실패해도 스키마는 이미
    올라간 뒤일 수 있다. **이미지만 되돌리는 롤백으로는 부족하다.** 백업·복구 리허설이 없다.
-5. **Caddy가 저장소에 없다** — Caddyfile도, compose 서비스도, 인증서 영속화도 아직 없다.
+5. ~~**Caddy가 저장소에 없다**~~ — **해소됐다.** PR #107이 `infrastructure/caddy/Caddyfile` 과
+   `docker-compose.public.yml`(인증서 영속 볼륨 포함)을 넣었다.
 6. **배포 동시 실행 잠금**이 없다.
 
 ## 대가 — 무엇을 포기했나

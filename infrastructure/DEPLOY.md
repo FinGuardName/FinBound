@@ -1,7 +1,7 @@
 # 배포 절차
 
-EC2 한 대에 여덟 서비스를 올린다. 이미지는 GitHub Actions가 GHCR에 굽고, SSM Send-Command가
-EC2에서 받아 실행하고, Caddy가 HTTPS를 씌운다. **왜 이 방식인지는 [ADR 0004](../docs/adr/0004-deploy-to-one-ec2-with-actions-and-ssm.md)에 있다.**
+EC2 한 대에 여덟 서비스를 올린다. 이미지는 GitHub Actions가 ECR에 굽고, SSM Send-Command가
+EC2에서 받아 실행하고, Caddy가 HTTPS를 씌운다. **왜 이 방식인지는 [ADR 0004](../docs/adr/0004-deploy-to-one-ec2-with-actions-and-ssm.md), 왜 ECR인지는 [ADR 0005](../docs/adr/0005-images-live-in-ecr-not-ghcr.md)에 있다.**
 
 이 문서는 "무엇을 어떤 순서로 누르는가"만 다룬다.
 
@@ -12,31 +12,59 @@ EC2에서 받아 실행하고, Caddy가 HTTPS를 씌운다. **왜 이 방식인�
 **인스턴스는 반드시 x86_64여야 한다.** `publish-images.yml`이 `linux/amd64` 이미지만 만든다.
 **Graviton(`t4g`, arm64)에서는 pull은 되고 실행이 안 된다.** 20% 싸서 눈에 띄지만 지금은 못 쓴다.
 
-## 1. IAM 역할 두 개
+## 1. ECR 리포지터리 여섯 개
 
-### ① 인스턴스용 — SSM이 명령을 넣을 수 있게 한다
+이미지는 ECR에 둔다. **GHCR이 아닌 이유**는 조직 정책이 public 패키지를 막고, private GHCR은
+EC2에 수명이 긴 토큰을 두게 만들기 때문이다. ECR은 EC2가 **자기 인스턴스 역할로 인증**하므로
+호스트에 저장되는 자격증명이 없다.
+
+```bash
+for s in core-api gateway agent mock-finance ai-risk frontend; do
+  aws ecr create-repository --repository-name "finbound-$s" \
+    --region ap-northeast-2 \
+    --image-scanning-configuration scanOnPush=true
+done
+```
+
+레지스트리 주소는 `<계정번호>.dkr.ecr.ap-northeast-2.amazonaws.com` 형태다. 뒤에서 저장소
+변수로 넣는다.
+
+## 2. IAM 역할 두 개
+
+### ① 인스턴스용 — SSM 명령을 받고 ECR에서 이미지를 받는다
 
 ```
 신뢰할 수 있는 엔터티 : AWS 서비스 → EC2
 정책                 : AmazonSSMManagedInstanceCore
+                       AmazonEC2ContainerRegistryReadOnly
 이름                 : finbound-ec2-ssm
 ```
+
+**`AmazonEC2ContainerRegistryReadOnly`가 ECR pull을 가능하게 한다.** 이것 덕분에 호스트에
+레지스트리 자격증명을 저장하지 않는다.
 
 ### ② GitHub Actions용 — OIDC로 맡는다
 
 GitHub OIDC 공급자(`token.actions.githubusercontent.com`)를 IAM에 만들고, 이 저장소에서만
-맡을 수 있는 역할을 만든다. 권한은 SSM 명령 전송과 결과 조회면 충분하다.
+맡을 수 있는 역할을 만든다. 필요한 권한은 ECR push와 SSM 명령 전송이다.
 
 ```
-ssm:SendCommand           대상 인스턴스 + AWS-RunShellScript 문서
-ssm:GetCommandInvocation  전체
-ssm:ListCommandInvocations 전체
+ecr:GetAuthorizationToken                  전체 (리소스 지정 불가)
+ecr:BatchCheckLayerAvailability            finbound-* 리포지터리
+ecr:InitiateLayerUpload / UploadLayerPart
+ecr:CompleteLayerUpload / PutImage
+ssm:SendCommand                            대상 인스턴스 + AWS-RunShellScript 문서
+ssm:GetCommandInvocation                   전체
 ```
 
-**신뢰 정책의 `sub`를 저장소와 브랜치로 좁힌다.** 넓게 두면 다른 저장소가 이 역할을 맡는다.
+**신뢰 정책의 `sub`를 저장소로 좁힌다.** 넓게 두면 다른 저장소가 이 역할을 맡는다.
 역할 ARN은 뒤에서 저장소 시크릿에 넣는다.
 
-## 2. EC2 인스턴스
+> **의도한 단순화:** 이미지 발행과 배포가 **같은 역할 하나**를 쓴다. 엄밀히는 발행용과
+> 배포용을 나누는 편이 최소 권한에 맞지만, 시연용 구성에서 IAM 설정을 두 배로 늘리는 값어치가
+> 없다고 판단했다. 운영으로 가면 나눈다.
+
+## 3. EC2 인스턴스
 
 | 항목 | 값 |
 |---|---|
@@ -64,7 +92,7 @@ ssm:ListCommandInvocations 전체
 **22번을 열지 않는다.** 80이 필요한 이유는 Let's Encrypt HTTP-01 challenge다 — 닫으면
 인증서를 못 받는다.
 
-**아웃바운드는 전체 허용(기본값)을 유지한다.** GHCR pull, Let's Encrypt, 그리고 **SSM 에이전트가
+**아웃바운드는 전체 허용(기본값)을 유지한다.** ECR pull, Let's Encrypt, 그리고 **SSM 에이전트가
 AWS 엔드포인트에 붙는 데** 필요하다. 막으면 배포 경로 자체가 죽는다.
 
 ### 탄력적 IP
@@ -100,7 +128,7 @@ git clone https://github.com/FinGuardName/FinBound.git /opt/finbound
 docker compose version
 ```
 
-## 3. 비밀값 — 사용자 데이터에 넣지 않는다
+## 4. 비밀값 — 사용자 데이터에 넣지 않는다
 
 **사용자 데이터는 인스턴스 안에서 메타데이터로 다시 읽을 수 있다.** 비밀값을 두면 그 자체가
 유출 경로가 된다. 인스턴스가 뜬 뒤 Session Manager로 들어가 직접 놓는다.
@@ -113,7 +141,7 @@ sudo vi /opt/finbound/.env
 `.env.example`이 요구하는 값 다섯 개를 채운다. **`POSTGRES_PASSWORD`는 한 번 정하면 바꾸기
 어렵다** — 기존 볼륨에는 반영되지 않는다(README의 같은 경고 참조).
 
-## 4. 저장소 설정
+## 5. 저장소 설정
 
 **Settings → Secrets and variables → Actions**
 
@@ -122,14 +150,15 @@ sudo vi /opt/finbound/.env
 | Variable | `AWS_REGION` | `ap-northeast-2` |
 | Variable | `EC2_INSTANCE_ID` | `i-0123456789abcdef0` |
 | Variable | `FINBOUND_PUBLIC_HOST` | `3-35-1-2.sslip.io` |
+| Variable | `ECR_REGISTRY` | `302303422491.dkr.ecr.ap-northeast-2.amazonaws.com` |
 | Secret | `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::…:role/finbound-gha-deploy` |
 
 **Settings → Environments** 에서 `production` 환경을 만든다. `deploy-ec2.yml`이 이 이름을 쓴다.
 
-**Packages** — GHCR 패키지 여섯 개를 public으로 두면 EC2가 토큰 없이 pull한다.
-private으로 두면 EC2에 장기 토큰이 필요해지고, "OIDC라 장기 자격증명이 없다"는 전제가 깨진다.
+이미지 레지스트리를 GHCR이 아니라 ECR로 고른 이유는 [ADR 0005](../docs/adr/0005-images-live-in-ecr-not-ghcr.md)에 있다.
+요약하면 **EC2가 자기 인스턴스 역할로 인증하므로 호스트에 저장되는 자격증명이 없다.**
 
-## 5. 배포
+## 6. 배포
 
 이미지는 `main`·`develop` push마다 자동으로 올라간다. 배포는 수동 실행이다.
 
@@ -145,7 +174,7 @@ Actions → Deploy to EC2 → Run workflow
 3. SSM 명령 상태가 `Success`가 아니면 실패시킨다
 4. `https://<호스트>/health`가 200을 줄 때까지 확인한다
 
-## 6. 배포 후 확인
+## 7. 배포 후 확인
 
 ```bash
 # 화면이 뜨는가
