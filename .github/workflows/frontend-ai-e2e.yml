@@ -1,0 +1,52 @@
+name: Frontend and AI real E2E
+
+on:
+  pull_request:
+    paths:
+      - frontend/**
+      - ai-risk/**
+      - backend/**
+      - policy/**
+      - infrastructure/**
+      - e2e/**
+      - contracts/**
+      - gradle/**
+      - build.gradle.kts
+      - settings.gradle.kts
+      - gradlew
+      - gradlew.bat
+      - .dockerignore
+      - .env.example
+      - .github/workflows/frontend-ai-e2e.yml
+  push:
+    branches: [main, develop]
+    paths:
+      - frontend/**
+      - ai-risk/**
+      - backend/**
+      - policy/**
+      - infrastructure/**
+      - e2e/**
+      - contracts/**
+      - gradle/**
+      - build.gradle.kts
+      - settings.gradle.kts
+      - gradlew
+      - gradlew.bat
+      - .dockerignore
+      - .env.example
+      - .github/workflows/frontend-ai-e2e.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-eight-service-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run isolated real topology E2E
+        shell: pwsh
+        run: ./infrastructure/tests/frontend-ai-e2e.ps1

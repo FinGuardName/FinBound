@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finguard.io/contracts/audit/execution-outcome.schema.json",
+  "title": "ExecutionOutcome",
+  "description": "정책 결정과 시스템 실행 결과를 분리한 최종 실행 결과",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requestId",
+    "systemOutcome",
+    "downstreamReached",
+    "responseReleased",
+    "completedAt"
+  ],
+  "properties": {
+    "requestId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "decision": {
+      "type": "string",
+      "enum": ["ALLOW", "BLOCK"]
+    },
+    "systemOutcome": {
+      "type": "string",
+      "enum": ["COMPLETED", "ERROR"]
+    },
+    "reasonCodes": { "$ref": "#/$defs/reasonCodes" },
+    "downstreamReached": { "type": "boolean" },
+    "responseReleased": { "type": "boolean" },
+    "success": { "type": "boolean" },
+    "recordsRead": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "latencyMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "errorLocation": { "$ref": "#/$defs/upperSnakeCase" },
+    "severity": { "$ref": "#/$defs/severity" },
+    "riskFlagged": { "type": "boolean" },
+    "completedAt": { "$ref": "#/$defs/timestamp" }
+  },
+  "dependentRequired": {
+    "severity": ["riskFlagged"],
+    "riskFlagged": ["severity"]
+  },
+  "allOf": [
+    {
+      "if": { "required": ["decision"] },
+      "then": { "required": ["severity", "riskFlagged"] }
+    },
+    {
+      "if": {
+        "properties": { "systemOutcome": { "const": "COMPLETED" } },
+        "required": ["systemOutcome"]
+      },
+      "then": { "required": ["decision"] }
+    },
+    {
+      "if": {
+        "properties": { "systemOutcome": { "const": "ERROR" } },
+        "required": ["systemOutcome"]
+      },
+      "then": {
+        "required": ["errorLocation", "reasonCodes", "success"],
+        "properties": {
+          "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
+          "responseReleased": { "const": false },
+          "success": { "const": false }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "const": "BLOCK" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "required": ["reasonCodes"],
+        "properties": {
+          "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
+          "downstreamReached": { "const": false },
+          "responseReleased": { "const": false }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["success"] },
+            { "required": ["recordsRead"] },
+            { "required": ["latencyMs"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": { "decision": { "const": "ALLOW" } },
+            "required": ["decision"]
+          },
+          {
+            "properties": { "systemOutcome": { "const": "COMPLETED" } },
+            "required": ["systemOutcome"]
+          }
+        ]
+      },
+      "then": {
+        "required": ["success"],
+        "properties": {
+          "downstreamReached": { "const": true },
+          "responseReleased": { "const": true },
+          "success": { "const": true }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "upperSnakeCase": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    },
+    "reasonCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/upperSnakeCase" }
+    },
+    "nonEmptyReasonCodes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/upperSnakeCase" }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -9,6 +9,33 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  flyway:
+    # 경로를 오타 내면 조용히 무시되는 대신 기동에 실패한다. 시드 경로가 무시되면 기동은 성공하는데
+    # 데모 데이터가 없어서, 원인이 로그에 남지 않는 실패가 된다.
+    fail-on-missing-locations: true
+
+finguard:
+  internal:
+    # 값이 없으면 기동에 실패한다. 인증이 사실상 꺼진 Internal API가 떠 있는 상태를 만들지 않는다.
+    credential: ${FINGUARD_INTERNAL_CREDENTIAL:}
+  agent:
+    # docs/04 §3.1 — Agent는 8082에서 실행하고 Compose 주소는 http://agent:8082 다.
+    base-url: ${AGENT_URL:http://localhost:8082}
+    # Agent의 /internal/** 도 같은 공유 자격 증명으로 보호된다. 값이 하나뿐인 것은 P0의 전제다.
+    internal-credential: ${finguard.internal.credential}
+    connect-timeout-ms: ${AGENT_CONNECT_TIMEOUT_MS:1000}
+    # Agent는 Gateway와 Mock Finance를 거쳐 오므로 한 Tool Call보다 넉넉해야 한다.
+    read-timeout-ms: ${AGENT_READ_TIMEOUT_MS:10000}
+  risk:
+    # docs/04 §8 — ai-risk는 8000에서 실행하고 Compose 주소는 http://ai-risk:8000 이다.
+    # 이슈 #72가 compose에 서비스를 올리기 전까지 이 주소는 닿지 않는다. 그때는 평가가
+    # 실패하고 스냅샷이 NOT_EVALUATED로 남는다 — 의도한 동작이다(AC-14).
+    base-url: ${AI_RISK_URL:http://localhost:8000}
+    # ai-risk의 /internal/** 도 같은 공유 자격 증명으로 보호된다.
+    service-credential: ${finguard.internal.credential}
+    connect-timeout-ms: ${AI_RISK_CONNECT_TIMEOUT_MS:1000}
+    # ONNX 추론 한 번이다. Agent 왕복(10초)보다 짧아도 된다.
+    read-timeout-ms: ${AI_RISK_READ_TIMEOUT_MS:3000}
 
 management:
   endpoints:

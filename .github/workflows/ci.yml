@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -11,15 +11,33 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    # if 조건은 step 자신의 env를 읽지 못하므로 job 레벨에 둔다.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # SonarQube가 신규 코드를 판정하려면 전체 히스토리가 필요하다.
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Test Spring modules
-        run: ./gradlew test --no-daemon
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      # check는 test, checkstyle, jacocoTestCoverageVerification(80%),
+      # enforceTestPresence를 모두 실행한다.
+      - name: Build and verify Spring modules
+        run: ./gradlew check --no-daemon
+      # SONAR_TOKEN이 없는 fork PR에서는 분석을 건너뛴다.
+      - name: SonarQube analyze
+        if: env.SONAR_TOKEN != ''
+        run: ./gradlew sonar --no-daemon -Dsonar.projectVersion=${{ github.run_number }}
 
   ai-risk:
     runs-on: ubuntu-latest
@@ -37,6 +55,10 @@ jobs:
         run: |
           python -m pip install -r requirements.lock
           python -m pip install -e . --no-deps
+      - name: Lint and verify AI Risk formatting
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
       - name: Test AI Risk API
         run: python -m pytest -q
 
@@ -57,7 +79,61 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test
       - run: pnpm build
+      - name: Build Frontend production image
+        run: docker build --tag finbound-frontend:ci .
+      - name: Smoke test Frontend container and Core Public API allowlist
+        run: |
+          docker network create finbound-frontend-ci
+          docker run --detach --network finbound-frontend-ci --name core-api nginx:1.29-alpine
+          docker exec core-api sh -c 'mkdir -p /usr/share/nginx/html/api/v1 /usr/share/nginx/html/internal/v1 /usr/share/nginx/html/actuator'
+          docker exec core-api sh -c 'printf public-api-ok > /usr/share/nginx/html/api/v1/probe'
+          docker exec core-api sh -c 'printf internal-api-reached > /usr/share/nginx/html/internal/v1/probe'
+          docker exec core-api sh -c 'printf actuator-reached > /usr/share/nginx/html/actuator/health'
+          docker run --detach \
+            --network finbound-frontend-ci \
+            --name finbound-frontend \
+            --publish 127.0.0.1:18088:8080 \
+            --env CORE_API_UPSTREAM=http://core-api:80 \
+            finbound-frontend:ci
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18088/health > /dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker logs finbound-frontend
+              exit 1
+            fi
+            sleep 1
+          done
+
+          test "$(curl --fail --silent http://127.0.0.1:18088/core-api/api/v1/probe)" = "public-api-ok"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18088/core-api/internal/v1/probe)" = "404"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18088/core-api/actuator/health)" = "404"
+
+          # Nginx는 `..;` 를 상위 디렉터리가 아니라 이름이 `..;` 인 세그먼트로 본다. 정규화되지
+          # 않으므로 위 Prefix 검사만으로는 allowlist 를 벗어난 경로가 Core 로 전달된다.
+          # 상태 코드만 보면 이 결함을 못 잡는다 — upstream 이 404 를 냈을 때와 구분되지 않는다.
+          # 차단이 Nginx 에서 일어났는지, 즉 upstream 이 그 요청을 보지 못했는지를 확인한다.
+          for variant in '..;/..;/actuator/health' '..%3B/..%3B/actuator/health'; do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:18088/core-api/api/v1/$variant")
+            test "$status" = "404"
+          done
+          if docker logs core-api 2>&1 | grep --quiet '\.\.'; then
+            echo 'Nginx forwarded a non-normalized traversal path to the Core upstream'
+            docker logs core-api
+            exit 1
+          fi
+
+          test "$(docker exec finbound-frontend id -u)" = "101"
+          curl --fail --silent http://127.0.0.1:18088/loan-review | grep --quiet '<div id="app"></div>'
+      - name: Clean up Frontend smoke containers
+        if: always()
+        run: |
+          docker rm --force finbound-frontend core-api 2>/dev/null || true
+          docker network rm finbound-frontend-ci 2>/dev/null || true
 
   policy:
     runs-on: ubuntu-latest

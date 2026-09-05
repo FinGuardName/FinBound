@@ -1,10 +1,11 @@
 [project]
-name = "finguard-ai-risk"
+name = "finbound-ai-risk"
 version = "0.1.0"
-description = "Prompt and behavior risk signals for FinGuard"
+description = "Prompt and behavior risk signals for FinBound"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.116,<1.0",
+  "joblib>=1.5,<2.0",
   "numpy>=2.0,<3.0",
   "pandas>=2.2,<4.0",
   "pydantic>=2.11,<3.0",
@@ -17,6 +18,15 @@ requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
+data = [
+  "pyarrow>=23,<26",
+]
+prompt = [
+  "huggingface-hub>=0.36,<1.0",
+  "onnxruntime>=1.23,<2.0",
+  "sentencepiece>=0.2,<0.3",
+  "transformers>=4.57,<5.0",
+]
 dev = [
   "httpx>=0.28,<1.0",
   "pytest>=8.4,<9.0",
@@ -26,6 +36,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+filterwarnings = [
+  "ignore:Setting the shape on a NumPy array has been deprecated:DeprecationWarning:joblib.numpy_pickle",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

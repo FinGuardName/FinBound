@@ -28,6 +28,24 @@
 - 형식은 `type: subject`이며, 가능한 경우 기능·테스트·문서 커밋을 나눕니다.
 - 예: `feat: Financial Case 생성 기능 추가`.
 
+## 의존성 추가와 검증
+
+`gradle/verification-metadata.xml`이 Gradle이 내려받는 모든 Artifact의 SHA-256을 고정합니다. 목록에 없는 Artifact가 나타나면 빌드가 섭니다. 따라서 **의존성이나 Gradle Plugin의 추가·삭제·버전 변경은 이 파일 갱신을 동반합니다.**
+
+```bash
+./gradlew --write-verification-metadata sha256 check --refresh-dependencies
+```
+
+**`--refresh-dependencies`를 빼지 않습니다.** 로컬 Cache에 이미 있는 Artifact는 다시 내려받지 않아 목록에 기록되지 않습니다. 특히 Parent POM이 이렇게 누락되며, 로컬에서는 통과하고 깨끗한 CI에서만 `Dependency verification failed`가 납니다.
+
+갱신된 파일을 같은 PR에 포함합니다. 빌드가 `Dependency verification failed`로 서면 대부분 이 갱신을 빠뜨린 경우입니다. 다만 **의도하지 않은 Artifact가 늘어난 것은 아닌지 diff를 먼저 확인합니다** — 검증의 목적이 거기에 있습니다.
+
+CI와 같은 조건으로 확인하려면 빈 Gradle Home으로 돌립니다.
+
+```bash
+GRADLE_USER_HOME=$(mktemp -d) ./gradlew check
+```
+
 ## Pull Request와 Merge
 
 - PR 제목은 `[TYPE] 작업 요약` 형식을 사용합니다.
@@ -39,7 +57,8 @@
 - `ALLOW/BLOCK`과 시스템 `ERROR`를 구분합니다.
 - Local Test와 적용 가능한 CI를 모두 통과시킵니다.
 - 최소 1명의 팀원 Review와 열린 대화의 해결을 확인합니다.
-- 확인이 끝난 뒤 Squash and Merge를 기본으로 사용합니다.
+- Push 전에 CI 재실행용 빈 Commit이나 자기 교정 Commit을 정리합니다(`docs/08` §11.1).
+- 확인이 끝난 뒤 Create a merge commit으로 Merge합니다. Squash와 Rebase는 비활성입니다.
 
 검증 범위는 변경 종류에 맞게 적용합니다. 기능 PR은 관련 Unit/Contract/Integration 테스트가 필수이고, 문서 전용 PR은 문서·링크·Contract 정합성 검사를 우선합니다. Coverage 80%와 SonarQube Quality Gate는 해당 CI가 구성된 영역부터 Merge 조건으로 적용합니다.
 

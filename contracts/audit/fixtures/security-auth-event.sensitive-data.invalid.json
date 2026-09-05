@@ -1,0 +1,11 @@
+{
+  "securityEventId": "SEC-003",
+  "requestId": "REQ-X03",
+  "eventType": "AUTH_FAILURE",
+  "reasonCode": "AGENT_AUTHENTICATION_FAILED",
+  "credentialType": "AGENT_SERVICE",
+  "credential": "raw-secret",
+  "prompt": "raw prompt",
+  "financialPayload": { "income": 72000000 },
+  "occurredAt": "2026-08-17T21:35:00+09:00"
+}

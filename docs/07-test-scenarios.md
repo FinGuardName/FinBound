@@ -42,6 +42,18 @@ PASS-001
 
 ## 3. 정상 ALLOW
 
+### #59 AgentRun → Simulator 연결 (F06, F07, AC-01, AC-14)
+
+- Core는 AgentRun 생성 트랜잭션 커밋 후에만 Simulator를 호출한다 (#74 검증 범위).
+- Core 생성 거부·저장 실패·Timeout이면 Simulator 미호출이며 Gateway로 진행하지 않는다 (#74).
+- Agent는 Core 발급 `agentRunId`/`passportId`를 변경 없이 Gateway Body에 전달한다.
+- 참조 누락/null/공백은 HTTP 400이며 Gateway 호출 0회다.
+- 정상 Simulator 실행은 Gateway 호출 1회이며 Runtime Body에 Identity/권한/입력 원문이 없다.
+- Gateway BLOCK은 그대로 전달하고 오류·Timeout·잘못된 응답은 실행 오류로 구분한다.
+- Simulator 호출 이후 Timeout은 금융 실행 미도달을 보장하지 않는다. 자동 재시도하지 않는다.
+
+### Gateway 이후 정상 흐름
+
 Given:
 
 ```text
@@ -196,6 +208,17 @@ Prompt Detector 추가 호출 = 0회
 세 Runtime 판단에서 동일 PromptRiskSnapshot 사용
 Behavior Risk는 각 Tool Call마다 새 계산
 ```
+
+### 10.1 AI-primary Prompt 등급
+
+- Rule만 일치하고 모델 증거가 낮으면 `ALERT`, `detected=false`, OPA `ALLOW + riskFlagged=true`다.
+- Rule이 없어도 모델이 고신뢰면 `CRITICAL`, `detected=true`, OPA `PROMPT_INJECTION BLOCK`이다.
+- 모델이 중간신뢰이고 Rule이 함께 일치하면 `CRITICAL`이다.
+- 인용문-only 공격 문구는 `matchedRules=[]`여도 전체 텍스트 모델 판단으로 `ALERT` 또는
+  `CRITICAL`이 될 수 있다.
+- `promptInjectionDetected`와 `promptRiskLevel`이 불일치하면 OPA는 fail-closed한다.
+- Core Prompt Risk가 `NOT_EVALUATED`면 Gateway는 Behavior/OPA 호출 전에
+  `PROMPT_RISK_UNAVAILABLE`로 fail-closed한다.
 
 ---
 
@@ -393,7 +416,7 @@ ALLOW / BLOCK / ERROR를 모두 만든 뒤 다음을 확인한다.
 - OPA Policy Version
 - Reason Code
 - downstreamReached
-- Authority vs Effective Permission
+- LoanAgent 실행 화면에 통합된 Authority vs Effective Permission
 - 원본 Prompt/금융 응답 미표시
 - Vue DB 직접 접근 없음
 
@@ -456,6 +479,9 @@ ServiceAccount의 불필요한 Kubernetes API 접근도 거부한다.
 - [ ] Gateway DB 직접 접근 없음
 - [ ] 새 Prompt/Document Prompt Detector 실행
 - [ ] 동일 입력 Tool Call에서 Snapshot 재사용
+- [ ] Rule-only Prompt Alert → ALLOW + riskFlagged
+- [ ] Rule miss + AI 고신뢰 Prompt → PROMPT_INJECTION BLOCK
+- [ ] 인용문-only 입력을 전체 텍스트 AI가 평가
 - [ ] Prompt Detector Miss에서도 Case Rule BLOCK
 - [ ] Behavior Alert
 - [ ] Behavior Critical AI-only BLOCK

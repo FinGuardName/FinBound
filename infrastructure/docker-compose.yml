@@ -1,14 +1,51 @@
 name: finguard
 
+networks:
+  public-zone:
+    driver: bridge
+  internal-zone:
+    driver: bridge
+  finance-zone:
+    driver: bridge
+    internal: true
+  data-zone:
+    driver: bridge
+    internal: true
+
+# Values are read at container creation, never interpolated into `compose config`.
+secrets:
+  postgres-password:
+    environment: POSTGRES_PASSWORD
+  internal-credential:
+    environment: FINGUARD_INTERNAL_CREDENTIAL
+  agent-credential:
+    environment: AGENT_SERVICE_CREDENTIAL
+  viewer-credential:
+    environment: VIEWER_CREDENTIAL
+  operator-credential:
+    environment: OPERATOR_CREDENTIAL
+
+x-java-runtime: &java-runtime
+  entrypoint: ["/bin/sh", "/opt/finguard/with-secrets.sh", "java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
+  restart: unless-stopped
+  volumes:
+    - ./docker/with-secrets.sh:/opt/finguard/with-secrets.sh:ro
+  # Compose materializes environment-backed secrets during container creation.
+  # read_only requires file-backed secrets; do not silently switch off credentials.
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  security_opt: [no-new-privileges:true]
+
 services:
+  # data-zone
   postgres:
     image: postgres:17.10-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-finguard}
       POSTGRES_USER: ${POSTGRES_USER:-finguard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-password
+    secrets: [postgres-password]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -16,27 +53,170 @@ services:
       retries: 10
     volumes:
       - finguard-postgres:/var/lib/postgresql/data
-    networks: [finguard]
+    networks: [data-zone]
+
+  # internal-zone
+  core-api:
+    <<: *java-runtime
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/spring-service.Dockerfile
+      args:
+        SERVICE_MODULE: core-api
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finguard}
+      POSTGRES_USER: ${POSTGRES_USER:-finguard}
+      FINGUARD_REQUIRED_SECRETS: POSTGRES_PASSWORD FINGUARD_INTERNAL_CREDENTIAL FINGUARD_API_VIEWERCREDENTIAL FINGUARD_API_OPERATORCREDENTIAL
+      FINGUARD_API_OPERATOREMPLOYEEID: ${OPERATOR_EMPLOYEE_ID:?set OPERATOR_EMPLOYEE_ID in .env}
+      AGENT_URL: http://agent:8082
+      AGENT_READ_TIMEOUT_MS: ${AGENT_READ_TIMEOUT_MS:-15000}
+      # 기본은 프로파일 없음 = 데모 시드를 넣지 않는다.
+      # PostgreSQL 볼륨이 영속이라 한 번 들어간 시드는 프로파일을 나중에 꺼도 남는다.
+      # 되돌릴 수 없는 쪽을 기본값으로 두지 않는다. 시드가 필요하면 docker-compose.demo.yml.
+      SPRING_PROFILES_ACTIVE: ${CORE_API_PROFILES:-}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+    secrets:
+      - source: postgres-password
+        target: POSTGRES_PASSWORD
+      - source: internal-credential
+        target: FINGUARD_INTERNAL_CREDENTIAL
+      - source: viewer-credential
+        target: FINGUARD_API_VIEWERCREDENTIAL
+      - source: operator-credential
+        target: FINGUARD_API_OPERATORCREDENTIAL
+    # ports가 아니라 expose다. 호스트에 열지 않는다 — /internal/** 의 방어가 공유 자격 증명 하나뿐이라
+    # 1차 방어선인 네트워크 격리를 포기하지 않는다. 브라우저에서 접근이 필요하면
+    # docker-compose.expose.yml 을 함께 지정한다. README 참조.
+    expose:
+      - "8080"
+    # ENTRYPOINT의 -XX:MaxRAMPercentage=75 는 "컨테이너에 허용된 메모리의 75%"다.
+    # 상한이 없으면 호스트 전체 RAM 기준이 되어 힙이 과도하게 커진다.
+    mem_limit: ${CORE_API_MEM_LIMIT:-1g}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    # data-zone은 postgres에, internal-zone은 gateway가 닿기 위해서다. public-zone에는 두지 않는다.
+    networks: [internal-zone, data-zone]
 
   opa:
     image: openpolicyagent/opa:1.17.0-static
-    command:
-      - run
-      - --server
-      - --addr=0.0.0.0:8181
-      - /policy
-    ports:
-      - "${OPA_PORT:-8181}:8181"
+    restart: unless-stopped
+    command: [run, --server, --addr=0.0.0.0:8181, /policy]
     volumes:
       - ../policy:/policy:ro
     read_only: true
     security_opt:
       - no-new-privileges:true
-    networks: [finguard]
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "--fail", "http.send({\"method\":\"get\",\"url\":\"http://127.0.0.1:8181/health?bundles=true\"}).status_code == 200"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks: [internal-zone]
 
-networks:
-  finguard:
-    driver: bridge
+  gateway:
+    <<: *java-runtime
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/spring-service.Dockerfile
+      args:
+        SERVICE_MODULE: gateway
+    environment:
+      CORE_URL: http://core-api:8080
+      OPA_URL: http://opa:8181
+      MOCK_FINANCE_URL: http://mock-finance:8083
+      # AI service is supplied by the #72 override. Keep MockAiClient until that
+      # service is present so the six-service base stack can exercise ALLOW paths.
+      SPRING_PROFILES_ACTIVE: real-core,real-downstream
+      FINGUARD_REQUIRED_SECRETS: FINGUARD_CREDENTIALS_VALIDAGENTTOKENS FINGUARD_CREDENTIALS_INTERNALSERVICE
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+    secrets:
+      - source: agent-credential
+        target: FINGUARD_CREDENTIALS_VALIDAGENTTOKENS
+      - source: internal-credential
+        target: FINGUARD_CREDENTIALS_INTERNALSERVICE
+    depends_on:
+      core-api:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+      mock-finance:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    mem_limit: ${GATEWAY_MEM_LIMIT:-512m}
+    ports:
+      - "127.0.0.1:${GATEWAY_HOST_PORT:-8091}:8081"
+    networks: [public-zone, internal-zone, finance-zone]
+
+  agent:
+    <<: *java-runtime
+    build:
+      context: ..
+      dockerfile: backend/agent/Dockerfile
+    environment:
+      CORE_API_BASE_URL: http://core-api:8080
+      GATEWAY_BASE_URL: http://gateway:8081
+      GATEWAY_TIMEOUT: ${GATEWAY_TIMEOUT:-10s}
+      FINGUARD_REQUIRED_SECRETS: AGENT_SERVICE_CREDENTIAL FINGUARD_INTERNAL_CREDENTIAL
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+    secrets:
+      - source: agent-credential
+        target: AGENT_SERVICE_CREDENTIAL
+      - source: internal-credential
+        target: FINGUARD_INTERNAL_CREDENTIAL
+    expose: ["8082"]
+    mem_limit: ${AGENT_MEM_LIMIT:-512m}
+    depends_on:
+      core-api:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    networks: [internal-zone]
+
+  mock-finance:
+    <<: *java-runtime
+    build:
+      context: ..
+      dockerfile: backend/mock-finance/Dockerfile
+    environment:
+      FINGUARD_REQUIRED_SECRETS: FINGUARD_INTERNAL_CREDENTIAL
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+    secrets:
+      - source: internal-credential
+        target: FINGUARD_INTERNAL_CREDENTIAL
+    expose: ["8083"]
+    mem_limit: ${MOCK_FINANCE_MEM_LIMIT:-512m}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    networks: [finance-zone]
+
+  # ai-risk is added by the #72 override together with the real-ai profile.
+  # ai-risk:
+  #   build:
+  #     context: ../ai-risk
+  #   networks: [internal-zone]
 
 volumes:
   finguard-postgres:

@@ -2,6 +2,8 @@
 
 현재 서비스 간 계약은 `docs/04-api-contract.md`와 `docs/06-common-conventions.md`가 기준입니다. OpenAPI가 Freeze되는 시점부터 `docs/api-contract.yaml`을 추가합니다. 구현 전 아래 DTO/Enum을 합의하고, 이후 변경은 문서와 소비자 테스트를 같은 PR에서 갱신합니다.
 
+`contracts/audit`에는 P0 Audit Runtime Event JSON Schema와 검증 Fixture가 있습니다. 문서와 Schema가 충돌하면 위 두 문서가 우선하며, 계약 변경은 문서와 생산자·소비자 테스트를 같은 PR에서 갱신합니다.
+
 ## DTO
 
 `EmployeeAuthority`, `ConsumerMandate`, `PermissionTemplate`, `FinancialCase`, `TaskPassport`, `AgentRun`, `ToolCallAttempt`, `ExecutionOutcome`, `ScopeStatus`, `PromptRiskSnapshot`, `AiRiskResult`, `AuthorizationContext`, `PolicyDecision`, `AuditEvent`, `SecurityAuthEvent`, `BehaviorHistory`

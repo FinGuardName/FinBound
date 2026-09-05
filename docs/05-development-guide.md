@@ -26,6 +26,35 @@ P1 Hardening
 Agent Effective Permission ⊆ Employee Authority
 ```
 
+### 1.1 로컬 개발 환경
+
+**JDK 21이 `JAVA_HOME`으로 잡혀 있어야 한다.** Gradle toolchain은 `build.gradle.kts`에서 21로 고정돼
+있지만, **Gradle 자체를 띄우는 JVM은 `JAVA_HOME`이 정한다.** 이 값이 없으면 `PATH`의 아무 `java`나
+잡히고, 그게 17 미만이면 빌드가 시작조차 못 한다.
+
+```text
+> Dependency requires at least JVM runtime version 17. This build uses a Java 11 JVM.
+```
+
+확인:
+
+```bash
+./gradlew -q javaToolchains
+```
+
+설정 (한 번만):
+
+```bash
+# Windows — 새 터미널부터 적용된다
+setx JAVA_HOME "C:\Program Files\Java\jdk-21"
+
+# macOS / Linux — 셸 설정 파일에 추가
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+```
+
+Docker가 필요한 것: PostgreSQL / OPA(`infrastructure/docker-compose.yml`), OPA 정책 테스트,
+그리고 Core의 영속화 테스트(Testcontainers). Docker Desktop이 떠 있지 않으면 이들이 실패한다.
+
 ---
 
 ## 2. Repository 구조
@@ -80,6 +109,7 @@ finguard/
 - Permission Template
 - Financial Case
 - Effective Permission / Task Passport
+- AgentRun 발급·저장 / Core → Agent Simulator 실행 오케스트레이션
 - Context Resolver / Scope Status
 - Prompt Risk Snapshot Persistence
 - Business Audit / SecurityAuthEvent Persistence
@@ -103,7 +133,7 @@ finguard/
 
 ### Backend 3 — Agent / Mock Finance / Audit Contract
 
-- AgentRun / LoanAgent / Simulator
+- Core 발급 AgentRun 참조를 사용하는 LoanAgent / Simulator
 - Mock Financial API / Mock 금융데이터
 - ToolCallAttempt / ExecutionOutcome Contract
 - AuditEvent Contract 설계 지원
@@ -116,9 +146,9 @@ finguard/
 Frontend:
 
 ```text
-1. LoanAgent 실행 / Financial Case
-2. Employee Authority vs Agent Effective Permission
-3. Security Dashboard
+1. AI 업무 지원 / LoanAgent 실행 / Financial Case
+   - Employee Authority vs Agent Effective Permission 통합
+2. Security Dashboard
 ```
 
 AI:
@@ -217,7 +247,7 @@ SecurityAuthEvent
 
 ### Frontend & AI
 
-- Vue 3화면 Mock
+- Vue 2화면 Mock과 LoanAgent 실행 화면 내 Authority 비교 패널
 - FastAPI Skeleton
 - Behavior Feature Schema
 - Synthetic 샘플
@@ -354,21 +384,25 @@ Behavior Risk = CRITICAL
 
 ## 11. Phase 6 — Frontend Integration
 
-P0 3화면만 우선한다.
+P0는 두 개의 주요 화면을 우선한다.
 
-- LoanAgent 실행 / Case
-- Authority vs Effective Permission
+- AI 업무 지원 / LoanAgent 실행 / Case
+  - Authority vs Effective Permission 비교 근거를 현재 업무 보호 패널에 통합
 - Security Dashboard
+
+직원은 권한이나 위반 범위를 선택하지 않고 실제 금융업무만 선택한다. Agent Tool Call의
+대상·Tool·Data 범위는 서버 Context와 Task Passport로 결정한다.
 
 표시:
 
 ```text
 Scope Status
-Prompt Risk Snapshot
-Behavior Risk
-Decision
+Prompt Risk Snapshot / Evaluation Status / Model Version
+Behavior Risk / Risk Level / Feature Version / Model Version
+PolicyDecision / Audit·System Outcome
 Reason Code
-Downstream Reached
+Policy Version
+Downstream Reached / Response Released
 ```
 
 Vue는 DB를 직접 조회하지 않는다.
@@ -515,7 +549,7 @@ DB 접근은 Core Persistence Layer만 수행한다.
 
 ### Frontend
 
-- 핵심 3화면
+- 핵심 2화면과 실행 화면 내 Authority 비교 패널
 - DB 직접 접근 없음
 - Scope/Risk/Decision/Reason 표시
 

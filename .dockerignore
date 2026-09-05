@@ -1,0 +1,63 @@
+# Docker build context 최소화용.
+# 프로젝트 루트를 build.context로 쓰는 이미지(gateway 등)가 이 파일을 사용한다.
+
+# Build outputs
+**/build/
+**/out/
+.gradle/
+*.class
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Secrets (실수 방지)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+**/gradle.properties
+
+# Python (ai-risk가 컨텍스트에 있으면 무시)
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/*.egg-info/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/*.joblib
+
+# Node
+**/node_modules/
+**/.pnpm-store/
+frontend/dist/
+**/*.tsbuildinfo
+
+# Docker meta
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# 문서와 CI (이미지에 넣을 필요 없음)
+docs/
+*.md
+.github/
+
+# Test/coverage 리포트
+coverage/
+htmlcov/
+*.log
+
+# Agent 설정
+.claude/

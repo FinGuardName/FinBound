@@ -57,7 +57,7 @@ flowchart LR
     CORE --> DB[(FinGuard PostgreSQL)]
     CORE --> AG[LoanAgent / AgentRun]
 
-    AG --> GW[Spring Cloud Gateway]
+    AG --> GW[Gateway<br/>Spring MVC + Virtual Threads]
 
     GW -->|Context / Audit / History| CORE
     GW --> BEH[FastAPI Behavior Risk]
@@ -93,6 +93,10 @@ SecurityAuthEvent 저장
 Behavior History 조회
 Prompt Risk Snapshot 조회
 ```
+
+Runtime에서 Gateway는 Core 응답의 저장된 Prompt Risk Snapshot과 AI Risk Engine이 현재 Tool Call에
+대해 계산한 Behavior Risk를 조립한다. Prompt Detector를 Tool Call마다 다시 호출하거나 Behavior
+Client가 Prompt Risk를 새로 만들어서는 안 된다.
 
 ---
 
@@ -226,6 +230,7 @@ Rego에서 raw Customer/Tool/Data 비교를 중복하지 않는다.
 - Financial Case
 - Agent Effective Permission
 - Task Passport
+- AgentRun 발급·저장 및 생성 트랜잭션 커밋 후 Agent Simulator 호출
 - Financial Context Resolver
 - Prompt Risk Snapshot Persistence
 - Business Audit / SecurityAuthEvent Persistence
@@ -233,7 +238,7 @@ Rego에서 raw Customer/Tool/Data 비교를 중복하지 않는다.
 - Dashboard Read API
 - **FinGuard PostgreSQL의 유일한 애플리케이션 접근 주체**
 
-### 7.2 Spring Cloud Gateway — Backend 2
+### 7.2 Gateway (Spring MVC + Virtual Threads) — Backend 2
 
 - Runtime Tool Call Interception
 - Request Size / Envelope / Rate Limit
@@ -250,7 +255,7 @@ Rego에서 raw Customer/Tool/Data 비교를 중복하지 않는다.
 
 ### 7.3 LoanAgent / Mock Finance / Audit Contract — Backend 3
 
-- AgentRun / LoanAgent / Simulator
+- Core 발급 AgentRun 참조를 소비하는 LoanAgent / Simulator (발급·저장은 Core)
 - Tool Call 생성
 - Mock Financial API / Mock 데이터
 - ToolCallAttempt Contract
@@ -276,8 +281,8 @@ Rego에서 raw Customer/Tool/Data 비교를 중복하지 않는다.
 
 ### 7.6 Vue Frontend
 
-- LoanAgent 실행 / Financial Case
-- Authority vs Effective Permission
+- AI 업무 지원 / LoanAgent 실행 / Financial Case
+  - Authority vs Effective Permission 비교를 현재 업무 보호 패널에 통합
 - Security Dashboard
 - Core/Gateway API만 호출
 - DB 직접 접근 금지
@@ -343,7 +348,7 @@ P0는 보안 우선 `fail-closed`를 사용한다.
 flowchart TD
     FE[Vue Frontend]
     CORE[Spring Core API]
-    GW[Spring Cloud Gateway]
+    GW[Gateway<br/>Spring MVC + Virtual Threads]
     AG[LoanAgent]
     AI[FastAPI AI Risk]
     OPA[OPA]

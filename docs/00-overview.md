@@ -208,9 +208,11 @@ Gateway 우회에 대한 NetworkPolicy 기반 차단은 P1 Hardening으로 분�
 ### Audit / Web
 
 - PostgreSQL Audit
-- LoanAgent 실행 화면
-- Employee Authority vs Agent Effective Permission 화면
+- LoanAgent 실행 화면과 Financial Case별 권한 축소 근거
 - Security Dashboard / 위험 상세
+
+P0 Web은 두 개의 주요 화면으로 구성한다. Employee Authority와 Agent Effective Permission
+비교는 별도 메뉴로 분리하지 않고 LoanAgent 실행 화면의 현재 업무 보호 패널에 통합한다.
 
 ### Deployment
 
@@ -317,6 +319,7 @@ OPA
 | Agent Identity / Passport Binding 불일치 | BLOCK |
 | Case 또는 Passport 비활성·만료 | BLOCK |
 | Prompt Injection 차단 조건 충족 | BLOCK |
+| Prompt Risk가 Alert 구간 | ALLOW + `riskFlagged=true` |
 | Behavior Risk가 Alert 구간 | ALLOW + `riskFlagged=true` |
 | Behavior Risk가 Critical Threshold 이상 | BLOCK |
 | Hard Request Limit 초과 | AI와 무관하게 BLOCK |
@@ -346,6 +349,22 @@ Case Scope = VIOLATION
 
 ### B. AI 독립 가치
 
+Prompt Injection과 Behavior Anomaly는 각각 Rule/Scope가 정상인 조건에서도 AI만의 탐지 가치를
+보여야 한다.
+
+```text
+명시적 공격 어휘 Rule = 불일치
+Scope = 모두 OK
+Hard Limit = 미초과
+
+BUT
+의미적 우회·의역 공격을 Prompt 모델이 고신뢰로 탐지
+
+→ promptRiskLevel = CRITICAL
+→ PROMPT_INJECTION
+→ BLOCK
+```
+
 ```text
 Employee Scope = OK
 Case Scope = OK
@@ -369,7 +388,7 @@ Isolation Forest
 → Prompt Injection 탐지
 → 다른 고객 조회 시도
 
-Prompt Risk = HIGH
+Prompt Risk Level = CRITICAL
 Case Scope = VIOLATION
 
 → BLOCK
@@ -433,7 +452,7 @@ SecurityAuthEvent 저장 역시 `Gateway → Core API → PostgreSQL` 경로만 
 | DB | PostgreSQL |
 | ORM | Spring Data JPA |
 | AI Risk Engine | FastAPI |
-| Prompt Injection | PyTorch / Hugging Face Transformers + Rule Detection |
+| Prompt Injection | Hugging Face 다국어 모델의 ONNX 추론 + Domain Adapter + 보조 Rule |
 | Behavior Detection | scikit-learn Isolation Forest, pandas, NumPy, joblib |
 | Policy | OPA + Rego |
 | P0 Deployment | Docker + Docker Compose |

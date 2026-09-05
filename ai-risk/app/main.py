@@ -1,12 +1,86 @@
-from fastapi import FastAPI
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from app.behavior.service import BehaviorModelError, BehaviorRiskService
+from app.prompt.service import PromptInputError, PromptModelError, PromptRiskService
+from app.schemas.behavior import BehaviorRiskRequest, BehaviorRiskResponse
+from app.schemas.prompt import PromptRiskRequest, PromptRiskResponse
+from app.security import (
+    internal_credential_is_configured,
+    verify_internal_credential,
+    verify_prompt_internal_credential,
+)
 
 app = FastAPI(
-    title="FinGuard AI Risk Engine",
+    title="FinBound AI Risk Engine",
     version="0.1.0",
     description="Returns risk signals only; authorization decisions belong to OPA.",
 )
+behavior_service = BehaviorRiskService()
+prompt_service = PromptRiskService()
+
+
+@app.exception_handler(RequestValidationError)
+def request_validation_exception_handler(
+    _request: Request,
+    _error: RequestValidationError,
+) -> JSONResponse:
+    # Pydantic validation errors include the rejected input by default. Prompt and
+    # financial request bodies must not be reflected into responses that callers may log.
+    return JSONResponse(status_code=422, content={"detail": "REQUEST_VALIDATION_FAILED"})
 
 
 @app.get("/health", tags=["operations"])
 def health() -> dict[str, str]:
     return {"status": "UP"}
+
+
+@app.get("/ready", tags=["operations"])
+def ready() -> dict[str, str]:
+    try:
+        if not internal_credential_is_configured():
+            raise BehaviorModelError("Internal credential is not configured")
+        behavior_service.check_ready()
+        prompt_service.check_ready()
+    except BehaviorModelError as error:
+        raise HTTPException(status_code=503, detail="BEHAVIOR_RISK_UNAVAILABLE") from error
+    except PromptModelError as error:
+        raise HTTPException(status_code=503, detail="PROMPT_RISK_UNAVAILABLE") from error
+    return {"status": "READY"}
+
+
+@app.post(
+    "/internal/v1/risk/behavior",
+    response_model=BehaviorRiskResponse,
+    response_model_by_alias=True,
+    tags=["risk"],
+)
+def evaluate_behavior(
+    request: BehaviorRiskRequest,
+    _internal_credential: Annotated[None, Depends(verify_internal_credential)],
+) -> BehaviorRiskResponse:
+    try:
+        return behavior_service.evaluate(request)
+    except BehaviorModelError as error:
+        raise HTTPException(status_code=503, detail="BEHAVIOR_RISK_UNAVAILABLE") from error
+
+
+@app.post(
+    "/internal/v1/risk/prompt",
+    response_model=PromptRiskResponse,
+    response_model_by_alias=True,
+    tags=["risk"],
+)
+def evaluate_prompt(
+    request: PromptRiskRequest,
+    _internal_credential: Annotated[None, Depends(verify_prompt_internal_credential)],
+) -> PromptRiskResponse:
+    try:
+        return prompt_service.evaluate(request)
+    except PromptInputError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except PromptModelError as error:
+        raise HTTPException(status_code=503, detail="PROMPT_RISK_UNAVAILABLE") from error

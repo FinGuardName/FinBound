@@ -4,3 +4,7 @@ spring:
 
 server:
   port: ${MOCK_FINANCE_PORT:8083}
+
+finguard:
+  mock-finance:
+    internal-credential: ${FINGUARD_INTERNAL_CREDENTIAL:}

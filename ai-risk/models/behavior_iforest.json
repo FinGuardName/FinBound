@@ -1,0 +1,36 @@
+{
+  "modelVersion": "iforest-1",
+  "artifactSha256": "371f2dd9f1232a655ab36d318c1ec358de2fd9905682f083fb1fc947c65e07ea",
+  "featureVersion": "behavior-features-1",
+  "datasetVersion": "synthetic-agent-log-4",
+  "randomSeed": 42,
+  "alertThreshold": 0.9041666666666667,
+  "criticalThreshold": 1.0,
+  "trainedAt": "2026-08-27T14:13:25.938857+00:00",
+  "featureNames": [
+    "requestCount1m",
+    "requestCount5m",
+    "uniqueCustomers5m",
+    "uniqueTools5m",
+    "blockRatio5m",
+    "errorRatio5m",
+    "averageRequestIntervalMs",
+    "caseSwitchCount5m",
+    "financialDataRequestCount5m",
+    "afterHoursAccess"
+  ],
+  "splitSummary": {
+    "train": {
+      "samples": 1120,
+      "sessions": 140
+    },
+    "validation": {
+      "samples": 400,
+      "sessions": 50
+    },
+    "heldOutTest": {
+      "samples": 400,
+      "sessions": 50
+    }
+  }
+}

@@ -130,12 +130,15 @@ ERROR
 
 ### SecurityAuthEvent
 
-인증 실패 등 Gateway 보안 Event는 Business Audit과 분리한다.
+인증·인가 실패 등 Gateway/Core API 보안 Event는 Business Audit과 분리한다.
 
 ```text
 AUTH_FAILURE
 RATE_LIMITED       # 필요 시 집계/운영 로그로 사용
 ```
+
+Core `/api/v1/**`의 Credential·Role·Employee 검증 실패도 `AUTH_FAILURE`로 기록하고
+§20의 구체적인 Reason Code로 원인을 구분한다.
 
 Business AuditEvent는 **Agent 인증 성공 이후** 생성한다.
 
@@ -312,6 +315,9 @@ UNKNOWN_PROMPT_ATTACK
 | `INVALID_TOOL_REQUEST` | Tool Call Schema 오류 |
 | `AGENT_AUTHENTICATION_FAILED` | Agent Credential 검증 실패 |
 | `AGENT_IDENTITY_MISMATCH` | Verified Agent와 Passport Agent 불일치 |
+| `CORE_API_CREDENTIAL_INVALID` | Core `/api/v1/**` Bearer Credential 누락 또는 불일치 |
+| `CORE_API_ROLE_FORBIDDEN` | 인증된 Core API 호출자의 Role 부족 |
+| `EMPLOYEE_IDENTITY_MISMATCH` | 인증된 Operator Employee와 요청 Employee 불일치 |
 | `DUPLICATE_REQUEST` | 동일 Request ID 중복 요청 |
 | `REQUEST_RATE_LIMITED` | Gateway 요청 제한 초과 |
 | `CONTEXT_SERVICE_UNAVAILABLE` | Core Context API 조회 실패 |
@@ -386,6 +392,9 @@ Isolation Forest raw score와 `behaviorRisk`를 명확히 구분한다.
 ## 22. Threshold Naming
 
 ```text
+modelSupportThreshold
+modelHighThreshold
+promptAlertThreshold
 promptBlockThreshold
 behaviorAlertThreshold
 behaviorCriticalThreshold
@@ -393,6 +402,14 @@ hardRequestLimit1m
 ```
 
 Threshold 값은 Config/환경변수/정책 설정에서 단일 관리하고 여러 코드에 Magic Number로 중복하지 않는다.
+Prompt Detector의 `modelSupportThreshold`와 `modelHighThreshold`는 모델 원점수의 증거 경계이고,
+`promptAlertThreshold`와 `promptBlockThreshold`는 외부로 내보내는 Risk 등급 경계다.
+현재 결합 `modelScore`는 공격 확률이 아니라 각 AI 계층의 Validation Threshold 대비 정규화된
+증거비이며 1.0에서 상한 처리한다. 따라서 `modelHighThreshold=1.0`은 확률 100%를 뜻하지 않는다.
+
+Prompt Risk Level은 `LOW | ALERT | CRITICAL`이다. Rule 단독 증거는 최대 `ALERT`이고,
+AI 고신뢰 또는 AI 중간신뢰+Rule 일치만 `CRITICAL`이 된다. 하위 호환 Boolean
+`promptInjectionDetected`는 `CRITICAL`과 정확히 같아야 한다.
 
 ---
 
@@ -409,7 +426,7 @@ templateVersion
 예:
 
 ```text
-prompt-guard-1
+prompt-guard-6
 iforest-1
 behavior-features-1
 synthetic-agent-log-1
@@ -486,7 +503,7 @@ Prompt Risk는 Runtime마다 새로 계산되는 행동 점수가 아니라 **�
 - 목록/상세 조회는 페이지네이션을 사용한다.
 - 위험 이벤트는 `riskFlagged=true` 또는 `HIGH/CRITICAL`로 필터링할 수 있다.
 - Reason Code는 고정된 사용자 설명과 함께 표시한다.
-- Employee Authority와 Agent Effective Permission 비교 화면을 제공한다.
+- LoanAgent 실행 화면의 현재 업무 보호 패널에서 Employee Authority와 Agent Effective Permission 비교를 제공한다.
 
 ---
 

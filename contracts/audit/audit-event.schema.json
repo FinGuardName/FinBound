@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://finguard.io/contracts/audit/audit-event.schema.json",
+  "title": "AuditEvent",
+  "description": "인증 성공 후 생성되는 Business Audit의 저장 상태",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "auditEventId",
+    "requestId",
+    "traceId",
+    "agentId",
+    "agentRunId",
+    "status",
+    "requestedAt"
+  ],
+  "properties": {
+    "auditEventId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "requestId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "traceId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "agentId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "agentRunId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "employeeId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "caseId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "passportId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "targetConsumerId": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "requestedTool": { "$ref": "#/$defs/tool" },
+    "requestedData": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/dataType" }
+    },
+    "scopeStatus": { "$ref": "#/$defs/scopeStatus" },
+    "promptRiskEvaluationStatus": {
+      "type": "string",
+      "enum": ["EVALUATED", "NOT_EVALUATED"]
+    },
+    "promptRisk": { "$ref": "#/$defs/riskScore" },
+    "promptRiskLevel": {
+      "type": "string",
+      "enum": ["LOW", "ALERT", "CRITICAL"]
+    },
+    "promptModelVersion": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "behaviorRisk": { "$ref": "#/$defs/riskScore" },
+    "behaviorRiskLevel": {
+      "type": "string",
+      "enum": ["LOW", "ALERT", "CRITICAL"]
+    },
+    "behaviorFeatureVersion": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "behaviorModelVersion": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "severity": { "$ref": "#/$defs/severity" },
+    "riskFlagged": { "type": "boolean" },
+    "decision": {
+      "type": "string",
+      "enum": ["ALLOW", "BLOCK"]
+    },
+    "reasonCodes": { "$ref": "#/$defs/reasonCodes" },
+    "policyVersion": { "$ref": "#/$defs/nonEmptyIdentifier" },
+    "systemOutcome": {
+      "type": "string",
+      "enum": ["COMPLETED", "ERROR"]
+    },
+    "downstreamReached": { "type": "boolean" },
+    "responseReleased": { "type": "boolean" },
+    "success": { "type": "boolean" },
+    "recordsRead": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "latencyMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "errorLocation": { "$ref": "#/$defs/upperSnakeCase" },
+    "status": {
+      "type": "string",
+      "enum": ["PROCESSING", "COMPLETED", "ERROR"]
+    },
+    "requestedAt": { "$ref": "#/$defs/timestamp" },
+    "completedAt": { "$ref": "#/$defs/timestamp" }
+  },
+  "dependentRequired": {
+    "severity": ["riskFlagged"],
+    "riskFlagged": ["severity"]
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "COMPLETED" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": [
+          "decision",
+          "systemOutcome",
+          "reasonCodes",
+          "downstreamReached",
+          "responseReleased",
+          "completedAt"
+        ],
+        "properties": { "systemOutcome": { "const": "COMPLETED" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "ERROR" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": [
+          "systemOutcome",
+          "reasonCodes",
+          "downstreamReached",
+          "responseReleased",
+          "success",
+          "errorLocation",
+          "completedAt"
+        ],
+        "properties": {
+          "systemOutcome": { "const": "ERROR" },
+          "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
+          "responseReleased": { "const": false },
+          "success": { "const": false }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "const": "BLOCK" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "status": { "const": "COMPLETED" },
+          "reasonCodes": { "$ref": "#/$defs/nonEmptyReasonCodes" },
+          "downstreamReached": { "const": false },
+          "responseReleased": { "const": false }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["success"] },
+            { "required": ["recordsRead"] },
+            { "required": ["latencyMs"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": { "decision": { "const": "ALLOW" } },
+            "required": ["decision"]
+          },
+          {
+            "properties": { "status": { "const": "COMPLETED" } },
+            "required": ["status"]
+          }
+        ]
+      },
+      "then": {
+        "required": ["success"],
+        "properties": {
+          "downstreamReached": { "const": true },
+          "responseReleased": { "const": true },
+          "success": { "const": true }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "upperSnakeCase": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    },
+    "tool": {
+      "type": "string",
+      "enum": ["CREDIT_SCORE_READ", "INCOME_READ", "DEBT_READ"]
+    },
+    "dataType": {
+      "type": "string",
+      "enum": ["CREDIT_SCORE", "INCOME", "DEBT"]
+    },
+    "riskScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reasonCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/upperSnakeCase" }
+    },
+    "nonEmptyReasonCodes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/upperSnakeCase" }
+    },
+    "scopeStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "employeeAuthority",
+        "permissionTemplate",
+        "caseStatus",
+        "mandate",
+        "passportStatus",
+        "agentBinding",
+        "customerScope",
+        "toolScope",
+        "dataScope"
+      ],
+      "properties": {
+        "employeeAuthority": { "$ref": "#/$defs/scopeResult" },
+        "permissionTemplate": { "$ref": "#/$defs/scopeResult" },
+        "caseStatus": { "$ref": "#/$defs/scopeResult" },
+        "mandate": { "$ref": "#/$defs/scopeResult" },
+        "passportStatus": { "$ref": "#/$defs/scopeResult" },
+        "agentBinding": { "$ref": "#/$defs/scopeResult" },
+        "customerScope": { "$ref": "#/$defs/scopeResult" },
+        "toolScope": { "$ref": "#/$defs/scopeResult" },
+        "dataScope": { "$ref": "#/$defs/scopeResult" }
+      }
+    },
+    "scopeResult": {
+      "type": "string",
+      "enum": ["OK", "VIOLATION"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -274,11 +274,15 @@ Employee Authority 조회
 → Effective Permission 계산
 → Task Passport 발급
 → AgentRun RUNNING
+→ 생성 트랜잭션 커밋 후 Core가 Agent Simulator 호출
+→ Agent가 발급된 agentRunId / passportId로 Gateway 호출
 ```
 
 ### 보안 규칙
 
 - AgentRun 입력 원문은 통제된 저장소에 보관한다.
+- AgentRun/Case/Passport/Input Reference의 발급·저장은 Core 책임이다.
+- P0 Agent는 Core가 호출하는 결정론적 Simulator이며 Core 생성 API를 호출하지 않는다.
 - Audit에는 원문 대신 `inputRef / inputHash`만 저장한다.
 - Tool Call 시 Agent가 Prompt를 다시 첨부한 값을 신뢰하지 않는다.
 
@@ -500,16 +504,19 @@ Tool Call 발생
 {
   "detected": true,
   "promptRisk": 0.96,
+  "riskLevel": "CRITICAL",
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
   "inputHash": "sha256:...",
-  "modelVersion": "prompt-guard-1"
+  "modelVersion": "prompt-guard-6"
 }
 ```
 
 ### 처리 규칙
 
-- 한국어·영어 Rule Detection과 분류 모델을 결합한다.
+- 분류 모델을 주 판단 신호로, 한국어·영어 Rule Detection을 설명 가능한 보조 증거로 결합한다.
+- Rule 단독 일치는 `ALERT`까지만 만들고 `CRITICAL`은 AI 고신뢰 또는 AI 중간신뢰+Rule 일치에서만 만든다.
+- 인용문 안에만 있는 지시는 Rule과 별개로 전체 텍스트를 보는 AI 모델이 평가한다.
 - 원본 입력을 FastAPI Application Log / DB에 저장하지 않는다.
 - 모델 오류를 낮은 Risk로 대체하지 않는다.
 - Prompt Risk는 권한을 확대하지 않는다.
@@ -603,6 +610,7 @@ agentRunId
 caseId
 passportId
 Scope Status
+Prompt Risk Evaluation Status
 Prompt Risk
 Behavior Risk
 Hard Limit Status
@@ -612,6 +620,7 @@ Hard Limit Status
 
 - Prompt 원문과 금융 API Payload 원문을 OPA에 전달하지 않는다.
 - OPA에는 필요한 상태값과 Risk만 전달한다.
+- Prompt Risk가 `EVALUATED` 상태가 아니면 `PROMPT_RISK_UNAVAILABLE`로 Fail-closed한다.
 - 필수 Context가 없으면 OPA 호출 전 Fail-closed 처리한다.
 
 ---
@@ -645,6 +654,7 @@ AuthorizationContext를 Rego 정책으로 평가해 최종 `ALLOW / BLOCK`을 �
 | Case/Mandate/Passport/Tool/Data 위반 | BLOCK | true |
 | Agent Binding 위반 | BLOCK | true |
 | Prompt Injection 차단 조건 | BLOCK | true |
+| Prompt Alert 구간 | ALLOW | true |
 | Behavior Alert 구간 | ALLOW | true |
 | Behavior Critical 구간 | BLOCK | true |
 | Hard Request Limit 초과 | BLOCK | true |
@@ -756,29 +766,21 @@ Reason Code
 
 ## F20. Web UI / Security Dashboard
 
-### P0 화면 1 — LoanAgent 실행
+P0 Web은 은행 직원의 실제 업무 흐름을 끊지 않도록 두 개의 주요 화면으로 구성한다.
+Employee Authority와 Agent Effective Permission 비교는 별도 메뉴가 아니라 LoanAgent 실행
+화면의 현재 업무 보호 패널에 통합한다.
 
-- 직원 / Consumer / 업무 선택
-- AgentRun 생성
-- Case / Passport 생성 결과 확인
-- Tool Call 실행
+### P0 화면 1 — AI 업무 지원 / LoanAgent 실행
 
-### P0 화면 2 — Authority 비교
+- 직원은 현재 수행할 금융업무만 선택한다.
+- Consumer, Financial Case와 Task Passport를 현재 업무 기준으로 확인한다.
+- Employee가 원래 접근 가능한 범위와 이번 업무의 Agent Effective Permission을 함께 표시한다.
+- Agent 허용 Tool/Data와 Task Passport 만료시간을 보안 상세에서 확인한다.
+- AgentRun을 생성하고 Tool Call별 ALLOW/BLOCK/ERROR Outcome을 표시한다.
+- 직원이 요청한 업무와 Agent가 실제로 시도한 Tool Call을 구분한다.
+- 직원의 요청이나 화면 선택만으로 Agent 권한을 확대하지 않는다.
 
-```text
-EMP-101 Employee Authority
-VS
-LoanAgent Effective Permission
-```
-
-표시:
-
-- Employee가 원래 접근 가능한 범위
-- 현재 Case Consumer
-- Agent 허용 Tool/Data
-- Task Passport 만료시간
-
-### P0 화면 3 — Security Dashboard
+### P0 화면 2 — Security Dashboard
 
 표시:
 
@@ -791,17 +793,22 @@ Target Consumer
 Tool
 Scope Status
 Prompt Risk
+Prompt Evaluation Status / Model Version
 Behavior Risk
-ALLOW / BLOCK / ERROR
+Behavior Risk Level / Feature Version / Model Version
+PolicyDecision (ALLOW / BLOCK)
+Audit / System Outcome (COMPLETED / ERROR)
 Severity
 Reason Code
+Policy Version
 Downstream 도달 여부
+Response 제공 여부
 ```
 
 필터:
 
 ```text
-기간 / Agent / Case / Consumer / Tool / Decision / Severity / Reason Code
+기간 / Agent / Case / Consumer / Tool / 처리 결과 / Severity / Reason Code
 ```
 
 ### 처리 규칙

@@ -1,7 +1,7 @@
 name: Feature Issue
 description: P0/P1 기능 구현 작업
 title: "[FEAT] "
-labels: ["feature"]
+labels: ["feat"]
 body:
   - type: textarea
     id: purpose

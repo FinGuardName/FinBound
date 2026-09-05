@@ -4,9 +4,45 @@ import rego.v1
 
 policy_version := "loan-review-policy-1"
 
+scope_status_keys := {
+    "employeeAuthority",
+    "permissionTemplate",
+    "caseStatus",
+    "mandate",
+    "passportStatus",
+    "agentBinding",
+    "customerScope",
+    "toolScope",
+    "dataScope",
+}
+
+scope_status_values := {"OK", "VIOLATION"}
+
+# 키 집합이 정확히 일치해야 하고, 값도 정해진 두 가지여야 한다.
+# 개수만 세면 필수 키를 빼고 오타 키를 넣어도 통과하고, "UNKNOWN" 같은 값이
+# 어떤 deny 규칙과도 매치되지 않아 ALLOW로 흐른다.
+valid_scope_status if {
+    object.keys(input.scopeStatus) == scope_status_keys
+    every status in input.scopeStatus {
+        status in scope_status_values
+    }
+}
+
+valid_prompt_detection if {
+    input.risk.promptRiskLevel == "CRITICAL"
+    input.risk.promptInjectionDetected
+}
+
+valid_prompt_detection if {
+    input.risk.promptRiskLevel != "CRITICAL"
+    not input.risk.promptInjectionDetected
+}
+
 valid_input if {
-    count(input.scopeStatus) == 9
+    valid_scope_status
+    input.risk.promptRiskLevel in {"LOW", "ALERT", "CRITICAL"}
     input.risk.promptInjectionDetected in {true, false}
+    valid_prompt_detection
     input.risk.behaviorRiskLevel in {"LOW", "ALERT", "CRITICAL"}
     input.limits.hardRequestLimitExceeded in {true, false}
 }
@@ -21,7 +57,7 @@ deny_reasons contains "AGENT_IDENTITY_MISMATCH" if { input.scopeStatus.agentBind
 deny_reasons contains "CASE_SCOPE_VIOLATION" if { input.scopeStatus.customerScope == "VIOLATION" }
 deny_reasons contains "TOOL_SCOPE_VIOLATION" if { input.scopeStatus.toolScope == "VIOLATION" }
 deny_reasons contains "DATA_SCOPE_VIOLATION" if { input.scopeStatus.dataScope == "VIOLATION" }
-deny_reasons contains "PROMPT_INJECTION" if { input.risk.promptInjectionDetected }
+deny_reasons contains "PROMPT_INJECTION" if { input.risk.promptRiskLevel == "CRITICAL" }
 deny_reasons contains "BEHAVIOR_ANOMALY" if { input.risk.behaviorRiskLevel == "CRITICAL" }
 deny_reasons contains "HARD_REQUEST_LIMIT_EXCEEDED" if { input.limits.hardRequestLimitExceeded }
 
@@ -35,14 +71,23 @@ decision := {
     count(deny_reasons) > 0
 }
 
+risk_flagged := true if { input.risk.promptRiskLevel == "ALERT" }
+risk_flagged := true if { input.risk.behaviorRiskLevel == "ALERT" }
+risk_flagged := false if {
+    input.risk.promptRiskLevel != "ALERT"
+    input.risk.behaviorRiskLevel != "ALERT"
+}
+
+allow_severity := "HIGH" if { risk_flagged }
+allow_severity := "LOW" if { not risk_flagged }
+
 decision := {
     "decision": "ALLOW",
-    "severity": severity,
-    "riskFlagged": input.risk.behaviorRiskLevel == "ALERT",
+    "severity": allow_severity,
+    "riskFlagged": risk_flagged,
     "reasonCodes": [],
     "policyVersion": policy_version,
 } if {
     valid_input
     count(deny_reasons) == 0
-    severity := object.get({"LOW": "LOW", "ALERT": "HIGH"}, input.risk.behaviorRiskLevel, "LOW")
 }
