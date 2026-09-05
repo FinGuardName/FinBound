@@ -78,8 +78,16 @@ jobs:
             -f docker-compose.yml -f docker-compose.demo.yml
             -f docker-compose.frontend-ai.yml -f docker-compose.deploy.yml
             -f docker-compose.public.yml"
-          $COMPOSE pull
-          $COMPOSE up -d --no-build --wait
+          # pull 진행률이 SSM 출력 한도(24KB)를 채워 실제 에러를 밀어낸다.
+          # --quiet 로 줄이고, 실패했을 때만 상태와 로그 꼬리를 남긴다.
+          $COMPOSE pull --quiet
+          if ! $COMPOSE up -d --no-build --wait; then
+            echo "=== up 실패: 서비스 상태 ==="
+            $COMPOSE ps
+            echo "=== 로그 꼬리 ==="
+            $COMPOSE logs --tail=40 --no-color
+            exit 1
+          fi
           $COMPOSE ps
           REMOTE
           } > remote.sh
