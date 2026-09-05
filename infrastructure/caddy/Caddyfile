@@ -1,0 +1,20 @@
+# Caddy는 TLS 종료만 한다. 경로 판단은 하지 않는다.
+#
+# Public API allowlist 는 뒤의 Frontend Nginx 가 계속 책임진다
+# (`frontend/nginx/default.conf.template`, ADR 0003). 여기서 경로를 나누면
+# 같은 규칙이 두 곳에 생기고, 두 곳이 갈라지는 순간 방어가 무너진다.
+#
+# 호스트명은 배포 환경이 준다. 값이 없으면 Caddy 가 기동에 실패한다 —
+# 잘못된 이름으로 인증서를 받아 두는 것보다 안 뜨는 편이 낫다.
+{$FINBOUND_PUBLIC_HOST} {
+	encode zstd gzip
+
+	# Frontend 컨테이너는 public-zone 안에서만 8080 을 연다.
+	# 호스트 포트로 나가지 않으므로 바깥에서 이 경로를 우회할 수 없다.
+	reverse_proxy frontend:8080
+
+	log {
+		output stderr
+		format console
+	}
+}

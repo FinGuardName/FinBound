@@ -1,0 +1,45 @@
+# 인터넷 노출 오버레이 — Caddy 가 TLS 를 끊고 Frontend 로만 넘긴다.
+#
+#   FINBOUND_PUBLIC_HOST=<호스트명> IMAGE_TAG=<sha> docker compose \
+#     --env-file /opt/finbound/.env \
+#     -f docker-compose.yml -f docker-compose.demo.yml \
+#     -f docker-compose.frontend-ai.yml -f docker-compose.deploy.yml \
+#     -f docker-compose.public.yml up -d --no-build --wait
+#
+# 바깥에 열리는 것은 Caddy 의 80·443 둘뿐이다. 나머지 서비스의 호스트 포트는
+# 기본 파일들이 정한 대로 `127.0.0.1` 에 묶인 채로 둔다 — 이 파일은 그것을 바꾸지 않는다.
+# core-api 는 애초에 호스트 포트를 열지 않는다(`docker-compose.yml` 의 expose 주석 참조).
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    # 80 은 ACME HTTP-01 challenge 와 HTTPS 리다이렉트에 쓴다. 닫으면 인증서를 못 받는다.
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # 값이 없으면 Caddy 가 기동에 실패한다. 잘못된 이름으로 인증서를 받아 두지 않는다.
+      FINBOUND_PUBLIC_HOST: ${FINBOUND_PUBLIC_HOST:?FINBOUND_PUBLIC_HOST must be set}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # 인증서를 영속하지 않으면 재배포마다 새로 발급받다가 Let's Encrypt 발급 한도에 걸린다.
+      - finbound-caddy-data:/data
+      - finbound-caddy-config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+    mem_limit: ${CADDY_MEM_LIMIT:-128m}
+    # Caddy 는 public-zone 에만 속한다. 내부 존에 넣을 이유가 없다 —
+    # 프록시 대상이 Frontend 하나뿐이고 그것이 public-zone 에 있다.
+    networks: [public-zone]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  finbound-caddy-data:
+  finbound-caddy-config:

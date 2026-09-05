@@ -1,0 +1,120 @@
+# EC2 배포 — SSH 가 아니라 SSM Send-Command 로 명령을 넣는다.
+# 인바운드 포트를 열지 않고, 저장소에 장기 개인키를 두지 않는다. 근거는 ADR 0004.
+#
+# 필요한 저장소 설정 (Settings → Secrets and variables → Actions):
+#   vars.AWS_REGION            예: ap-northeast-2
+#   vars.EC2_INSTANCE_ID       예: i-0123456789abcdef0
+#   vars.FINBOUND_PUBLIC_HOST  예: 3-35-1-2.sslip.io
+#   secrets.AWS_DEPLOY_ROLE_ARN  GitHub OIDC 를 신뢰하는 IAM 역할
+#
+# EC2 쪽 준비:
+#   /opt/finbound          저장소 clone (public 이라 자격증명 불필요)
+#   /opt/finbound/.env     비밀값 5개. 이 워크플로는 값을 만들지도 전달하지도 않는다.
+name: Deploy to EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "배포할 commit SHA (비우면 현재 커밋)"
+        required: false
+        type: string
+
+permissions:
+  # OIDC 토큰 발급. 이것 때문에 장기 자격증명이 필요 없다.
+  id-token: write
+  contents: read
+
+# 배포가 겹치면 서로의 컨테이너를 갈아치운다. 취소하지 않고 줄을 세운다.
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Resolve image tag
+        id: tag
+        run: echo "value=${{ inputs.image_tag || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # 원격 스크립트를 파일로 만든 뒤 JSON 으로 감싼다. 셸 인용을 손으로 하면
+      # 따옴표 하나에 조용히 다른 명령이 실행된다.
+      #
+      # 값 두 개만 앞에 export 로 붙이고 본문은 따옴표 heredoc(<<'REMOTE')으로 둔다.
+      # 본문에서 치환이 일어나지 않으므로 러너의 변수가 원격 스크립트로 새지 않는다.
+      - name: Build remote script
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.value }}
+          PUBLIC_HOST: ${{ vars.FINBOUND_PUBLIC_HOST }}
+        run: |
+          {
+            printf "export IMAGE_TAG='%s'\n" "$IMAGE_TAG"
+            printf "export FINBOUND_PUBLIC_HOST='%s'\n" "$PUBLIC_HOST"
+            cat <<'REMOTE'
+          set -eu
+          cd /opt/finbound
+          # GitHub 은 SHA 로 직접 fetch 하는 것을 허용한다. 브랜치를 거치지 않으므로
+          # 배포 대상이 사이에 움직이지 않는다.
+          git fetch --depth=1 origin "$IMAGE_TAG"
+          git checkout --detach FETCH_HEAD
+          cd infrastructure
+          COMPOSE="docker compose --env-file /opt/finbound/.env
+            -f docker-compose.yml -f docker-compose.demo.yml
+            -f docker-compose.frontend-ai.yml -f docker-compose.deploy.yml
+            -f docker-compose.public.yml"
+          $COMPOSE pull
+          $COMPOSE up -d --no-build --wait
+          $COMPOSE ps
+          REMOTE
+          } > remote.sh
+          cat remote.sh
+
+      - name: Send command
+        id: send
+        run: |
+          command_id=$(aws ssm send-command \
+            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+            --document-name AWS-RunShellScript \
+            --comment "FinBound deploy ${{ steps.tag.outputs.value }}" \
+            --parameters commands="$(jq -Rs . < remote.sh)" \
+            --query "Command.CommandId" --output text)
+          echo "id=$command_id" >> "$GITHUB_OUTPUT"
+
+      # wait 는 성공/실패 어느 쪽이든 종료를 기다린다. 실패해도 아래에서 로그를 꺼낸다.
+      - name: Wait for completion
+        continue-on-error: true
+        run: |
+          aws ssm wait command-executed \
+            --command-id "${{ steps.send.outputs.id }}" \
+            --instance-id "${{ vars.EC2_INSTANCE_ID }}"
+
+      - name: Report result
+        run: |
+          aws ssm get-command-invocation \
+            --command-id "${{ steps.send.outputs.id }}" \
+            --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+            --query "{status:Status,stdout:StandardOutputContent,stderr:StandardErrorContent}" \
+            --output json | tee result.json
+          status=$(jq -r .status result.json)
+          echo "SSM status: $status"
+          # 명령이 성공했는지를 종료 코드로 옮긴다. 이게 없으면 배포 실패가 초록으로 보인다.
+          test "$status" = "Success"
+
+      - name: Verify the site answers over HTTPS
+        run: |
+          for _ in $(seq 1 20); do
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              "https://${{ vars.FINBOUND_PUBLIC_HOST }}/health" || true)
+            if [ "$code" = "200" ]; then echo "healthy"; exit 0; fi
+            sleep 10
+          done
+          echo "배포는 끝났지만 공개 주소가 200을 주지 않는다"
+          exit 1
