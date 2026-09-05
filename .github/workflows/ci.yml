@@ -112,6 +112,21 @@ jobs:
           test "$(curl --fail --silent http://127.0.0.1:18088/core-api/api/v1/probe)" = "public-api-ok"
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18088/core-api/internal/v1/probe)" = "404"
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18088/core-api/actuator/health)" = "404"
+
+          # Nginx는 `..;` 를 상위 디렉터리가 아니라 이름이 `..;` 인 세그먼트로 본다. 정규화되지
+          # 않으므로 위 Prefix 검사만으로는 allowlist 를 벗어난 경로가 Core 로 전달된다.
+          # 상태 코드만 보면 이 결함을 못 잡는다 — upstream 이 404 를 냈을 때와 구분되지 않는다.
+          # 차단이 Nginx 에서 일어났는지, 즉 upstream 이 그 요청을 보지 못했는지를 확인한다.
+          for variant in '..;/..;/actuator/health' '..%3B/..%3B/actuator/health'; do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:18088/core-api/api/v1/$variant")
+            test "$status" = "404"
+          done
+          if docker logs core-api 2>&1 | grep --quiet '\.\.'; then
+            echo 'Nginx forwarded a non-normalized traversal path to the Core upstream'
+            docker logs core-api
+            exit 1
+          fi
+
           test "$(docker exec finbound-frontend id -u)" = "101"
           curl --fail --silent http://127.0.0.1:18088/loan-review | grep --quiet '<div id="app"></div>'
       - name: Clean up Frontend smoke containers

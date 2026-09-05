@@ -18,8 +18,19 @@ server {
     }
 
     # Frontend가 internal-zone에 연결되어도 Core Public API 외의 경로는 전달하지 않는다.
-    # 정규화된 URI가 이 Prefix를 벗어나면 아래 차단 Location에서 종료된다.
+    # 정규화된 URI가 이 Prefix를 벗어나면 아래 차단 Location에서 종료되고,
+    # 정규화를 피한 URI는 이 Location 안에서 종료된다.
     location ^~ /core-api/api/v1/ {
+        # Nginx는 `..;`를 상위 디렉터리가 아니라 이름이 `..;`인 세그먼트로 본다. 정규화 대상이
+        # 아니므로 위 Prefix 검사를 그대로 통과해 allowlist 밖 경로가 Core에 전달된다.
+        # 정규화가 끝난 $uri에 남아 있는 `..`는 정상 경로에서는 나올 수 없다 — 진짜 `../`는
+        # 정규화 단계에서 이미 사라지기 때문이다. 그래서 남아 있다면 정규화를 피한 변형이다.
+        # $request_uri가 아니라 $uri를 보는 이유: 전자는 Query String을 포함해서
+        # 값에 `..`가 들어간 정상 요청까지 막게 된다.
+        if ($uri ~ "\.\.") {
+            return 404;
+        }
+
         rewrite ^/core-api(/api/v1/.*)$ $1 break;
         proxy_pass $core_api_upstream;
         proxy_http_version 1.1;
