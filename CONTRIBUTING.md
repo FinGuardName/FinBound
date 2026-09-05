@@ -33,10 +33,18 @@
 `gradle/verification-metadata.xml`이 Gradle이 내려받는 모든 Artifact의 SHA-256을 고정합니다. 목록에 없는 Artifact가 나타나면 빌드가 섭니다. 따라서 **의존성이나 Gradle Plugin의 추가·삭제·버전 변경은 이 파일 갱신을 동반합니다.**
 
 ```bash
-./gradlew --write-verification-metadata sha256 help
+./gradlew --write-verification-metadata sha256 check --refresh-dependencies
 ```
 
+**`--refresh-dependencies`를 빼지 않습니다.** 로컬 Cache에 이미 있는 Artifact는 다시 내려받지 않아 목록에 기록되지 않습니다. 특히 Parent POM이 이렇게 누락되며, 로컬에서는 통과하고 깨끗한 CI에서만 `Dependency verification failed`가 납니다.
+
 갱신된 파일을 같은 PR에 포함합니다. 빌드가 `Dependency verification failed`로 서면 대부분 이 갱신을 빠뜨린 경우입니다. 다만 **의도하지 않은 Artifact가 늘어난 것은 아닌지 diff를 먼저 확인합니다** — 검증의 목적이 거기에 있습니다.
+
+CI와 같은 조건으로 확인하려면 빈 Gradle Home으로 돌립니다.
+
+```bash
+GRADLE_USER_HOME=$(mktemp -d) ./gradlew check
+```
 
 ## Pull Request와 Merge
 
