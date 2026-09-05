@@ -78,8 +78,16 @@ jobs:
             -f docker-compose.yml -f docker-compose.demo.yml
             -f docker-compose.frontend-ai.yml -f docker-compose.deploy.yml
             -f docker-compose.public.yml"
-          $COMPOSE pull
-          $COMPOSE up -d --no-build --wait
+          # pull 진행률이 SSM 출력 한도(24KB)를 채워 실제 에러를 밀어낸다.
+          # --quiet 로 줄이고, 실패했을 때만 상태와 로그 꼬리를 남긴다.
+          $COMPOSE pull --quiet
+          if ! $COMPOSE up -d --no-build --wait; then
+            echo "=== up 실패: 서비스 상태 ==="
+            $COMPOSE ps
+            echo "=== 로그 꼬리 ==="
+            $COMPOSE logs --tail=40 --no-color
+            exit 1
+          fi
           $COMPOSE ps
           REMOTE
           } > remote.sh
@@ -88,21 +96,39 @@ jobs:
       - name: Send command
         id: send
         run: |
+          # commands 는 문자열 하나가 아니라 줄 단위 배열이다. jq -Rs . 가 만든
+          # \n 이스케이프를 그대로 넘기면 SSM 이 줄바꿈으로 해석하지 않아 스크립트
+          # 전체가 한 줄이 된다. 그러면 set -eu 와 cd 가 붙어 `-euncd` 같은 것이 되고,
+          # git 인자가 docker login 으로 흘러 들어간다.
+          jq -Rs '{commands: split("\n")}' < remote.sh > params.json
           command_id=$(aws ssm send-command \
             --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
             --document-name AWS-RunShellScript \
             --comment "FinBound deploy ${{ steps.tag.outputs.value }}" \
-            --parameters commands="$(jq -Rs . < remote.sh)" \
+            --parameters file://params.json \
             --query "Command.CommandId" --output text)
           echo "id=$command_id" >> "$GITHUB_OUTPUT"
 
-      # wait 는 성공/실패 어느 쪽이든 종료를 기다린다. 실패해도 아래에서 로그를 꺼낸다.
+      # `aws ssm wait command-executed` 는 기본 한도가 약 100초다. 이미지 pull 과
+      # 여덟 서비스 기동은 그보다 오래 걸리므로, 성공한 배포를 InProgress 상태에서
+      # 실패로 판정하게 된다. 실제로 그렇게 한 번 오판했다.
+      #
+      # 직접 폴링한다. 20분까지 기다리고, 끝난 상태가 보이면 즉시 빠져나온다.
       - name: Wait for completion
         continue-on-error: true
         run: |
-          aws ssm wait command-executed \
-            --command-id "${{ steps.send.outputs.id }}" \
-            --instance-id "${{ vars.EC2_INSTANCE_ID }}"
+          for _ in $(seq 1 120); do
+            status=$(aws ssm get-command-invocation \
+              --command-id "${{ steps.send.outputs.id }}" \
+              --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            echo "SSM: $status"
+            case "$status" in
+              Success|Failed|Cancelled|TimedOut) exit 0 ;;
+            esac
+            sleep 10
+          done
+          echo "20분 안에 끝나지 않았다"
 
       - name: Report result
         run: |
