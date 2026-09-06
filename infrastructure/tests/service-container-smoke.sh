@@ -217,7 +217,7 @@ assert_internal_rejected \
     "$agent_container" \
     8082 \
     /internal/v1/agent-simulations \
-    '{"agentRunId":"RUN-001","passportId":"PASS-001","scenario":"NORMAL_CREDIT_SCORE"}'
+    '{"agentRunId":"RUN-001","passportId":"PASS-001","caseConsumerId":"CUST-1001","scenario":"NORMAL_CREDIT_SCORE"}'
 assert_internal_rejected \
     "$mock_container" \
     8083 \

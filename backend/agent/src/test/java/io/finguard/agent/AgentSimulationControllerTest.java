@@ -226,6 +226,7 @@ class AgentSimulationControllerTest {
                 {
                   "agentRunId": "RUN-CORE-001",
                   "passportId": "PASS-CORE-001",
+                  "caseConsumerId": "CUST-1001",
                   "scenario": "%s"
                 }
                 """.formatted(scenario.name());

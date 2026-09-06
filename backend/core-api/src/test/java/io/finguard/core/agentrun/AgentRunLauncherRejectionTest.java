@@ -32,11 +32,13 @@ class AgentRunLauncherRejectionTest {
         AgentRunLauncher launcher =
                 new AgentRunLauncher(
                         new RecordingOutcomes(run),
-                        (agentRunId, passportId, scenario) -> { },
+                        (agentRunId, passportId, caseConsumerId, scenario) -> { },
                         alwaysRejects());
 
         launcher.onAgentRunCreated(
-                new AgentRunCreated("RUN-900", "PASS-900", AgentSimulationScenario.NORMAL_CREDIT_SCORE));
+                new AgentRunCreated(
+                        "RUN-900", "PASS-900", "CUST-1001",
+                        AgentSimulationScenario.NORMAL_CREDIT_SCORE));
 
         assertThat(run.getStatus()).isEqualTo(AgentRunStatus.FAILED);
     }

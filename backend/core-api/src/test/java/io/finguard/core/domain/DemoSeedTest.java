@@ -105,8 +105,11 @@ class DemoSeedTest {
         List<String> mandateConsumers =
                 jdbcTemplate.queryForList("select consumer_id from consumer_mandates", String.class);
 
+        // CUST-2001·CUST-3001은 화면의 나머지 두 업무가 쓰는 고객이다. 없으면 Passport를 발급할 수
+        // 없어 화면이 422로 막힌다 — 이슈 #115.
         assertThat(mandateConsumers)
-                .containsExactlyInAnyOrder("CUST-1001", "CUST-1002", "CUST-1003");
+                .containsExactlyInAnyOrder(
+                        "CUST-1001", "CUST-1002", "CUST-1003", "CUST-2001", "CUST-3001");
         assertThat(allowedDataOf("CUST-1001"))
                 .containsExactlyInAnyOrder("CREDIT_SCORE", "INCOME", "DEBT");
         assertThat(allowedDataOf("CUST-1002"))
@@ -115,6 +118,12 @@ class DemoSeedTest {
         assertThat(allowedDataOf("CUST-1003"))
                 .as("MANDATE 공격용 — DEBT가 빠져야 한다")
                 .containsExactlyInAnyOrder("CREDIT_SCORE", "INCOME");
+        assertThat(allowedDataOf("CUST-2001"))
+                .as("한도 재심사 — 상환능력을 다 본다")
+                .containsExactlyInAnyOrder("CREDIT_SCORE", "INCOME", "DEBT");
+        assertThat(allowedDataOf("CUST-3001"))
+                .as("서류 보완 확인 — 소득 자료 동의가 없다")
+                .containsExactlyInAnyOrder("CREDIT_SCORE", "DEBT");
     }
 
     private List<String> allowedDataOf(String consumerId) {

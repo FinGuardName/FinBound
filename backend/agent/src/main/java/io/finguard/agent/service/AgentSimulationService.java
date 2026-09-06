@@ -22,7 +22,8 @@ public class AgentSimulationService {
                 request.agentRunId(),
                 request.passportId(),
                 request.scenario().tool(),
-                request.scenario().targetConsumerId(),
+                // 정상 시나리오는 사건의 고객을, 공격은 자기 Fixture 고객을 쓴다.
+                request.scenario().resolveTargetConsumerId(request.caseConsumerId()),
                 request.scenario().requestedData(),
                 FinancialAction.READ
         );
