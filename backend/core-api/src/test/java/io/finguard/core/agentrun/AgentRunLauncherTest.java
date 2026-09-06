@@ -72,7 +72,7 @@ class AgentRunLauncherTest {
     }
 
     private AgentRunCreated created(AgentSimulationScenario scenario) {
-        return new AgentRunCreated("RUN-900", "PASS-900", scenario);
+        return new AgentRunCreated("RUN-900", "PASS-900", "CUST-1001", scenario);
     }
 
     private AgentRun running() {
@@ -92,6 +92,7 @@ class AgentRunLauncherTest {
         private final RuntimeException failure;
         private String agentRunId;
         private String passportId;
+        private String caseConsumerId;
         private AgentSimulationScenario scenario;
 
         private RecordingClient(RuntimeException failure) {
@@ -100,9 +101,13 @@ class AgentRunLauncherTest {
 
         @Override
         public void simulate(
-                String agentRunId, String passportId, AgentSimulationScenario scenario) {
+                String agentRunId,
+                String passportId,
+                String caseConsumerId,
+                AgentSimulationScenario scenario) {
             this.agentRunId = agentRunId;
             this.passportId = passportId;
+            this.caseConsumerId = caseConsumerId;
             this.scenario = scenario;
             if (failure != null) {
                 throw failure;

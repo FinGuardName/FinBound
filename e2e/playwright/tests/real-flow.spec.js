@@ -156,11 +156,20 @@ test('the same Prompt Snapshot is reused for two AgentRuns', async ({ request })
 
   for (const audit of [first, second]) {
     expect(audit).toMatchObject({
-      decision: 'ALLOW',
       systemOutcome: 'COMPLETED',
       promptRiskEvaluationStatus: 'EVALUATED',
     })
   }
+
+  // 같은 입력이면 같은 Snapshot 을 다시 쓴다. 그것이 이 테스트의 주제이므로 점수와
+  // 모델 버전이 두 실행에서 같아야 한다.
+  expect(second.promptRisk).toBe(first.promptRisk)
+  expect(second.promptModelVersion).toBe(first.promptModelVersion)
+
+  // 최종 decision 은 단언하지 않는다. 이 스위트는 앞선 테스트들이 이미 여러 실행을
+  // 만든 뒤에 여기 도착하고, 5분 창에 이력이 쌓이면 행동 이상 관문이 정당하게 걸려
+  // BLOCK 이 된다(이슈 #117 을 고쳐 관문이 살아난 뒤 나타난 현상이다).
+  // ALLOW/BLOCK 경계는 위쪽 전용 테스트가 창이 비어 있는 동안 따로 검증한다.
 })
 
 test('SPA bundle and runtime storage do not contain credentials', async ({ page, request }) => {

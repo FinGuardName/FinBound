@@ -42,13 +42,17 @@ public class AgentSimulationHttpClient implements AgentSimulationClient {
     }
 
     @Override
-    public void simulate(String agentRunId, String passportId, AgentSimulationScenario scenario) {
+    public void simulate(
+            String agentRunId,
+            String passportId,
+            String caseConsumerId,
+            AgentSimulationScenario scenario) {
         try {
             restClient
                     .post()
                     .uri("/internal/v1/agent-simulations")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new SimulationRequest(agentRunId, passportId, scenario))
+                    .body(new SimulationRequest(agentRunId, passportId, caseConsumerId, scenario))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RuntimeException failure) {
@@ -58,6 +62,9 @@ public class AgentSimulationHttpClient implements AgentSimulationClient {
     }
 
     private record SimulationRequest(
-            String agentRunId, String passportId, AgentSimulationScenario scenario) {
+            String agentRunId,
+            String passportId,
+            String caseConsumerId,
+            AgentSimulationScenario scenario) {
     }
 }

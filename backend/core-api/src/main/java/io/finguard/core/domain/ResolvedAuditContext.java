@@ -18,6 +18,7 @@ import java.util.Set;
 public record ResolvedAuditContext(
         String employeeId,
         String passportId,
+        String caseId,
         Set<DataType> requestedData,
         AuditScopeStatus scopeStatus,
         BigDecimal promptRisk,
@@ -63,6 +64,7 @@ public record ResolvedAuditContext(
         return other != null
                 && employeeId.equals(other.employeeId)
                 && passportId.equals(other.passportId)
+                && Objects.equals(caseId, other.caseId)
                 && requestedData.equals(other.requestedData)
                 && scopeStatus.equals(other.scopeStatus)
                 && promptRiskEvaluationStatus == other.promptRiskEvaluationStatus

@@ -161,6 +161,7 @@ public class ContextResolveService {
                 new ResolvedAuditContext(
                         passport.getEmployeeId(),
                         passport.getPassportId(),
+                        financialCase.getCaseId(),
                         request.requestedData(),
                         toAuditScopeStatus(scopeStatus),
                         promptRisk.getPromptRisk(),
