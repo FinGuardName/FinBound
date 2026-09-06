@@ -2,6 +2,7 @@ import hashlib
 import io
 import json
 import os
+from decimal import ROUND_CEILING, Decimal
 from pathlib import Path
 
 import joblib
@@ -29,10 +30,21 @@ MODEL_PATH_ENV = "FINGUARD_BEHAVIOR_MODEL_PATH"
 MODEL_METADATA_PATH_ENV = "FINGUARD_BEHAVIOR_MODEL_METADATA_PATH"
 COLD_START_MIN_EVENTS = 5
 COLD_START_RISK = 0.0
+CRITICAL_MIN_EVENTS = 20
+AUDIT_RISK_QUANTUM = Decimal("0.0001")
 
 
 class BehaviorModelError(RuntimeError):
     pass
+
+
+def _largest_auditable_risk_below(threshold: float) -> float:
+    """Return the largest four-decimal score that remains below the threshold."""
+    stored_threshold = Decimal(str(threshold)).quantize(
+        AUDIT_RISK_QUANTUM,
+        rounding=ROUND_CEILING,
+    )
+    return float(max(Decimal(0), stored_threshold - AUDIT_RISK_QUANTUM))
 
 
 class BehaviorRiskService:
@@ -135,6 +147,16 @@ class BehaviorRiskService:
         if not np.isfinite(raw_score):
             raise BehaviorModelError("Behavior model returned a non-finite score")
         behavior_risk = bundle.risk_from_raw_score(raw_score)
+
+        # A short burst can be unusual enough to alert, but there is not enough
+        # accumulated evidence to turn behavior alone into a blocking signal.
+        # Keep evaluating after cold start while reserving CRITICAL for a
+        # sustained pattern. Scope, prompt, and hard-limit controls still apply.
+        if len(valid_history) < CRITICAL_MIN_EVENTS:
+            behavior_risk = min(
+                behavior_risk,
+                _largest_auditable_risk_below(bundle.critical_threshold),
+            )
 
         if behavior_risk >= bundle.critical_threshold:
             level = BehaviorRiskLevel.CRITICAL

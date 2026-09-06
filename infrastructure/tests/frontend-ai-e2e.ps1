@@ -86,7 +86,7 @@ try {
     Write-Output 'PASS: all eight runtime services healthy'
 
     $businessE2E = Run-Docker ($compose + @('run', '--rm', '--no-deps', 'e2e', 'pnpm', 'test', '--grep-invert', '@fail-closed'))
-    $behaviorDemoEvidence = 'PASS: isolated behavior demo: 18 synthetic events, AI CRITICAL, OPA BLOCK, BEHAVIOR_ANOMALY'
+    $behaviorDemoEvidence = 'PASS: isolated behavior demo: 20 synthetic events, AI CRITICAL, OPA BLOCK, BEHAVIOR_ANOMALY'
     Assert-Contract ($businessE2E.Contains($behaviorDemoEvidence)) 'isolated behavior demo evidence missing'
     Write-Output $behaviorDemoEvidence
     Write-Output 'PASS: browser, ALLOW/BLOCK, prompt, behavior, authentication, and secret-storage E2E'
