@@ -147,7 +147,7 @@ import sys
 
 prompt = json.load(open(sys.argv[1], encoding="utf-8"))
 behavior = json.load(open(sys.argv[2], encoding="utf-8"))
-assert prompt["modelVersion"] == "prompt-guard-6"
+assert prompt["modelVersion"] == "prompt-guard-7"
 assert isinstance(prompt["detected"], bool)
 assert "decision" not in prompt and "inputText" not in prompt
 assert behavior["modelVersion"] == "iforest-1"

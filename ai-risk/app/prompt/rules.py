@@ -40,6 +40,9 @@ RULES = (
         "POLICY_BYPASS",
         PromptAttackType.POLICY_BYPASS,
         _patterns(
+            r"(?:심사\s*기준|보호\s*기준|접근\s*제한).{0,24}?"
+            r"(?:무시하고|무시한\s*채|무시해(?:줘)?|건너뛰고|생략하고)"
+            r".{0,40}(?:조회해|열람해|출력해|가져와|실행해)",
             r"(?:정책|검사|인증|게이트웨이|gateway|opa).{0,30}(?:우회|건너뛰|생략|무시|skip)",
             r"(?:우회|건너뛰|생략|무시|skip).{0,30}(?:정책|검사|인증|게이트웨이|gateway|opa)",
             r"(?:mark|set).{0,20}(?:opa|policy).{0,20}(?:allow|passed)",

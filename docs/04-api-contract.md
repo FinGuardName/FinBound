@@ -453,7 +453,7 @@ Core임을 독점적으로 증명하거나 Run/Passport의 실제 발급·결합
   "riskLevel": "LOW",
   "attackType": null,
   "matchedRules": [],
-  "modelVersion": "prompt-guard-6",
+  "modelVersion": "prompt-guard-7",
   "evaluatedAt": "2026-08-17T21:30:01+09:00"
 }
 ```
@@ -612,7 +612,7 @@ POST /internal/v1/context/resolve
     "riskLevel": "LOW",
     "detected": false,
     "inputHash": "sha256:...",
-    "modelVersion": "prompt-guard-6"
+    "modelVersion": "prompt-guard-7"
   }
 }
 ```
@@ -677,7 +677,7 @@ POST /internal/v1/risk/prompt
   "attackType": "CROSS_CUSTOMER_ACCESS",
   "matchedRules": ["IGNORE_PREVIOUS_INSTRUCTION"],
   "inputHash": "sha256:...",
-  "modelVersion": "prompt-guard-6",
+  "modelVersion": "prompt-guard-7",
   "evaluatedAt": "2026-08-17T21:32:00+09:00"
 }
 ```
@@ -1069,7 +1069,7 @@ Mock Finance는 Scope Status를 계산하거나 `ALLOW/BLOCK`을 결정하지 �
   "promptRiskEvaluationStatus": "EVALUATED",
   "promptRisk": 0.05,
   "promptRiskLevel": "LOW",
-  "promptModelVersion": "prompt-guard-6",
+  "promptModelVersion": "prompt-guard-7",
   "behaviorRisk": 0.21,
   "decision": "ALLOW",
   "reasonCodes": [],
