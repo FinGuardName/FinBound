@@ -103,4 +103,5 @@ test('real AI behavior CRITICAL signal is blocked by real OPA policy', async ({ 
     reasonCodes: ['BEHAVIOR_ANOMALY'],
     riskFlagged: true,
   })
+  console.info('PASS: isolated behavior demo: 18 synthetic events, AI CRITICAL, OPA BLOCK, BEHAVIOR_ANOMALY')
 })
