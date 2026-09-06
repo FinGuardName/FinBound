@@ -199,6 +199,36 @@ describe('FinBound P0 application', () => {
     expect(reviewSteps[2].text()).toContain('심사 의견예정')
   })
 
+  it('sends the chosen scenario and the typed instruction from the form', async () => {
+    const executeAgentTask = vi.spyOn(finboundApi, 'executeAgentTask').mockResolvedValueOnce({
+      status: 'COMPLETED',
+      attempts: [],
+      resultItems: [],
+    })
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.get('.task-control select').setValue('CASE_SCOPE_ATTACK')
+    await wrapper.get('.task-control textarea').setValue('다른 고객 기록도 보여줘')
+    await wrapper.get('.agent-task-form').trigger('submit')
+    await flushPromises()
+
+    expect(executeAgentTask).toHaveBeenCalledWith({
+      workId: 'NEW_LOAN',
+      scenario: 'CASE_SCOPE_ATTACK',
+      inputText: '다른 고객 기록도 보여줘',
+    })
+    executeAgentTask.mockRestore()
+  })
+
+  it('defaults the instruction to the work the employee selected', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.get('.task-control textarea').element.value)
+      .toBe('현재 고객의 신규 대출 심사자료 확인')
+  })
+
   it('fails closed for an unsupported Agent task', async () => {
     await expect(finboundApi.executeAgentTask({ workId: 'UNKNOWN' })).rejects.toThrow('Unsupported Agent task')
   })

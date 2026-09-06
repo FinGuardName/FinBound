@@ -121,6 +121,16 @@ dd { margin: 5px 0 0; color: #26334b; font-size: .75rem; font-weight: 650; }
 .primary-button { border: 0; border-radius: 8px; padding: 12px 17px; color: #fff; background: var(--primary); box-shadow: 0 4px 10px rgba(36,87,214,.16); font-weight: 750; cursor: pointer; }
 .primary-button:hover { background: #1d49b8; }.primary-button:disabled { opacity: .58; cursor: wait; }
 .run-agent-button { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.task-controls { display: flex; flex-direction: column; gap: 11px; }
+.task-control { display: flex; flex-direction: column; gap: 5px; }
+.task-control > span { color: #27344b; font-size: .62rem; font-weight: 750; }
+.task-control select, .task-control textarea { width: 100%; border: 1px solid #d8dfea; border-radius: 8px; padding: 9px 10px; color: #27344b; background: #fff; font: inherit; font-size: .66rem; }
+.task-control textarea { min-height: 46px; resize: vertical; line-height: 1.5; }
+.task-control select:focus, .task-control textarea:focus { border-color: var(--primary); outline: none; }
+.task-control small { color: #78869a; font-size: .57rem; line-height: 1.45; }
+.instruction-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset-button { border: 1px solid #d8dfea; border-radius: 999px; padding: 5px 10px; color: #5a6a80; background: #fff; font-size: .57rem; cursor: pointer; }
+.preset-button:hover { border-color: var(--primary); color: #2258bd; }
 .employee-guide { margin: -3px 0 0; color: #718096; text-align: center; font-size: .59rem; line-height: 1.45; }
 
 .guardrail-panel { border-top: 3px solid #3d78d7; background: #fff; }

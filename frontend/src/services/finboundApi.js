@@ -370,7 +370,7 @@ const mockApi = {
 
 const realApi = {
   async getBankWorkCatalog() { return clone(bankWorkCatalogFixture) },
-  async executeAgentTask({ workId }) {
+  async executeAgentTask({ workId, scenario, inputText }) {
     const work = bankWorkCatalogFixture.find((candidate) => candidate.id === workId)
     if (!work) throw new FinboundApiError('Unsupported Agent task', { code: 'AGENT_TASK_UNSUPPORTED' })
 
@@ -383,7 +383,10 @@ const realApi = {
           employeeId: work.employee.id,
           consumerId: work.case.consumerId,
           taskType: work.case.taskLabel,
-          inputText: work.employeeRequest.title,
+          // 검증 시나리오와 업무 지시 문구를 화면이 정한다. 예전에는 둘 다 고정이라
+          // 심사자가 권한 범위·프롬프트 위험 관문을 화면에서 확인할 수 없었다 — 이슈 #122.
+          ...(scenario ? { scenario } : {}),
+          inputText: inputText?.trim() || work.employeeRequest.title,
         },
       })
       permission = await coreRequest(`/api/v1/agent-runs/${encodeURIComponent(agentRun.agentRunId)}/permission-comparison`)
