@@ -18,5 +18,9 @@ public interface AgentSimulationClient {
      *
      * @throws AgentSimulationFailedException 부르지 못했거나 Agent가 실패를 알린 경우
      */
-    void simulate(String agentRunId, String passportId, AgentSimulationScenario scenario);
+    void simulate(
+            String agentRunId,
+            String passportId,
+            String caseConsumerId,
+            AgentSimulationScenario scenario);
 }

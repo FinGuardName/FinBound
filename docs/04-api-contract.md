@@ -231,16 +231,28 @@ Content-Type: application/json
 {
   "agentRunId": "RUN-001",
   "passportId": "PASS-001",
+  "caseConsumerId": "CUST-1001",
   "scenario": "NORMAL_CREDIT_SCORE"
 }
 ```
 
+`caseConsumerId`는 Core가 만든 Financial Case의 고객이다. **정상 Scenario는 이 고객을 조회하고,
+공격 Scenario는 이 값을 무시하고 자기 Fixture 고객을 쓴다.** 사건 밖 고객을 노리거나 Mandate가
+좁은 고객을 노리는 것이 공격의 내용 자체여서, 사건의 고객을 쓰면 공격이 성립하지 않기 때문이다.
+필드 이름이 `targetConsumerId`가 아닌 이유도 이것이다 — 실제 조회 대상이라고 부르면 Scenario
+절반에 대해 거짓이 된다. 배경은 이슈 #115.
+
 P0 Scenario:
 
 ```text
-NORMAL_CREDIT_SCORE → CREDIT_SCORE_READ(CUST-1001)
+NORMAL_CREDIT_SCORE → CREDIT_SCORE_READ(caseConsumerId)
 CASE_SCOPE_ATTACK   → CREDIT_SCORE_READ(CUST-9999)
 ```
+
+**공격 Scenario가 의도한 Reason Code로 막히려면 실행의 고객이 그 공격의 고객과 같아야 한다.**
+Core의 Context Resolve가 Consumer Mandate를 요청 대상이 아니라 Passport의 고객으로 조회하기
+때문이다. 실행이 `CUST-1001`짜리면 `CUST-1002`의 좁은 Mandate는 읽히지도 않고 그냥
+`CASE_SCOPE_VIOLATION`이 난다. 실측 대조는 `infrastructure/tests/deployed-scenarios.py`.
 
 ### #60 Scenario 확장 — PR #79 소비자 리뷰 반영
 

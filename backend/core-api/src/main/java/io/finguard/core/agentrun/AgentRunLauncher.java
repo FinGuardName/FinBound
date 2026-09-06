@@ -65,7 +65,11 @@ public class AgentRunLauncher {
      */
     void launch(AgentRunCreated event) {
         try {
-            agentSimulations.simulate(event.agentRunId(), event.passportId(), event.scenario());
+            agentSimulations.simulate(
+                    event.agentRunId(),
+                    event.passportId(),
+                    event.caseConsumerId(),
+                    event.scenario());
             outcomes.complete(event.agentRunId());
         } catch (RuntimeException failure) {
             log.warn("Agent simulation failed. agentRunId={}", event.agentRunId(), failure);

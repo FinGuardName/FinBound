@@ -103,7 +103,70 @@ class AgentScenarioMappingTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    /**
+     * 이슈 #115. 예전에는 시나리오에 고객이 박혀 있어 어떤 사건이든 CUST-1001 을 조회했다.
+     * 화면에서 다른 고객의 업무를 시작하면 사건은 그 고객으로 만들어지는데 조회는 엉뚱한
+     * 고객을 향해 CASE_SCOPE_VIOLATION 으로 막혔다.
+     */
+    @ParameterizedTest
+    @EnumSource(
+            value = AgentSimulationScenario.class,
+            names = {"NORMAL_CREDIT_SCORE", "NORMAL_INCOME", "NORMAL_DEBT"})
+    void normalScenariosAskAboutTheConsumerOfTheCase(AgentSimulationScenario scenario) {
+        when(gateway.execute(any())).thenReturn(Mono.just(allowResponse()));
+
+        service.simulate(new AgentSimulationRequest(
+                "RUN-115", "PASS-115", "CUST-2001", scenario)).block();
+
+        ArgumentCaptor<GatewayToolCallRequest> sent =
+                ArgumentCaptor.forClass(GatewayToolCallRequest.class);
+        verify(gateway).execute(sent.capture());
+        assertThat(sent.getValue().targetConsumerId()).isEqualTo("CUST-2001");
+    }
+
+    /**
+     * 공격은 자기 Fixture 고객을 지킨다. 사건의 고객을 쓰면 사건 밖 고객을 노리는 것도,
+     * Mandate 가 좁은 고객을 노리는 것도 성립하지 않아 공격이 공격이 아니게 된다.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "CASE_SCOPE_ATTACK,CUST-9999",
+        "TOOL_SCOPE_ATTACK,CUST-1002",
+        "DATA_SCOPE_ATTACK,CUST-1002",
+        "MANDATE_SCOPE_ATTACK,CUST-1003"
+    })
+    void attackScenariosIgnoreTheCaseConsumer(
+            AgentSimulationScenario scenario, String pinned) {
+        when(gateway.execute(any())).thenReturn(Mono.just(allowResponse()));
+
+        service.simulate(new AgentSimulationRequest(
+                "RUN-115", "PASS-115", "CUST-2001", scenario)).block();
+
+        ArgumentCaptor<GatewayToolCallRequest> sent =
+                ArgumentCaptor.forClass(GatewayToolCallRequest.class);
+        verify(gateway).execute(sent.capture());
+        assertThat(sent.getValue().targetConsumerId()).isEqualTo(pinned);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = AgentSimulationScenario.class,
+            names = {"NORMAL_CREDIT_SCORE", "NORMAL_INCOME", "NORMAL_DEBT"})
+    void normalScenariosRefuseToRunWithoutACaseConsumer(AgentSimulationScenario scenario) {
+        assertThatThrownBy(() -> scenario.resolveTargetConsumerId(" "))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private GatewayToolCallResponse allowResponse() {
+        try {
+            return new GatewayToolCallResponse(
+                    "REQ-115", PolicyDecision.ALLOW, mapper.readTree("{\"value\":1}"), List.of());
+        } catch (Exception unreachable) {
+            throw new IllegalStateException(unreachable);
+        }
+    }
+
     private AgentSimulationRequest request(AgentSimulationScenario scenario) {
-        return new AgentSimulationRequest("RUN-CORE-060", "PASS-CORE-060", scenario);
+        return new AgentSimulationRequest("RUN-CORE-060", "PASS-CORE-060", "CUST-1001", scenario);
     }
 }
