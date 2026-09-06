@@ -36,7 +36,7 @@ test('AI readiness, internal authentication, and risk-signal-only contract', asy
 
 test('real AI behavior CRITICAL signal is blocked by real OPA policy', async ({ request }) => {
   const now = new Date('2026-08-17T23:00:00Z')
-  const history = Array.from({ length: 18 }, (_, index) => ({
+  const history = Array.from({ length: 20 }, (_, index) => ({
     requestId: `REQ-E2E-BEHAVIOR-${index}`,
     caseId: 'LOAN-2026-E2E',
     targetConsumerId: 'CUST-1001',
@@ -103,4 +103,5 @@ test('real AI behavior CRITICAL signal is blocked by real OPA policy', async ({ 
     reasonCodes: ['BEHAVIOR_ANOMALY'],
     riskFlagged: true,
   })
+  console.info('PASS: isolated behavior demo: 20 synthetic events, AI CRITICAL, OPA BLOCK, BEHAVIOR_ANOMALY')
 })
