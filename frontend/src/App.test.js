@@ -226,14 +226,14 @@ describe('FinBound P0 application', () => {
     await flushPromises()
 
     expect(wrapper.get('.task-control textarea').element.value)
-      .toBe('CUST-1001의 신규 대출 심사를 위해 부채 정보를 조회해줘.')
+      .toBe('현재 고객의 신규 대출 심사를 위해 부채 정보를 조회해줘.')
     expect(wrapper.text()).toContain('신규 신청 고객 부채 조회')
 
     await wrapper.get('[data-work="LIMIT_REVIEW"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('.task-control textarea').element.value)
-      .toBe('CUST-2001의 한도 재심사를 위해 변경된 소득 정보를 확인해줘.')
+      .toBe('현재 고객의 한도 재심사를 위해 변경된 소득 정보를 확인해줘.')
     expect(wrapper.text()).toContain('변경된 소득 재확인')
     expect(wrapper.text()).toContain('심사 기준 무시 지시 차단')
 
@@ -241,7 +241,7 @@ describe('FinBound P0 application', () => {
     await flushPromises()
 
     expect(wrapper.get('.task-control textarea').element.value)
-      .toBe('CUST-3001이 제출한 보완 부채자료를 확인해줘.')
+      .toBe('현재 고객이 제출한 보완 부채자료를 확인해줘.')
     expect(wrapper.text()).toContain('제출된 부채자료 확인')
     expect(wrapper.text()).toContain('보완서류 지시 변조 차단')
   })

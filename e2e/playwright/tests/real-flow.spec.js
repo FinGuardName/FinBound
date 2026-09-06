@@ -40,43 +40,72 @@ async function completedAudit(request, run) {
   return matching
 }
 
-test('real UI creates the default debt AgentRun and renders the verified execution', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByText('Core API 연결 모드')).toBeVisible()
-  await page.locator('#core-credential').fill(operatorCredential)
-  await page.getByRole('button', { name: 'Core API 연결' }).click()
-  await expect(page.getByRole('region', { name: 'AI가 수행하려는 실제 요청' })).toContainText('DEBT_READ')
-  const [runRequest] = await Promise.all([
-    page.waitForRequest((request) => request.method() === 'POST'
-      && new URL(request.url()).pathname === '/core-api/api/v1/agent-runs'),
-    page.getByRole('button', { name: 'AI로 이 업무 진행' }).click(),
-  ])
-  expect(runRequest.postDataJSON().scenario).toBe('NORMAL_DEBT')
-  await expect(page.getByRole('heading', { name: 'AI 업무 처리가 완료되었습니다' })).toBeVisible({ timeout: 20_000 })
-  await expect(page.locator('.security-details')).toContainText('AI 실행 번호RUN-')
-  await expect(page.locator('.security-details')).toContainText('권한 확인서PASS-')
-  await expect(page.locator('.security-details')).toContainText('허용 업무: CREDIT_SCORE_READ')
-  await expect(page.locator('.attempt-details')).toHaveCount(1)
-  await expect(page.locator('.attempt-details')).toContainText('도구DEBT_READ')
-  await expect(page.locator('.attempt-details')).toContainText('금융시스템 요청전달됨')
-  await expect(page.locator('.attempt-details')).toContainText('결과 제공제공함')
+const normalWorkCases = [
+  { workId: 'NEW_LOAN', card: '신규 신청 고객 부채 조회', consumerId: 'CUST-1001',
+    scenario: 'NORMAL_DEBT', tool: 'DEBT_READ', eventLabel: '부채자료 확인' },
+  { workId: 'LIMIT_REVIEW', card: '변경된 소득 재확인', consumerId: 'CUST-2001',
+    scenario: 'NORMAL_INCOME', tool: 'INCOME_READ', eventLabel: '소득자료 확인' },
+  { workId: 'DOCUMENT_REVIEW', card: '제출된 부채자료 확인', consumerId: 'CUST-3001',
+    scenario: 'NORMAL_DEBT', tool: 'DEBT_READ', eventLabel: '부채자료 확인' },
+]
 
-  const storage = await page.evaluate(() => ({
-    local: Object.fromEntries(Object.entries(localStorage)),
-    session: Object.fromEntries(Object.entries(sessionStorage)),
-  }))
-  expect(storage).toEqual({ local: {}, session: {} })
-  expect(await page.locator('body').innerText()).not.toContain(operatorCredential)
+for (const work of normalWorkCases) {
+  test(`real UI normal ${work.workId} is LOW and ALLOW with real AI`, async ({ page, request }) => {
+    await page.goto('/')
+    await expect(page.getByText('Core API 연결 모드')).toBeVisible()
+    await page.locator('#core-credential').fill(operatorCredential)
+    await page.getByRole('button', { name: 'Core API 연결' }).click()
+    await page.locator(`[data-work="${work.workId}"]`).click()
+    await page.getByRole('button', { name: work.card }).click()
+    await expect(page.getByRole('region', { name: 'AI가 수행하려는 실제 요청' })).toContainText(work.tool)
+    await expect(page.getByRole('region', { name: 'AI가 수행하려는 실제 요청' })).toContainText(work.consumerId)
+    const [runResponse] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === 'POST'
+        && new URL(response.url()).pathname === '/core-api/api/v1/agent-runs'),
+      page.getByRole('button', { name: 'AI로 이 업무 진행' }).click(),
+    ])
+    expect(runResponse.status()).toBe(201)
+    expect(runResponse.request().postDataJSON().scenario).toBe(work.scenario)
+    expect(runResponse.request().postDataJSON().consumerId).toBe(work.consumerId)
+    const run = await runResponse.json()
+    await expect(page.getByRole('heading', { name: 'AI 업무 처리가 완료되었습니다' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('.security-details')).toContainText('AI 실행 번호RUN-')
+    await expect(page.locator('.security-details')).toContainText('권한 확인서PASS-')
+    await expect(page.locator('.security-details .security-permissions')).toContainText(work.tool)
+    await expect(page.locator('.attempt-details')).toHaveCount(1)
+    await expect(page.locator('.attempt-details')).toContainText(`도구${work.tool}`)
+    await expect(page.locator('.attempt-details')).toContainText('금융시스템 요청전달됨')
+    await expect(page.locator('.attempt-details')).toContainText('결과 제공제공함')
+    const audit = await completedAudit(request, run)
+    expect(audit).toMatchObject({
+      decision: 'ALLOW',
+      systemOutcome: 'COMPLETED',
+      promptRiskEvaluationStatus: 'EVALUATED',
+      promptRiskLevel: 'LOW',
+      downstreamReached: true,
+      responseReleased: true,
+      reasonCodes: [],
+    })
+    const promptGate = page.locator('.gate-card').filter({ hasText: '1 · 입력 위험' })
+    await expect(promptGate).toContainText('정상')
 
-  await page.locator('[data-screen="dashboard"]').click()
-  await expect(page.getByRole('heading', { name: 'AI 업무 보호 결과' })).toBeVisible()
-  const newestEvent = page.locator('.event-row').first()
-  await expect(newestEvent).toBeVisible({ timeout: 20_000 })
-  await expect(newestEvent).toContainText('부채자료 확인')
-  await expect(newestEvent).toContainText('정상 처리')
-  await expect(page.locator('.event-detail')).toContainText('COMPLETED')
-  await expect(page.locator('.event-detail')).toContainText('EVALUATED')
-})
+    const storage = await page.evaluate(() => ({
+      local: Object.fromEntries(Object.entries(localStorage)),
+      session: Object.fromEntries(Object.entries(sessionStorage)),
+    }))
+    expect(storage).toEqual({ local: {}, session: {} })
+    expect(await page.locator('body').innerText()).not.toContain(operatorCredential)
+
+    await page.locator('[data-screen="dashboard"]').click()
+    await expect(page.getByRole('heading', { name: 'AI 업무 보호 결과' })).toBeVisible()
+    const newestEvent = page.locator('.event-row').first()
+    await expect(newestEvent).toBeVisible({ timeout: 20_000 })
+    await expect(newestEvent).toContainText(work.eventLabel)
+    await expect(newestEvent).toContainText('정상 처리')
+    await expect(page.locator('.event-detail')).toContainText('COMPLETED')
+    await expect(page.locator('.event-detail')).toContainText('EVALUATED')
+  })
+}
 
 test('real Core-Agent-Gateway-AI-OPA flow preserves ALLOW and BLOCK boundaries', async ({ request }) => {
   const nonce = crypto.randomUUID()
