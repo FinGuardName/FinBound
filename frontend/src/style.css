@@ -1111,3 +1111,51 @@ main { padding: 30px clamp(28px, 3.2vw, 48px) 48px; }
   .event-list-heading small, .filter-heading small { display: none; }
   .event-detail { padding: 18px; }
 }
+
+/* Keep nested content responsive to the card width, not only the viewport. */
+.work-protection-panel { container-type: inline-size; }
+.work-protection-panel .work-detail-grid { grid-template-columns: minmax(160px, .8fr) minmax(0, 1.2fr); }
+.application-detail { container-type: inline-size; }
+.application-detail .case-facts { grid-template-columns: minmax(0, 1fr); }
+.application-detail .case-facts > div { grid-template-columns: 66px minmax(0, 1fr); gap: 8px; }
+.application-detail .case-facts dd { word-break: keep-all; overflow-wrap: anywhere; }
+.employee-profile > div { min-width: 0; }
+.employee-avatar, .case-state, .session-end { flex-shrink: 0; }
+.case-state, .session-end { white-space: nowrap; }
+.case-heading h2 { word-break: keep-all; overflow-wrap: anywhere; }
+
+/* Extra height belongs to the editable request, not buttons or arbitrary gaps. */
+.agent-demo-panel .agent-task-form { display: flex; flex-direction: column; gap: 18px; padding: 24px; }
+.agent-demo-panel .assistant-intro { min-height: 81px; flex-shrink: 0; padding-bottom: 16px; }
+.agent-demo-panel .assistant-intro > div { min-width: 0; }
+.agent-demo-panel .task-controls { flex: 1; gap: 18px; }
+.agent-demo-panel .task-control { flex: 1; }
+.agent-demo-panel .task-control textarea { flex: 1; min-height: 150px; font-size: .8rem; }
+.agent-demo-panel .employee-request,
+.agent-demo-panel .planned-request,
+.agent-demo-panel .run-agent-button { flex-shrink: 0; }
+.agent-demo-panel .run-agent-button { min-height: 46px; padding-block: 12px; }
+.agent-demo-panel .employee-guide { margin: 0; }
+.agent-demo-panel .verification-card > strong { font-size: .76rem; word-break: keep-all; }
+.agent-demo-panel .verification-card > small { font-size: .65rem; }
+.task-control textarea:focus-visible { outline: 2px solid #008f8b; outline-offset: 2px; }
+
+@container (max-width: 470px) {
+  .work-protection-panel .work-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .work-protection-panel .guardrail-lower { grid-template-columns: minmax(0, 1fr); }
+}
+@container (min-width: 430px) {
+  .application-detail .case-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+}
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; gap: 12px; }
+  .agent-demo-panel .agent-task-form { padding: 18px; }
+  .agent-demo-panel .assistant-intro { min-height: 0; }
+  .event-list-panel { min-height: 240px; }
+  .dashboard-filters .primary-filters > label:not(.check-label) { width: 100%; }
+}
+@media (max-width: 480px) {
+  .verification-grid { grid-template-columns: minmax(0, 1fr); }
+  .agent-demo-panel .verification-card { padding: 12px; }
+  .agent-demo-panel .task-control textarea { min-height: 160px; }
+}
