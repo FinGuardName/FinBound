@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import RiskMeter from '../components/RiskMeter.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { describeAuditReason } from '../presentation/auditReason'
+import { formatBusinessTime } from '../presentation/businessTime'
 import { finboundApi } from '../services/finboundApi'
 
 const events = ref([])
@@ -289,7 +290,7 @@ watch(page, () => {
         <div class="event-table" role="table" aria-label="AI 업무 처리 내역">
           <div class="table-head" role="row"><span>시간</span><span>고객 / 확인 업무</span><span>처리 결과</span></div>
           <button v-for="event in events" :key="event.auditEventId" :class="['event-row', { selected: selectedId === event.auditEventId }]" type="button" role="row" @click="selectEvent(event.auditEventId)">
-            <span>{{ event.requestedAt.slice(11, 19) }}</span>
+            <span>{{ formatBusinessTime(event.requestedAt) }}</span>
             <span><strong>{{ consumerLabels[event.targetConsumerId] || event.targetConsumerId }}</strong><small>{{ event.caseId }} · {{ toolLabels[event.requestedTool] || event.requestedTool }}</small></span>
             <StatusBadge :value="eventOutcome(event)" :label="decisionLabels[eventOutcome(event)]" />
           </button>

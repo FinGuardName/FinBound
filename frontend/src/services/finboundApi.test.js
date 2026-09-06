@@ -32,7 +32,7 @@ describe('real Core API adapter', () => {
         passportId: 'PASS-REAL-1',
         inputRefs: ['INPUT-REAL-1'],
         status: 'RUNNING',
-        startedAt: '2026-09-01T12:00:00+09:00',
+        startedAt: '2026-09-01T03:00:00Z',
       }))
       .mockResolvedValueOnce(jsonResponse({
         agentRunId: 'RUN-REAL-1',

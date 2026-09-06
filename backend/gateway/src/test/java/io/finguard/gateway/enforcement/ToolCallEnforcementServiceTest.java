@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -70,6 +71,23 @@ class ToolCallEnforcementServiceTest {
         verify(coreClient).createAudit(eq(identity), any(AuditStart.class), eq("trace"));
         verify(downstreamClient).execute(request, "REQ-1", "trace");
         verify(coreClient).updateAuditOutcome(eq(identity), eq("REQ-1"), any(AuditOutcome.class), eq("trace"));
+    }
+
+    @Test
+    void preservesAuditableBehaviorRiskWhenUpdatingCore() {
+        when(authorizationService.decide(any(), any(), any(), any(), any())).thenReturn(
+            new AuthorizationOutcome(
+                new PolicyDecisionResult(PolicyDecision.ALLOW, "HIGH", true,
+                    List.of(), "policy-1"),
+                0.9999));
+        when(downstreamClient.execute(any(), any(), any())).thenReturn(
+            new DownstreamToolResult("REQ-RISK", FinancialTool.CREDIT_SCORE_READ, "CUST-1001",
+                Map.of("creditScore", 812)));
+
+        service.enforce(identity, request, "REQ-RISK", "trace");
+
+        assertThat(captureOutcome("REQ-RISK").behaviorRisk())
+            .isEqualByComparingTo(new BigDecimal("0.9999"));
     }
 
     @Test

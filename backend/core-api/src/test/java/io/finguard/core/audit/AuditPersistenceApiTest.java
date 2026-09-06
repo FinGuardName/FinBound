@@ -2,6 +2,7 @@ package io.finguard.core.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
@@ -285,6 +286,44 @@ class AuditPersistenceApiTest {
         assertThat(response.getBody().get("riskFlagged").asBoolean()).isFalse();
         assertThat(response.getBody().get("downstreamReached").asBoolean()).isTrue();
         assertThat(response.getBody().get("responseReleased").asBoolean()).isTrue();
+    }
+
+    @Test
+    void preservesAlertBehaviorRiskAcrossPostgresPersistence() {
+        String requestId = requestId();
+        createAudit(requestId, "LOAN-AGENT-01", "LOAN-AGENT-01", true);
+
+        ResponseEntity<JsonNode> response =
+                updateOutcome(
+                        requestId,
+                        "LOAN-AGENT-01",
+                        """
+                        {
+                          "decision": "ALLOW",
+                          "systemOutcome": "COMPLETED",
+                          "reasonCodes": [],
+                          "downstreamReached": true,
+                          "responseReleased": true,
+                          "success": true,
+                          "behaviorRisk": 0.9999,
+                          "severity": "HIGH",
+                          "riskFlagged": true,
+                          "policyVersion": "loan-review-policy-1",
+                          "completedAt": "%s"
+                        }
+                        """
+                                .formatted(COMPLETED_AT));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("behaviorRisk").decimalValue())
+                .isEqualByComparingTo(new BigDecimal("0.9999"));
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "select behavior_risk from audit_events where request_id = ?",
+                                BigDecimal.class,
+                                requestId))
+                .isEqualByComparingTo(new BigDecimal("0.9999"));
     }
 
     /**
