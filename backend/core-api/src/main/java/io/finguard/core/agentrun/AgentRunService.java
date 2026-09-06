@@ -213,7 +213,10 @@ public class AgentRunService {
         // 이 트랜잭션이 아직 안 닫혀 있어 Passport를 찾지 못한다 — AgentRunLauncher 참조.
         events.publishEvent(
                 new AgentRunCreated(
-                        agentRun.getAgentRunId(), passport.getPassportId(), scenario));
+                        agentRun.getAgentRunId(),
+                        passport.getPassportId(),
+                        financialCase.getConsumerId(),
+                        scenario));
 
         return new AgentRunStarted(
                 agentRun.getAgentRunId(),

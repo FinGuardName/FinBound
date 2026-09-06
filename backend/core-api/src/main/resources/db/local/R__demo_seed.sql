@@ -24,7 +24,9 @@ on conflict (employee_id) do update
     set created_at = excluded.created_at;
 
 insert into consumers (consumer_id, created_at)
-values ('CUST-1001', timestamptz '2026-08-17 09:00:00+09'),
+values ('CUST-2001', timestamptz '2026-08-17 09:00:00+09'),
+       ('CUST-3001', timestamptz '2026-08-17 09:00:00+09'),
+       ('CUST-1001', timestamptz '2026-08-17 09:00:00+09'),
        ('CUST-9999', timestamptz '2026-08-17 09:00:00+09'),  -- 데모의 반대편. 실재해야 한다.
        ('CUST-1002', timestamptz '2026-08-17 09:00:00+09'),  -- Tool/Data 공격 Fixture
        ('CUST-1003', timestamptz '2026-08-17 09:00:00+09')   -- Mandate 공격 Fixture
@@ -160,6 +162,51 @@ select m.mandate_id, d.data_type
 from consumer_mandates m
          cross join (values ('CREDIT_SCORE'), ('INCOME')) as d(data_type)
 where m.consumer_id = 'CUST-1003'
+  and m.purpose = 'LOAN_REVIEW'
+on conflict (mandate_id, data_type) do nothing;
+
+-- ---------------------------------------------------------------- 화면의 다른 업무 두 개
+
+-- 화면(frontend/src/mock/fixtures.js)에는 업무가 셋인데 각각 다른 고객을 가리킨다.
+-- 이 둘이 없으면 Consumer Mandate 가 없어 Task Passport 를 발급할 수 없고, 화면은
+-- 422 "Task Passport를 발급할 수 없는 상태입니다" 로 막힌다 — 이슈 #115.
+--
+-- 시드만 채워서는 부족했다. Agent 시나리오가 대상 고객을 값에 박아 두고 있어서 어떤 사건이든
+-- CUST-1001 을 조회했고, 사건이 CUST-2001 이면 customerScope 위반으로 막혔다. 같은 이슈에서
+-- Core→Agent 계약에 caseConsumerId 를 넣어 정상 시나리오가 사건의 고객을 보게 고쳤다.
+
+insert into consumer_mandates (consumer_id, purpose, status, version)
+values ('CUST-2001', 'LOAN_REVIEW', 'ACTIVE', 1),
+       ('CUST-3001', 'LOAN_REVIEW', 'ACTIVE', 1)
+on conflict (consumer_id, purpose) do update
+    set status = excluded.status,
+        version = consumer_mandates.version + 1;
+
+delete
+from consumer_mandate_allowed_data
+where mandate_id in (
+    select mandate_id
+    from consumer_mandates
+    where consumer_id in ('CUST-2001', 'CUST-3001')
+      and purpose = 'LOAN_REVIEW'
+);
+
+-- CUST-2001: 한도 재심사라 상환능력을 다 본다.
+insert into consumer_mandate_allowed_data (mandate_id, data_type)
+select m.mandate_id, d.data_type
+from consumer_mandates m
+         cross join (values ('CREDIT_SCORE'), ('INCOME'), ('DEBT')) as d(data_type)
+where m.consumer_id = 'CUST-2001'
+  and m.purpose = 'LOAN_REVIEW'
+on conflict (mandate_id, data_type) do nothing;
+
+-- CUST-3001: 서류 보완 확인이라 소득 자료 동의가 없다. 화면 Mock 의 감사 기록도 이 고객의
+-- INCOME_READ 를 MANDATE_SCOPE_VIOLATION 으로 그리고 있다 — 시드와 화면이 같은 이야기를 한다.
+insert into consumer_mandate_allowed_data (mandate_id, data_type)
+select m.mandate_id, d.data_type
+from consumer_mandates m
+         cross join (values ('CREDIT_SCORE'), ('DEBT')) as d(data_type)
+where m.consumer_id = 'CUST-3001'
   and m.purpose = 'LOAN_REVIEW'
 on conflict (mandate_id, data_type) do nothing;
 

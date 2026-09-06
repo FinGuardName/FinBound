@@ -87,7 +87,7 @@ wget -q -O /dev/null --header="X-FinGuard-Internal-Credential: $credential" \
 credential="$(cat /run/secrets/FINGUARD_INTERNAL_CREDENTIAL)"
 wget -qO- --header="X-FinGuard-Internal-Credential: $credential" \
   --header='Content-Type: application/json' \
-  --post-data='{"agentRunId":"RUN-COMPOSE-MISSING","passportId":"PASS-COMPOSE-MISSING","scenario":"NORMAL_CREDIT_SCORE"}' \
+  --post-data='{"agentRunId":"RUN-COMPOSE-MISSING","passportId":"PASS-COMPOSE-MISSING","caseConsumerId":"CUST-1001","scenario":"NORMAL_CREDIT_SCORE"}' \
   http://localhost:8082/internal/v1/agent-simulations | grep -q '"decision":"BLOCK"'
 '@
     Write-Output 'PASS: Gateway credential accepted by Mock Finance; Agent -> Gateway unknown-run fail-closed BLOCK'

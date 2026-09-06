@@ -85,6 +85,7 @@ class AgentSimulationFlowIntegrationTest {
                         {
                           "agentRunId": "RUN-CORE-001",
                           "passportId": "PASS-CORE-001",
+                          "caseConsumerId": "CUST-1001",
                           "scenario": "NORMAL_CREDIT_SCORE"
                         }
                         """)
@@ -103,6 +104,8 @@ class AgentSimulationFlowIntegrationTest {
         assertThat(captured.body()).contains(
                 "\"agentRunId\":\"RUN-CORE-001\"",
                 "\"passportId\":\"PASS-CORE-001\"",
+                // Gateway 로 가는 본문에는 caseConsumerId 가 없다. 그것은 Core→Agent 계약이고,
+                // Agent 는 시나리오에 따라 실제 조회 대상을 정해 targetConsumerId 로 보낸다.
                 "\"targetConsumerId\":\"CUST-1001\"",
                 "\"tool\":\"CREDIT_SCORE_READ\"",
                 "\"requestedData\":[\"CREDIT_SCORE\"]",
@@ -127,11 +130,14 @@ class AgentSimulationFlowIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {
         "{}",
-        "{\"passportId\":\"PASS-CORE-001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
+        "{\"passportId\":\"PASS-CORE-001\",\"caseConsumerId\":\"CUST-1001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
         "{\"agentRunId\":\"RUN-CORE-001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
-        "{\"agentRunId\":null,\"passportId\":\"PASS-CORE-001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
-        "{\"agentRunId\":\" \",\"passportId\":\"PASS-CORE-001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
-        "{\"agentRunId\":\"RUN-CORE-001\",\"passportId\":\" \",\"scenario\":\"NORMAL_CREDIT_SCORE\"}"
+        "{\"agentRunId\":null,\"passportId\":\"PASS-CORE-001\",\"caseConsumerId\":\"CUST-1001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
+        "{\"agentRunId\":\" \",\"passportId\":\"PASS-CORE-001\",\"caseConsumerId\":\"CUST-1001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
+        "{\"agentRunId\":\"RUN-CORE-001\",\"passportId\":\" \",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
+        // caseConsumerId 도 필수다. 빠지거나 비면 같은 400 이어야 한다 — 이슈 #115.
+        "{\"agentRunId\":\"RUN-CORE-001\",\"passportId\":\"PASS-CORE-001\",\"scenario\":\"NORMAL_CREDIT_SCORE\"}",
+        "{\"agentRunId\":\"RUN-CORE-001\",\"passportId\":\"PASS-CORE-001\",\"caseConsumerId\":\" \",\"scenario\":\"NORMAL_CREDIT_SCORE\"}"
     })
     void missingOrBlankReferencesNeverReachGateway(String body) {
         simulate(body).expectStatus().isBadRequest()
@@ -152,7 +158,7 @@ class AgentSimulationFlowIntegrationTest {
 
         simulate("""
                 {"agentRunId":"RUN-NOT-ISSUED","passportId":"PASS-NOT-ISSUED",
-                 "scenario":"NORMAL_CREDIT_SCORE"}
+                 "caseConsumerId":"CUST-1001","scenario":"NORMAL_CREDIT_SCORE"}
                 """).expectStatus().isOk().expectBody()
                 .jsonPath("$.gatewayResponse.decision").isEqualTo("BLOCK")
                 .jsonPath("$.gatewayResponse.reasonCodes[0]").isEqualTo("CONTEXT_NOT_FOUND")
@@ -231,7 +237,7 @@ class AgentSimulationFlowIntegrationTest {
 
     private String validRequest(String scenario) {
         return """
-                {"agentRunId":"RUN-CORE-001","passportId":"PASS-CORE-001","scenario":"%s"}
+                {"agentRunId":"RUN-CORE-001","passportId":"PASS-CORE-001","caseConsumerId":"CUST-1001","scenario":"%s"}
                 """.formatted(scenario);
     }
 

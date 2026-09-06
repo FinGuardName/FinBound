@@ -168,7 +168,7 @@ class AgentAttackScenarioIntegrationTest {
                 .header("X-FinGuard-Internal-Credential", "scenario-test-internal")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
-                        {"agentRunId":"RUN-CORE-060","passportId":"PASS-CORE-060","scenario":"%s"}
+                        {"agentRunId":"RUN-CORE-060","passportId":"PASS-CORE-060","caseConsumerId":"CUST-1001","scenario":"%s"}
                         """.formatted(scenario))
                 .exchange();
     }
