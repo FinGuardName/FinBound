@@ -128,9 +128,46 @@ dd { margin: 5px 0 0; color: #26334b; font-size: .75rem; font-weight: 650; }
 .task-control textarea { min-height: 46px; resize: vertical; line-height: 1.5; }
 .task-control select:focus, .task-control textarea:focus { border-color: var(--primary); outline: none; }
 .task-control small { color: #78869a; font-size: .57rem; line-height: 1.45; }
+.task-control .compatibility-select { display: none; }
 .instruction-presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset-button { border: 1px solid #d8dfea; border-radius: 999px; padding: 5px 10px; color: #5a6a80; background: #fff; font-size: .57rem; cursor: pointer; }
 .preset-button:hover { border-color: var(--primary); color: #2258bd; }
+.verification-section { display: grid; gap: 9px; padding-top: 2px; }
+.verification-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+.verification-heading > div { display: grid; gap: 3px; }
+.verification-heading span { color: #0b3f72; font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.verification-heading strong { color: #24384d; font-size: .72rem; }
+.verification-heading > small { padding: 4px 7px; border-radius: 99px; color: #5f7083; background: #eaf0f4; font-size: .5rem; font-weight: 700; }
+.verification-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.verification-card { min-width: 0; display: grid; gap: 5px; padding: 11px; border: 1px solid #d8e2e8; border-radius: 9px; color: #35485d; background: #fff; text-align: left; cursor: pointer; }
+.verification-card:hover { border-color: #7accc9; transform: translateY(-1px); }
+.verification-card.active { border-color: #00aaa6; background: linear-gradient(145deg, #effbf9, #fff); box-shadow: inset 0 0 0 1px rgba(0,170,166,.1); }
+.verification-card > span { color: #748397; font-size: .49rem; font-weight: 800; }
+.verification-card > strong { color: #23394f; font-size: .63rem; }
+.verification-card > small { min-height: 30px; color: #718095; font-size: .51rem; line-height: 1.45; }
+.verification-card > i { color: #087b77; font-size: .49rem; font-style: normal; font-weight: 750; }
+.planned-request { display: grid; gap: 9px; padding: 12px 13px; border: 1px solid #c8dbe4; border-radius: 9px; background: linear-gradient(135deg, #f0f8fb, #fff); }
+.planned-request > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.planned-request > div span { color: #53677d; font-size: .55rem; font-weight: 700; }
+.planned-request > div strong { color: #0b4e72; font-size: .66rem; }
+.planned-request dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 0; }
+.planned-request dl div { padding: 8px 9px; border-radius: 7px; background: rgba(255,255,255,.85); }
+.planned-request dt { color: #7a889a; font-size: .49rem; }
+.planned-request dd { margin: 3px 0 0; color: #273b51; font-size: .58rem; overflow-wrap: anywhere; }
+.planned-request p { margin: 0; color: #708095; font-size: .51rem; line-height: 1.45; }
+.submitted-plan { display: flex; align-items: center; gap: 10px; padding: 11px 21px; border-bottom: 1px solid #e2e9ee; background: #f8fafb; }
+.submitted-plan span { color: #728196; font-size: .52rem; font-weight: 750; }
+.submitted-plan strong { color: #2a3d52; font-size: .62rem; }
+.submitted-plan small { margin-left: auto; color: #5f7185; font-size: .53rem; }
+.gate-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; padding: 16px 21px; border-bottom: 1px solid #e1e8ed; background: #fbfcfd; }
+.gate-card { position: relative; display: grid; gap: 5px; min-height: 90px; padding: 12px; border: 1px solid #dde5ea; border-radius: 9px; background: #fff; }
+.gate-card::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; border-radius: 9px 0 0 9px; background: #acb7c4; }
+.gate-card > span { color: #748397; font-size: .5rem; font-weight: 800; }
+.gate-card > strong { color: #3b4f63; font-size: .7rem; }
+.gate-card > small { color: #778599; font-size: .5rem; line-height: 1.4; }
+.gate-card.pass::before { background: #00aaa6; }.gate-card.pass > strong { color: #087873; }
+.gate-card.alert::before { background: #e69b21; }.gate-card.alert { background: #fffaf0; }.gate-card.alert > strong { color: #9a5b06; }
+.gate-card.block::before { background: #d94656; }.gate-card.block { background: #fff8f8; }.gate-card.block > strong { color: #b52d3e; }
 .employee-guide { margin: -3px 0 0; color: #718096; text-align: center; font-size: .59rem; line-height: 1.45; }
 
 .guardrail-panel { border-top: 3px solid #3d78d7; background: #fff; }
@@ -723,6 +760,16 @@ main { padding: 30px clamp(28px, 3.2vw, 48px) 48px; }
 .boundary-narrowing span { font-size: 1.55rem; }
 .boundary-narrowing small { margin-top: -5px; font-size: .48rem; }
 .guardrail-lower { display: grid; grid-template-columns: minmax(245px, 1.1fr) minmax(170px, .9fr); gap: 12px; align-items: center; margin: 17px 0 18px; }
+.guardrail-more { margin-top: 16px; border: 1px solid #dce7e9; border-radius: 10px; background: #f8fbfc; overflow: hidden; }
+.guardrail-more > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; color: #30465b; cursor: pointer; list-style: none; font-size: .64rem; font-weight: 750; }
+.guardrail-more > summary::-webkit-details-marker { display: none; }
+.guardrail-more > summary small { display: inline-flex; align-items: center; gap: 7px; color: #087b77; font-size: .54rem; font-weight: 750; }
+.guardrail-more > summary small::after { content: '⌄'; font-size: .75rem; transition: transform 150ms ease; }
+.guardrail-more[open] > summary { border-bottom: 1px solid #dce7e9; background: #fff; }
+.guardrail-more[open] > summary small::after { transform: rotate(180deg); }
+.guardrail-more-content { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 18px; padding: 16px; }
+.guardrail-more-content .guardrail-lower { margin: 0; }
+.guardrail-more-content .security-details { margin-top: 0; align-self: stretch; }
 .guardrail-subtitle { margin: 0; color: #34485f; font-size: .68rem; font-weight: 750; }
 .protection-rules { gap: 12px; margin-top: 12px; }
 .protection-rules li { gap: 9px; }
@@ -791,6 +838,7 @@ main { padding: 30px clamp(28px, 3.2vw, 48px) 48px; }
   .work-card { min-height: 88px; }
   .work-detail-grid { grid-template-columns: minmax(0, 1fr); }
   .guardrail-lower { grid-template-columns: minmax(0, 1fr) 190px; }
+  .verification-grid, .gate-board { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 720px) {
@@ -826,6 +874,107 @@ main { padding: 30px clamp(28px, 3.2vw, 48px) 48px; }
   .boundary-narrowing small { display: none; }
   .assistant-intro { grid-template-columns: auto 1fr; }
   .protected-label { grid-column: 2; }
+}
+
+/* AI 업무 안전 현황 — shared FinBound workspace language */
+.agent-workspace .bank-work-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+.work-protection-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.work-protection-panel .bank-workbench,
+.work-protection-panel .guardrail-panel {
+  background: transparent;
+  box-shadow: none;
+}
+.work-protection-panel .guardrail-panel {
+  margin-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+}
+.work-protection-panel .guardrail-copy { margin-bottom: 0; }
+.guardrail-body { display: grid; gap: 14px; margin-top: 9px; }
+.guardrail-scope-note { display: grid; gap: 3px; margin: 9px 0 0; padding: 8px 10px; border-left: 3px solid #00aaa6; border-radius: 0 6px 6px 0; color: #68798b; background: #f3f9f9; font-size: .58rem; line-height: 1.4; }
+.guardrail-scope-note strong { color: #30465b; font-size: .62rem; }
+.guardrail-body .guardrail-lower { margin: 0; }
+.guardrail-body .guardrail-lower { align-items: start; }
+.guardrail-body .security-details { margin-top: 0; }
+.agent-demo-panel {
+  min-width: 0;
+  display: flex;
+  padding: 0;
+  overflow: hidden;
+}
+.agent-demo-panel .agent-task-form {
+  width: 100%;
+  margin: 0;
+  padding: 24px;
+  border: 0;
+  border-radius: 0;
+}
+.agent-demo-panel .assistant-intro h3 { font-size: .86rem; }
+.agent-demo-panel .assistant-intro p { font-size: .7rem; }
+.agent-demo-panel .employee-request strong { font-size: .79rem; }
+.agent-demo-panel .employee-request p { font-size: .66rem; }
+.agent-demo-panel .verification-heading strong { font-size: .77rem; }
+.agent-demo-panel .verification-card > strong { font-size: .68rem; }
+.agent-demo-panel .verification-card > small { font-size: .56rem; }
+.agent-demo-panel .task-control > span { font-size: .68rem; }
+.agent-demo-panel .task-control textarea { min-height: 96px; padding: 12px; font-size: .72rem; }
+.agent-demo-panel .task-control small,
+.agent-demo-panel .planned-request p,
+.agent-demo-panel .employee-guide { font-size: .59rem; }
+.agent-demo-panel .planned-request > div strong { font-size: .72rem; }
+.agent-demo-panel .planned-request dd { font-size: .64rem; }
+.agent-demo-panel .run-agent-button { padding-block: 15px; font-size: .78rem; }
+
+/* Balanced two-column workspace refinements */
+.work-protection-panel .bank-workbench { padding-bottom: 17px; }
+.work-protection-panel .work-detail-grid { margin-top: 13px; }
+.work-protection-panel .employee-detail,
+.work-protection-panel .application-detail { padding: 12px 14px; }
+.work-protection-panel .employee-profile { margin-top: 12px; }
+.work-protection-panel .case-facts { margin-top: 9px; }
+.work-protection-panel .review-status { flex: none; min-height: 0; padding: 16px 2px 11px; }
+
+.agent-demo-panel .agent-task-form { gap: 17px; padding: 16px 24px 20px; }
+.agent-demo-panel .assistant-intro { min-height: 65px; padding-bottom: 12px; }
+.agent-demo-panel .assistant-intro h3 { font-size: .92rem; }
+.agent-demo-panel .assistant-intro p { font-size: .72rem; }
+.agent-demo-panel .protected-label { font-size: .61rem; }
+.agent-demo-panel .employee-request { padding: 10px 13px; }
+.agent-demo-panel .employee-request small { font-size: .6rem; }
+.agent-demo-panel .employee-request strong { font-size: .82rem; }
+.agent-demo-panel .employee-request p { font-size: .69rem; }
+.agent-demo-panel .verification-section { gap: 11px; }
+.agent-demo-panel .verification-heading span { font-size: .61rem; }
+.agent-demo-panel .verification-heading strong { font-size: .81rem; }
+.agent-demo-panel .verification-card { gap: 7px; padding: 12px; }
+.agent-demo-panel .verification-card > span { font-size: .53rem; }
+.agent-demo-panel .verification-card > strong { font-size: .72rem; }
+.agent-demo-panel .verification-card > small { font-size: .59rem; line-height: 1.5; }
+.agent-demo-panel .verification-card > i { font-size: .53rem; }
+.agent-demo-panel .task-controls { gap: 15px; }
+.agent-demo-panel .task-control { gap: 7px; }
+.agent-demo-panel .task-control > span { font-size: .72rem; }
+.agent-demo-panel .task-control textarea { min-height: 122px; padding: 13px; font-size: .76rem; }
+.agent-demo-panel .task-control small,
+.agent-demo-panel .planned-request p,
+.agent-demo-panel .employee-guide { font-size: .62rem; }
+.agent-demo-panel .planned-request { gap: 10px; padding: 13px 14px; }
+.agent-demo-panel .planned-request > div strong { font-size: .76rem; }
+.agent-demo-panel .planned-request dd { font-size: .67rem; }
+.agent-demo-panel .run-agent-button { min-height: 0; padding-block: 11px; font-size: .86rem; }
+@media (max-width: 1080px) {
+  .agent-workspace .bank-work-grid { grid-template-columns: minmax(0, 1fr); }
+  .guardrail-more-content { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* AI 업무 안전 현황 — shared FinBound workspace language */

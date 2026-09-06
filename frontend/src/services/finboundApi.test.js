@@ -58,6 +58,19 @@ describe('real Core API adapter', () => {
           scopeStatus: { customerScope: 'OK' },
         }],
       }))
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{
+          auditEventId: 'AUD-REAL-1',
+          requestId: 'REQ-REAL-1',
+          status: 'COMPLETED',
+          decision: 'ALLOW',
+          promptRiskLevel: 'ALERT',
+          promptRisk: 0.72,
+          severity: 'HIGH',
+          riskFlagged: true,
+          reasonCodes: [],
+        }],
+      }))
 
     configureFinboundApi({
       mode: 'real',
@@ -68,7 +81,7 @@ describe('real Core API adapter', () => {
 
     const result = await finboundApi.executeAgentTask({ workId: 'NEW_LOAN' })
 
-    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    expect(fetchImpl).toHaveBeenCalledTimes(4)
     expect(fetchImpl.mock.calls[0][0]).toBe('http://localhost:8080/api/v1/agent-runs')
     expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer operator-test-credential')
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
@@ -79,6 +92,7 @@ describe('real Core API adapter', () => {
     })
     expect(fetchImpl.mock.calls[1][0]).toContain('/api/v1/agent-runs/RUN-REAL-1/permission-comparison')
     expect(fetchImpl.mock.calls[2][0]).toContain('/api/v1/agent-runs/RUN-REAL-1/execution')
+    expect(fetchImpl.mock.calls[3][0]).toContain('/api/v1/audit-events?page=1&pageSize=100')
     expect(fetchImpl.mock.calls.every(([url]) => !url.includes('/internal/'))).toBe(true)
     expect(result.status).toBe('COMPLETED')
     expect(result.attempts[0]).toMatchObject({
@@ -88,6 +102,7 @@ describe('real Core API adapter', () => {
       downstreamReached: true,
       responseReleased: true,
     })
+    expect(result.audit).toMatchObject({ promptRiskLevel: 'ALERT', riskFlagged: true })
     expect(result.resultItems).toContain('정상 확인 1건')
     expect(result.agentRun).toMatchObject({
       agentRunId: 'RUN-REAL-1',

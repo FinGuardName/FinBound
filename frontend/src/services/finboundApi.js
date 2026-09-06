@@ -316,7 +316,7 @@ function mapAgentExecution(agentRun, permission, execution) {
       `정상 확인 ${allowedCount}건`,
       `안전 차단 ${blockedCount}건`,
       `처리 오류 ${errorCount}건`,
-      ...(executionReasonCodes.length ? [`오류 사유 ${executionReasonCodes.join(' · ')}`] : []),
+      ...(executionReasonCodes.length ? [`판정 사유 ${executionReasonCodes.join(' · ')}`] : []),
     ],
     nextAction: status === 'ERROR' || errorCount
       ? '업무 기록에서 오류 사유를 확인한 뒤 재처리해 주세요.'
@@ -324,6 +324,19 @@ function mapAgentExecution(agentRun, permission, execution) {
     attempts,
     agentRun,
     permission,
+  }
+}
+
+async function findExecutionAudit(execution) {
+  const requestIds = new Set((execution.attempts ?? []).map((attempt) => attempt.requestId))
+  if (!requestIds.size) return null
+  try {
+    const page = await coreRequest('/api/v1/audit-events?page=1&pageSize=100')
+    const raw = (page.items ?? []).find((event) => requestIds.has(event.requestId))
+    return raw ? mapAuditEvent(raw) : null
+  } catch {
+    // 실행 결과 자체는 유효하다. 보조 감사 정보 조회 실패가 업무 결과를 덮지 않게 한다.
+    return null
   }
 }
 
@@ -391,8 +404,9 @@ const realApi = {
       })
       permission = await coreRequest(`/api/v1/agent-runs/${encodeURIComponent(agentRun.agentRunId)}/permission-comparison`)
       const execution = await waitForAgentExecution(agentRun.agentRunId)
-
-      return mapAgentExecution(agentRun, permission, execution)
+      const mapped = mapAgentExecution(agentRun, permission, execution)
+      mapped.audit = await findExecutionAudit(execution)
+      return mapped
     } catch (error) {
       if (!agentRun) throw error
       throw new FinboundApiError(error.message, {
