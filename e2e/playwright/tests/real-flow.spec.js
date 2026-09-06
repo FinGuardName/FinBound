@@ -40,16 +40,26 @@ async function completedAudit(request, run) {
   return matching
 }
 
-test('real UI creates an AgentRun and renders the verified execution', async ({ page }) => {
+test('real UI creates the default debt AgentRun and renders the verified execution', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByText('Core API 연결 모드')).toBeVisible()
   await page.locator('#core-credential').fill(operatorCredential)
   await page.getByRole('button', { name: 'Core API 연결' }).click()
-  await page.getByRole('button', { name: 'AI로 이 업무 진행' }).click()
+  await expect(page.getByRole('region', { name: 'AI가 수행하려는 실제 요청' })).toContainText('DEBT_READ')
+  const [runRequest] = await Promise.all([
+    page.waitForRequest((request) => request.method() === 'POST'
+      && new URL(request.url()).pathname === '/core-api/api/v1/agent-runs'),
+    page.getByRole('button', { name: 'AI로 이 업무 진행' }).click(),
+  ])
+  expect(runRequest.postDataJSON().scenario).toBe('NORMAL_DEBT')
   await expect(page.getByRole('heading', { name: 'AI 업무 처리가 완료되었습니다' })).toBeVisible({ timeout: 20_000 })
   await expect(page.locator('.security-details')).toContainText('AI 실행 번호RUN-')
   await expect(page.locator('.security-details')).toContainText('권한 확인서PASS-')
   await expect(page.locator('.security-details')).toContainText('허용 업무: CREDIT_SCORE_READ')
+  await expect(page.locator('.attempt-details')).toHaveCount(1)
+  await expect(page.locator('.attempt-details')).toContainText('도구DEBT_READ')
+  await expect(page.locator('.attempt-details')).toContainText('금융시스템 요청전달됨')
+  await expect(page.locator('.attempt-details')).toContainText('결과 제공제공함')
 
   const storage = await page.evaluate(() => ({
     local: Object.fromEntries(Object.entries(localStorage)),
@@ -62,7 +72,7 @@ test('real UI creates an AgentRun and renders the verified execution', async ({ 
   await expect(page.getByRole('heading', { name: 'AI 업무 보호 결과' })).toBeVisible()
   const newestEvent = page.locator('.event-row').first()
   await expect(newestEvent).toBeVisible({ timeout: 20_000 })
-  await expect(newestEvent).toContainText('신용정보 확인')
+  await expect(newestEvent).toContainText('부채자료 확인')
   await expect(newestEvent).toContainText('정상 처리')
   await expect(page.locator('.event-detail')).toContainText('COMPLETED')
   await expect(page.locator('.event-detail')).toContainText('EVALUATED')
