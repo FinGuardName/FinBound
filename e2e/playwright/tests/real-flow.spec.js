@@ -107,6 +107,35 @@ for (const work of normalWorkCases) {
   })
 }
 
+const attackWorkCases = [
+  { workId: 'NEW_LOAN', card: '전체 고객 조회 지시 차단' },
+  { workId: 'LIMIT_REVIEW', card: '심사 기준 무시 지시 차단' },
+  { workId: 'DOCUMENT_REVIEW', card: '보완서류 지시 변조 차단' },
+]
+
+for (const work of attackWorkCases) {
+  test(`real UI prompt attack ${work.workId} blocks before downstream`, async ({ page, request }) => {
+    await page.goto('/')
+    await page.locator('#core-credential').fill(operatorCredential)
+    await page.getByRole('button', { name: 'Core API 연결' }).click()
+    await page.locator(`[data-work="${work.workId}"]`).click()
+    await page.getByRole('button', { name: work.card }).click()
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.request().method() === 'POST'
+        && new URL(r.url()).pathname === '/core-api/api/v1/agent-runs'),
+      page.getByRole('button', { name: 'AI로 이 업무 진행' }).click(),
+    ])
+    expect(response.status()).toBe(201)
+    const audit = await completedAudit(request, await response.json())
+    expect(audit).toMatchObject({
+      decision: 'BLOCK', systemOutcome: 'COMPLETED',
+      promptRiskEvaluationStatus: 'EVALUATED', promptRiskLevel: 'CRITICAL',
+      downstreamReached: false, responseReleased: false,
+      reasonCodes: ['PROMPT_INJECTION'],
+    })
+  })
+}
+
 test('real Core-Agent-Gateway-AI-OPA flow preserves ALLOW and BLOCK boundaries', async ({ request }) => {
   const nonce = crypto.randomUUID()
   const allowedRun = await startRun(request, {

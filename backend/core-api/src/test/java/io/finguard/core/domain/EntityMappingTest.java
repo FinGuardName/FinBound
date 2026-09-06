@@ -331,7 +331,7 @@ class EntityMappingTest {
         em.persist(agentRun(List.of("INPUT-900")));
         em.persist(new SecuredAgentInput("INPUT-900", "RUN-900", "sha256:abc", "ko", ISSUED));
         PromptRiskSnapshot snapshot =
-                PromptRiskSnapshot.notEvaluated("INPUT-900", "sha256:abc", "prompt-guard-6", ISSUED);
+                PromptRiskSnapshot.notEvaluated("INPUT-900", "sha256:abc", "prompt-guard-7", ISSUED);
         em.persist(snapshot);
         em.flush();
         em.clear();
@@ -345,7 +345,7 @@ class EntityMappingTest {
         assertThat(found.getRiskLevel()).isEqualTo(PromptRiskLevel.LOW);
         assertThat(found.getAttackType()).isNull();
         assertThat(found.getMatchedRules()).isEmpty();
-        assertThat(found.getModelVersion()).isEqualTo("prompt-guard-6");
+        assertThat(found.getModelVersion()).isEqualTo("prompt-guard-7");
         assertThat(found.getInputRef()).isEqualTo("INPUT-900");
         assertThat(found.getInputHash()).isEqualTo("sha256:abc");
         assertThat(found.getEvaluatedAt()).isEqualTo(ISSUED);

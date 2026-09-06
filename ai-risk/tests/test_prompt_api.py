@@ -65,7 +65,7 @@ def test_prompt_endpoint_returns_contract_without_raw_input_or_decision() -> Non
     assert payload["attackType"] is None
     assert payload["matchedRules"] == []
     assert payload["inputHash"] == input_hash(text)
-    assert payload["modelVersion"] == "prompt-guard-6"
+    assert payload["modelVersion"] == "prompt-guard-7"
     assert "evaluatedAt" in payload
     assert "decision" not in payload
     assert text not in response.text

@@ -24,7 +24,7 @@
   "promptRiskEvaluationStatus": "EVALUATED",
   "promptRisk": 0.05,
   "promptRiskLevel": "LOW",
-  "promptModelVersion": "prompt-guard-6",
+  "promptModelVersion": "prompt-guard-7",
   "behaviorRisk": 0.21,
   "behaviorRiskLevel": "LOW",
   "behaviorFeatureVersion": "behavior-features-1",

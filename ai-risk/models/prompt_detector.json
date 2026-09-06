@@ -1,5 +1,5 @@
 {
-  "modelVersion": "prompt-guard-6",
+  "modelVersion": "prompt-guard-7",
   "modelId": "HikmaAI/hikmaai-mdeberta-v3-base-prompt-injection",
   "modelRevision": "ad81120116b9ec21bc5f47ffd5a2e0dccc803fe8",
   "modelArtifactPath": "onnx/int8/model_quantized.onnx",
