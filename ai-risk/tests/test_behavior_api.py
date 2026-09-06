@@ -122,6 +122,7 @@ def test_first_twenty_rapid_after_hours_attempts_do_not_become_critical() -> Non
     assert all(response.json()["behaviorRiskLevel"] != "CRITICAL" for response in responses)
     assert responses[5].json()["historyStatus"] == "READY"
     assert responses[-1].json()["behaviorRiskLevel"] == "ALERT"
+    assert responses[-1].json()["behaviorRisk"] == 0.9999
 
 
 def test_sustained_rapid_after_hours_pattern_is_critical() -> None:
