@@ -20,6 +20,12 @@ ContextResolveService 는 Consumer Mandate 를 **요청 대상이 아니라 Pass
     실행 CUST-1002 + TOOL_SCOPE_ATTACK -> TOOL_SCOPE_VIOLATION, DATA_SCOPE_VIOLATION,
                                           MANDATE_SCOPE_VIOLATION
 
+## 행동 이상 관문은 이 스크립트가 직접 시험하지 않는다
+
+아홉 경우를 연달아 쏘면 그 트래픽 자체가 짧은 시간의 반복 호출이라 행동 이상 관문이
+정당하게 걸린다. 그래서 여기서는 BEHAVIOR_ANOMALY 를 대조에서 빼고 표시만 한다.
+행동 관문의 실제 검증은 간격을 두고 이력을 쌓는 별도 절차가 필요하다 — 이슈 #117.
+
 **이전 판의 이 스크립트는 전부 CUST-1001 로 보내고 decision == BLOCK 만 봤다.**
 그래서 공격 넷 중 셋의 의도한 방어가 한 번도 발동하지 않았는데 7/7 PASS 로 찍혔다.
 차단됐다는 것과 의도한 이유로 차단됐다는 것은 다른 이야기다 — 이슈 #114, #115.
@@ -155,10 +161,29 @@ def main():
 
         decision = audit.get("decision") or "-"
         reasons = set(audit.get("reasonCodes") or [])
-        # 판정과 사유를 함께 본다. 차단됐다는 것과 의도한 이유로 차단됐다는 것은 다르다.
-        ok = decision == want_decision and reasons == want_reasons
+
+        # 이 스크립트는 아홉 경우를 연달아 쏜다. 그 자체가 짧은 시간의 반복 호출이라
+        # 행동 이상 관문이 **정당하게** 걸린다. 이슈 #117 을 고쳐 관문이 살아난 뒤
+        # 나타난 현상이고, 시스템이 옳게 동작한 결과이지 결함이 아니다.
+        #
+        # 그래서 행동 축을 다른 축과 분리해 판정한다. 범위 검사와 프롬프트 관문이
+        # 의도대로 동작했는지가 이 스크립트가 보려는 것이고, 행동 관문은 하네스의
+        # 트래픽 모양에 좌우되므로 따로 표시만 한다.
+        BEHAVIOR = "BEHAVIOR_ANOMALY"
+        harness_noise = BEHAVIOR in reasons and BEHAVIOR not in want_reasons
+        compared = reasons - {BEHAVIOR} if harness_noise else reasons
+
+        if want_decision == "ALLOW":
+            # 정상 업무: 범위 검사를 통과해야 한다. 행동 관문만으로 막힌 것은
+            # 하네스가 만든 상황이므로 통과로 본다 — 다만 표시는 남긴다.
+            ok = compared == want_reasons and (
+                decision == "ALLOW" or (decision == "BLOCK" and harness_noise))
+        else:
+            ok = decision == want_decision and compared == want_reasons
         failures += 0 if ok else 1
         shown = ",".join(sorted(reasons)) or "-"
+        if harness_noise:
+            shown += "  (연속 호출이 만든 부수 판정)"
         mark = "PASS" if ok else "FAIL"
         print(f"{name:<22} {consumer:<10} {want_decision:<6} {decision:<6} "
               f"{mark:<5} {shown}")
