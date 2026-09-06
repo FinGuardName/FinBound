@@ -220,6 +220,10 @@ public class AuditEvent {
         }
         this.employeeId = context.employeeId();
         this.passportId = context.passportId();
+        // Gateway 는 인가보다 먼저 감사행을 만들어 이 시점에 caseId 를 모른다. Resolver 를 거친
+        // 지금이 처음 알게 되는 자리다. 비워 두면 다음 실행의 행동 이력에서 이 기록이 통째로
+        // 버려진다 — AiClientImpl.isCompleteEvent 가 caseId 를 요구한다(이슈 #117).
+        this.caseId = context.caseId();
         this.requestedData.clear();
         this.requestedData.addAll(context.requestedData());
         this.scopeStatus = context.scopeStatus();
@@ -241,6 +245,7 @@ public class AuditEvent {
         return new ResolvedAuditContext(
                 employeeId,
                 passportId,
+                caseId,
                 requestedData,
                 scopeStatus,
                 promptRisk,
