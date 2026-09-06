@@ -50,6 +50,7 @@ public class AuthorizationService {
             BehaviorHistory history = coreClient.behaviorHistory(identity, "5m", requestId, traceparent);
             BehaviorRiskResult behavior = aiClient.evaluateBehavior(
                 identity, request, resolvedContext, history, requestId, traceparent, requestedAt);
+            logBehaviorEvidence(requestId, traceparent, history, behavior);
             AuthorizationContext context = new AuthorizationContext(
                 requestId,
                 resolvedContext.scopeStatus(),
@@ -90,6 +91,36 @@ public class AuthorizationService {
             behavior.behaviorRisk(),
             behavior.behaviorRiskLevel(),
             behavior.isAnomaly());
+    }
+
+    /**
+     * AI 가 무엇을 판단했는지 남긴다. 감사 기록에는 {@code behaviorRisk} 숫자만 저장되므로
+     * <strong>0.0 이 "모델이 정상이라 판단함" 인지 "모델이 아예 안 돌았음" 인지 구분할 수 없다.</strong>
+     * cold start 분기는 추론 없이 0.0 과 모델 버전을 함께 돌려주기 때문이다
+     * ({@code ai-risk/app/behavior/service.py} 의 {@code COLD_START_MIN_EVENTS}).
+     *
+     * <p>이력이 몇 건 들어갔는지도 함께 남긴다. 실제로 이 값이 0 인 채로 오래 방치돼
+     * 행동 이상 관문이 한 번도 발동하지 못한 적이 있다(이슈 #117).
+     *
+     * <p>감사 기록에 등급·상태를 저장하는 것이 근본 해법이지만 그것은 계약 변경이라 따로 간다.
+     * 여기서는 <strong>운영 진단만</strong> 연다 — 이 로그가 없다는 것이 추론이 돌지 않았다는
+     * 증거는 아니다. 점수나 원문 금융 데이터는 남기지 않는다({@code docs/06} §26).
+     */
+    private void logBehaviorEvidence(String requestId,
+                                     String traceparent,
+                                     BehaviorHistory history,
+                                     BehaviorRiskResult behavior) {
+        log.info(
+            "behaviorEvaluated requestId={} traceparent={} historyStatus={} historySize={} "
+                + "level={} anomaly={} featureVersion={} modelVersion={}",
+            requestId,
+            traceparent,
+            behavior.historyStatus(),
+            history.completedEvents() == null ? 0 : history.completedEvents().size(),
+            behavior.behaviorRiskLevel(),
+            behavior.isAnomaly(),
+            behavior.featureVersion(),
+            behavior.modelVersion());
     }
 
     private AuthorizationOutcome failClosed(String reasonCode, String requestId, Exception cause) {
