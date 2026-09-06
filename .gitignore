@@ -47,3 +47,6 @@ data/
 ai-risk/datasets/cache/
 coverage/
 htmlcov/
+
+# OpenTelemetry Java Agent — 로컬 추적 오버레이용. 25MB 라 받아서 쓴다.
+infrastructure/otel/*.jar

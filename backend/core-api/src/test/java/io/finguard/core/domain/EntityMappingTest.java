@@ -407,6 +407,7 @@ class EntityMappingTest {
                 new ResolvedAuditContext(
                         "EMP-900",
                         "PASS-900",
+                        "LOAN-2026-900",
                         EnumSet.of(DataType.CREDIT_SCORE),
                         new AuditScopeStatus(
                                 ScopeState.OK,
@@ -582,6 +583,7 @@ class EntityMappingTest {
         return new ResolvedAuditContext(
                 "EMP-900",
                 passportId,
+                "LOAN-2026-900",
                 EnumSet.of(DataType.CREDIT_SCORE),
                 new AuditScopeStatus(
                         ScopeState.OK,
