@@ -15,6 +15,18 @@ const getAllAuditEvents = async () => {
 }
 
 describe('FinBound P0 application', () => {
+  it('shows audit times in Korean time, not the raw UTC the API sends', async () => {
+    // 이 단언이 없어서 아홉 시간 어긋난 화면이 그대로 배포됐다 — 이슈 #124.
+    // Fixture 는 Core 와 같은 UTC 로 적혀 있다. 09:15:42Z 가 한국에서 18:15:42 다.
+    const wrapper = mount(App)
+    await wrapper.get('[data-screen="dashboard"]').trigger('click')
+    await flushPromises()
+
+    const firstRow = wrapper.get('.event-row')
+    expect(firstRow.text()).toContain('18:15:42')
+    expect(firstRow.text()).not.toContain('09:15:42')
+  })
+
   it('uses one label source for the compact navigation and page heading', async () => {
     const wrapper = mount(App)
 
@@ -411,7 +423,7 @@ describe('FinBound P0 application', () => {
       status: 'PROCESSING',
       decision: null,
       behaviorRisk: 0,
-      requestedAt: '2026-09-03T10:00:00+09:00',
+      requestedAt: '2026-09-03T01:00:00Z',
     })
     vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 0, block: 0, error: 0 })
     vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
@@ -517,7 +529,7 @@ describe('FinBound P0 application', () => {
       behaviorRiskLevel: 'LOW',
       errorLocation: 'DOWNSTREAM',
       requestedData: ['CREDIT_SCORE'],
-      requestedAt: '2026-09-03T10:00:00+09:00',
+      requestedAt: '2026-09-03T01:00:00Z',
     })
     vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 0, block: 0, error: 1 })
     vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
@@ -664,7 +676,7 @@ describe('FinBound P0 application', () => {
       promptRiskLevel: 'ALERT',
       promptRisk: 0.55,
       behaviorRisk: 0.1,
-      requestedAt: '2026-09-03T10:00:00+09:00',
+      requestedAt: '2026-09-03T01:00:00Z',
     })
     vi.spyOn(finboundApi, 'getDashboardSummary').mockResolvedValue({ total: 1, allow: 1, block: 0, error: 0 })
     vi.spyOn(finboundApi, 'getAuditEvents').mockResolvedValue({
