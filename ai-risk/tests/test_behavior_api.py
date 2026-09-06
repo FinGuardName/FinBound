@@ -103,9 +103,30 @@ def test_behavior_endpoint_rejects_future_outcome_fields() -> None:
     assert response.status_code == 422
 
 
-def test_rapid_after_hours_pattern_is_critical() -> None:
+def test_first_twenty_rapid_after_hours_attempts_do_not_become_critical() -> None:
     now = datetime(2026, 8, 17, 23, 0, tzinfo=UTC)
-    history = [_event(index, now, interval_seconds=2) for index in range(18)]
+
+    responses = [
+        client.post(
+            "/internal/v1/risk/behavior",
+            json=_request(
+                [_event(index, now, interval_seconds=2) for index in range(history_count)],
+                now,
+            ),
+            headers=INTERNAL_HEADERS,
+        )
+        for history_count in range(20)
+    ]
+
+    assert all(response.status_code == 200 for response in responses)
+    assert all(response.json()["behaviorRiskLevel"] != "CRITICAL" for response in responses)
+    assert responses[5].json()["historyStatus"] == "READY"
+    assert responses[-1].json()["behaviorRiskLevel"] == "ALERT"
+
+
+def test_sustained_rapid_after_hours_pattern_is_critical() -> None:
+    now = datetime(2026, 8, 17, 23, 0, tzinfo=UTC)
+    history = [_event(index, now, interval_seconds=2) for index in range(20)]
 
     response = client.post(
         "/internal/v1/risk/behavior", json=_request(history, now), headers=INTERNAL_HEADERS

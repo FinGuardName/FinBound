@@ -120,6 +120,12 @@ fail-closed 처리합니다.
 부족한 `COLD_START`로 분류하고 중립 `LOW` 신호를 반환합니다. 이는 모델 장애를 낮은 Risk로
 대체하는 동작이 아니며, Scope·Prompt Risk·Hard Limit 정책은 계속 적용됩니다.
 
+유효한 완료 이력이 5건부터 쌓이면 모델 평가는 시작하되, 20건 미만의 짧은 누적 구간에서는
+`CRITICAL` 신호를 내지 않고 최대 `ALERT`로 제한합니다. 따라서 이상 징후는 감사 화면에 계속
+표시되지만 Behavior 신호만으로 초기 반복 시연이 차단되지는 않습니다. 20건의 완료 이력이 쌓인
+뒤에도 강한 이상 패턴이 이어지면 `CRITICAL`이 가능하며, Gateway Hard Limit은 이 조건과 별도로
+계속 적용됩니다.
+
 Synthetic Behavior 데이터는 Agent Session을 Group으로 묶어 Train/Validation/Held-out Test로
 분리합니다. Validation 정상 분포로 Calibration하고 Validation FPR 제약 안에서 Critical
 Threshold를 선택합니다. 선택한 Alert/Critical Threshold는 모델 Bundle에 한 번만 저장하고 Runtime은
